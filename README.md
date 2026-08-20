@@ -1,7 +1,7 @@
 # Hireflow
 Autonomous AI job-search agent for **All Things Agentic Hackathon 2026**
 
-by ar-Raqmi and Zach
+by ar-Raqmi and Izaaz
 
 What currently build:
 - `AGENTS.md` is for AI assistant knowledge.
