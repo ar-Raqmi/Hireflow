@@ -9,7 +9,7 @@ What currently build:
 - standard `.gitignore`.
 - Scaffold Agents and it's Prompt Engineering.
 - Standard `status` such as MATCHED, ROUTED, DONE, etc.
-- `storage` folder are AI created db calls, need to identify with Zach's Google Cloud.
+- `storage` folder are AI created db calls, need to identify with Izaaz's Google Cloud.
 - `tools` is a scrape and API calls for job searches website.
 
 Stack will be Vite + React.
