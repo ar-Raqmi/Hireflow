@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*service-account*.json
+*credentials*.json
+
+# Node (frontend later)
+node_modules/
+dist/
+.vite/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
