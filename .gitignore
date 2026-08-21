@@ -13,6 +13,11 @@ venv/
 !.env.example
 *service-account*.json
 *credentials*.json
+*-<hash>.json
+API.md
+
+# CLI session logs (audit artifacts)
+hireflow_session_*.json
 
 # Node (frontend later)
 node_modules/
