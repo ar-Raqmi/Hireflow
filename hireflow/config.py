@@ -3,12 +3,16 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 @dataclass(frozen=True)
 class Settings:
     project_id: str = field(default_factory=lambda: os.getenv("GCP_PROJECT_ID", ""))
     gemini_api_key: str = field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
-    vertex_location: str = field(default_factory=lambda: os.getenv("VERTEX_LOCATION", "us-central1"))
+    vertex_location: str = field(default_factory=lambda: os.getenv("VERTEX_LOCATION", "global"))
     gemini_model: str = field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-3.5-flash"))
     gemini_use_vertex: bool = field(default_factory=lambda: os.getenv("GEMINI_USE_VERTEX", "").lower() in {"1", "true", "yes"})
     firestore_collection_profiles: str = "profiles"
