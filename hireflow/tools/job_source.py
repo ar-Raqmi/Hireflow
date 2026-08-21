@@ -18,6 +18,8 @@ class JobSource(ABC):
     name: str = "base"
     _url: str = ""
     _rows_path: tuple[str, ...] = ()
+    _QUERY_STOPWORDS = {"remote", "onsite", "hybrid", "any", "worldwide", "anywhere"}
+    _REMOTEISH_MARKERS = ("remote", "worldwide", "anywhere", "distributed")
 
     async def search(self, query: str = "", location: str = "", limit: int = 25) -> list[JobPosting]:
         data = await self._fetch_json(self._url, self._params(query, location))
@@ -46,8 +48,19 @@ class JobSource(ABC):
     def _parse_row(self, row: dict) -> JobPosting: ...
 
     def _matches(self, job: JobPosting, query: str, location: str) -> bool:
-        if query and query.lower() not in job.title.lower():
+        if not job.title:
             return False
-        if location and location.lower() not in job.location.lower():
-            return False
+        if query:
+            tokens = [
+                token for token in query.lower().split()
+                if len(token) > 2 and token not in self._QUERY_STOPWORDS
+            ]
+            if tokens and not any(token in job.title.lower() for token in tokens):
+                return False
+        if location:
+            preferred = [part.strip().lower() for part in location.split(",") if part.strip()]
+            job_location = (job.location or "").lower()
+            if job_location and not any(marker in job_location for marker in self._REMOTEISH_MARKERS):
+                if not any(pref in job_location for pref in preferred):
+                    return False
         return True
