@@ -7,9 +7,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY hireflow ./hireflow
 
-ENV GCP_PROJECT_ID=""
-ENV GEMINI_API_KEY=""
-ENV VERTEX_LOCATION="us-central1"
+ENV GCP_PROJECT_ID="hireflow-506204"
+ENV GEMINI_API_KEY="AQ.Ab8RN6IhMzpu8QgRKLKgyGKYn8nJTazQ_Lnhf6KQNEvuts_Iag"
+ENV VERTEX_LOCATION="asia-southeast1"
 ENV GEMINI_MODEL="gemini-3.5-flash"
 ENV GEMINI_USE_VERTEX="true"
 
