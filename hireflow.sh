@@ -58,11 +58,15 @@ echo "work_type: ${WORK:-any}"
 
 # --- 3. locations ---
 LOCS=()
-printf '\nPreferred work locations (comma or space separated; blank = anywhere):\n'
+printf '\nPreferred work locations (comma separated; blank = anywhere):\n'
 printf '> '
 IFS= read -r line
 if [[ -n "$line" ]]; then
-  IFS=', ' read -r -a LOCS <<< "$line"
+  while IFS= read -r part; do
+    part="${part#"${part%%[![:space:]]*}"}"   # trim leading whitespace
+    part="${part%"${part##*[![:space:]]}"}"    # trim trailing whitespace
+    [[ -n "$part" ]] && LOCS+=("$part")
+  done < <(printf '%s' "$line" | tr ',' '\n')
 fi
 [[ "${#LOCS[@]}" -gt 0 ]] && echo "locations: ${LOCS[*]} (${#LOCS[@]})" || echo "locations: any"
 
