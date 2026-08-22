@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Any
 
 import httpx
@@ -12,7 +13,8 @@ class JobSource(ABC):
     """Contract for keyless job-board sources.
 
     Subclasses configure the request and row-shape; the shared template in
-    :meth:`search` handles fetch, parse, filter, and truncate.
+    :meth:`search` handles fetch, parse, filter, truncate, and failure
+    tolerance. A source that is down must degrade to ``[]``, never raise.
     """
 
     name: str = "base"
@@ -21,19 +23,46 @@ class JobSource(ABC):
     _QUERY_STOPWORDS = {"remote", "onsite", "hybrid", "any", "worldwide", "anywhere"}
     _REMOTEISH_MARKERS = ("remote", "worldwide", "anywhere", "distributed")
 
-    async def search(self, query: str = "", location: str = "", limit: int = 25) -> list[JobPosting]:
-        data = await self._fetch_json(self._url, self._params(query, location))
+    def __init__(self) -> None:
+        self._last_error: str | None = None
+
+    @property
+    def last_error(self) -> str | None:
+        return self._last_error
+
+    async def search(
+        self,
+        query: str = "",
+        location: str = "",
+        limit: int = 25,
+        work_type: str = "any",
+        locations: list[str] | None = None,
+    ) -> list[JobPosting]:
+        try:
+            params = self._params(query, location, work_type=work_type, locations=locations)
+            data = await self._fetch_json(self._url, params)
+        except (httpx.HTTPError, ValueError) as exc:
+            self._last_error = f"{type(exc).__name__}: {str(exc)[:300]}"
+            return []
         jobs = [self._parse_row(row) for row in self._extract_rows(data)]
         jobs = [job for job in jobs if self._matches(job, query, location)]
         return jobs[:limit]
 
     async def _fetch_json(self, url: str, params: dict[str, str] | None) -> Any:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.get(url, params=params)
             response.raise_for_status()
         return response.json()
 
-    def _params(self, query: str, location: str) -> dict[str, str] | None:
+    def _params(
+        self,
+        query: str,
+        location: str,
+        work_type: str = "any",
+        locations: list[str] | None = None,
+    ) -> dict[str, str] | None:
+        if query:
+            return {"q": query}
         return None
 
     def _extract_rows(self, data: Any) -> list[dict]:
@@ -64,3 +93,15 @@ class JobSource(ABC):
                 if not any(pref in job_location for pref in preferred):
                     return False
         return True
+
+    @staticmethod
+    def _parse_iso(value: Any) -> datetime | None:
+        if not value:
+            return None
+        if isinstance(value, datetime):
+            return value
+        normalized = str(value).replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(normalized)
+        except ValueError:
+            return None

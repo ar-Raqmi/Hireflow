@@ -30,6 +30,36 @@ class ApplicationStatus(str, Enum):
 
 
 @dataclass
+class WorkTypeClassifier:
+    """Deterministic work-type gate. Returns remote|hybrid|onsite|any."""
+
+    _REMOTE_MARKERS = ("remote", "work from anywhere", "work from home", "wfh", "telecommut", "fully online", "distributed", "worldwide", "anywhere")
+    _ONSITE_MARKERS = ("onsite", "on-site", "on site", "in-office", "in office", "on office", "office based", "office-based", "at the office")
+    _HYBRID_MARKERS = ("hybrid", "mix of remote", "part remote", "flexible work")
+    _ONLY_WORK_TYPE_VALUES = {"remote", "hybrid", "onsite", "any"}
+
+    @classmethod
+    def classify(cls, text: str | None) -> str:
+        lowered = (text or "").lower()
+        has_hybrid = any(marker in lowered for marker in cls._HYBRID_MARKERS)
+        remote_hits = sum(marker in lowered for marker in cls._REMOTE_MARKERS)
+        onsite_hits = sum(marker in lowered for marker in cls._ONSITE_MARKERS)
+        if has_hybrid:
+            return "hybrid"
+        if remote_hits and not onsite_hits:
+            return "remote"
+        if onsite_hits and not remote_hits:
+            return "onsite"
+        if remote_hits and onsite_hits:
+            return "hybrid" if remote_hits >= onsite_hits else "onsite"
+        return "any"
+
+    @classmethod
+    def is_valid(cls, value: str) -> bool:
+        return value.strip().lower() in cls._ONLY_WORK_TYPE_VALUES
+
+
+@dataclass
 class Profile:
     id: str = ""
     resume_text: str = ""
@@ -37,6 +67,8 @@ class Profile:
     years_experience: float = 0.0
     target_roles: list[str] = field(default_factory=list)
     locations: list[str] = field(default_factory=list)
+    work_type: str = "any"
+    residence: str = ""
     salary_floor: int | None = None
     culture_keywords: list[str] = field(default_factory=list)
     parsed_at: datetime | None = None
@@ -45,11 +77,13 @@ class Profile:
     def from_mapping(cls, data: dict[str, Any]) -> Profile:
         return cls(
             id=str(data.get("id", "")),
-            resume_text=data.get("resume_text", ""),
+            resume_text=str(data.get("resume_text", "") or ""),
             skills=list(data.get("skills", [])),
             years_experience=float(data.get("years_experience", 0.0)),
             target_roles=list(data.get("target_roles", [])),
             locations=list(data.get("locations", [])),
+            work_type=str(data.get("work_type", "any") or "any"),
+            residence=str(data.get("residence", "") or ""),
             salary_floor=data.get("salary_floor"),
             culture_keywords=list(data.get("culture_keywords", [])),
             parsed_at=_parse_datetime(data.get("parsed_at")),
@@ -63,6 +97,8 @@ class Profile:
             "years_experience": self.years_experience,
             "target_roles": self.target_roles,
             "locations": self.locations,
+            "work_type": self.work_type,
+            "residence": self.residence,
             "salary_floor": self.salary_floor,
             "culture_keywords": self.culture_keywords,
             "parsed_at": self.parsed_at.isoformat() if self.parsed_at else None,
@@ -152,3 +188,69 @@ class Application:
             "human_handoff": self.human_handoff,
             "notes": self.notes,
         }
+
+
+@dataclass
+class ResumeFinding:
+    """One ATS-health finding produced by GeminiClient.audit_resume."""
+
+    id: str = ""
+    sev: str = "warn"
+    type: str = "input"
+    title: str = ""
+    area: str = ""
+    detail: str = ""
+    delta: int = 0
+    before: str | None = None
+    after: str | None = None
+    field: str | None = None
+    placeholder: str | None = None
+
+    @classmethod
+    def from_mapping(cls, data: dict[str, Any]) -> ResumeFinding:
+        return cls(
+            id=str(data.get("id", "") or ""),
+            sev=str(data.get("sev", "warn") or "warn"),
+            type=str(data.get("type", "input") or "input"),
+            title=str(data.get("title", "") or ""),
+            area=str(data.get("area", "") or ""),
+            detail=str(data.get("detail", "") or ""),
+            delta=_parse_int(data.get("delta")),
+            before=data.get("before"),
+            after=data.get("after"),
+            field=data.get("field"),
+            placeholder=data.get("placeholder"),
+        )
+
+    def to_mapping(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "sev": self.sev,
+            "type": self.type,
+            "title": self.title,
+            "area": self.area,
+            "detail": self.detail,
+            "delta": self.delta,
+            "before": self.before,
+            "after": self.after,
+            "field": self.field,
+            "placeholder": self.placeholder,
+        }
+
+
+def _parse_int(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+__all__ = [
+    "Profile",
+    "JobPosting",
+    "JobMatch",
+    "Application",
+    "ApplicationStatus",
+    "ResumeFinding",
+    "WorkTypeClassifier",
+]

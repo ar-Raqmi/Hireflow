@@ -75,7 +75,7 @@ The agent is **not a chatbot**. The user uploads a resume + preferences once; th
 | Database/state | **No SQL**. Browser `localStorage` owns prefs + history; backend is stateless, in-memory only for a run |
 | Hosting | **Cloud Run** (scale-to-zero) |
 | Scheduling | **Cloud Scheduler** → `POST /pipeline/run` (job polling) — optional |
-| Job sources | **Global source registry — keyless + native APIs + fallback CSE/JSON-LD** (details §10). Never "remote-only" nor "US-only" |
+| Job sources | **Global source registry — keyless + native APIs + fallback CSE/JSON-LD/Playwright** (details §10). Never "remote-only" nor "US-only" |
 | Apply strategy | **Sandboxed job board (simple ATS)** in the demo; real-world = draft-for-approval |
 | Scoring | 5 dimensions: skills, experience, location, salary band, culture/keywords |
 | Human handoff | offers, salary talks, counter-offers → flag "needs human" |
@@ -124,8 +124,8 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 - Domain models in `hireflow/domain/` — plain typed classes, no framework imports:
   - `Profile` (incl. `residence`, `work_type`, preferred `locations`, `salary_floor`)
   - `JobPosting`, `JobMatch`, `Application` (+ `ApplicationStatus`)
-  - **`ResumeFinding`** — NEEDED but NOT YET present (missing from the tree — see §9; this breaks `GeminiClient.audit_resume`, which imports it: `from hireflow.domain import JobPosting, Profile, ResumeFinding`).
-  - **`WorkTypeClassifier`** — NOT YET present (do not silently assume it exists).
+  - **`ResumeFinding`** — one ATS-health finding produced by `GeminiClient.audit_resume` (now present; `from hireflow.domain import JobPosting, Profile, ResumeFinding` resolves).
+  - **`WorkTypeClassifier`** — deterministic `remote|hybrid|onsite|any` gate (now present; used by `ResumeParser.infer_work_type` and `HireflowTools._infer_work_type`).
 - **Naming:** classes `PascalCase`, methods/vars `snake_case`, constants `UPPER_SNAKE`, private helpers `_underscore`.
 - **No code comments unless asked.**
 - Type hints everywhere (Python 3.11+).
@@ -140,49 +140,88 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 ├── AGENTS.md                # this file — the memory
 ├── README.md                # NEVER lie; update after every deploy with real URLs
 ├── hireflow-frontend.html   # single-file UI (mock today → real fetch wiring)
+├── hireflow.sh              # bash thin CLI driver — prompts + curls the LIVE Cloud Run URL (online-only)
 ├── requirements.txt
 ├── Dockerfile
+├── .dockerignore            # keeps .env/API.md/credential JSON out of the Cloud Build context
 ├── .gitignore
 ├── RULES.md                 # official hackathon rules — read before decisions
-├── chat/chat.py             # terminal chat against REAL GeminiClient (proves Gemini works)
+├── docs/
+│   ├── CURL_E2E.md          # exact online curl playbook (upload → run → approve) against live URL
+│   └── DEPLOY.md            # Zach's one-command Cloud Run redeploy + Vertex IAM grant
 ├── hireflow/
-│   ├── config.py            # Settings (project id, model, vertex/api-key flags, thresholds 80/60)
-│   ├── domain/__init__.py   # Profile, JobPosting, JobMatch, Application, ApplicationStatus
-│   │                        #  MISSING (must add): ResumeFinding (blocks import), WorkTypeClassifier
+│   ├── config.py            # Settings (project id, model, vertex/api-key flags, thresholds 80/60, caps)
+│   ├── cli.py               # `python -m hireflow.cli` — thin client of the deployed API (reports only)
+│   ├── domain/__init__.py   # Profile, JobPosting, JobMatch, Application, ApplicationStatus,
+│   │                        #   ResumeFinding, WorkTypeClassifier (all present — import tree unblocked)
 │   ├── storage/             # Repository ABC + InMemory + Firestore(optional) + StorageFactory
 │   ├── agents/              # BaseAgent ABC, router.py (Search/Match/Research/Prepare/Router),
 │   │                        #   adk_router.py (HireflowAgent + HireflowTools, Google ADK)
-│   ├── tools/               # JobSource ABC, RemoteOK, Remotive, Freehire, resume_parser,
-│   │                        #   gemini.py (REAL GeminiClient)
+│   ├── tools/               # JobSource ABC, RemoteOK, Remotive, Freehire, geo (LocationMapper),
+│   │                        #   resume_parser, gemini.py (REAL GeminiClient)
 │   └── api/app.py           # FastAPI: health, upload, dashboard, jobs, applications, approve, pipeline/run
-├── tests/test_app.py        # the ONLY test file today (others existed only as cached .pyc)
 └── web/                     # unused — frontend lives in hireflow-frontend.html
 ```
 
+**No `tests/` directory — by design.** Offline tests (stub agent, `_StubGemini`,
+`TestClient`) were deleted. The acceptance gate is the online curl e2e in
+`docs/CURL_E2E.md` against the live Cloud Run URL — never a local pytest run.
+
 **Ghosts of the tree — do NOT restore them as ground truth:**
-- `cli.py` — **was never committed** (only `.pyc` proved it existed). We WILL build it as a thin client calling the deployed API for a terminal e2e.
-- `json_repository.py`, `openrouter.py`, `mock_gemini.py` — existed only as `.pyc`; do NOT take them as ground truth.
+- `cli.py` — **was never committed** (only `.pyc` proved it existed). Now it IS committed: `hireflow/cli.py` (thin client of the deployed API) + `hireflow.sh` (bash driver).
+- `json_repository.py`, `openrouter.py`, `mock_gemini.py` — existed only as `.pyc`; do NOT take them as ground truth. Never rebuild a mock Gemini path.
 
 ---
 
 ## 8. Backend API surface (FastAPI) — current state (real!)
 
 - `GET /health` → `{"status":"ok"}` — live, works (verified Aug 22).
-- `POST /upload` — stores profile in in-memory repo. **does not parse/run yet.**
-- `GET /dashboard` — counts only, no pipeline progress.
+- `POST /upload` — real parse: `ResumeParser` extracts text from `.txt/.pdf/.docx`
+  (`pypdf`/`python-docx`), validates `work_type ∈ remote|hybrid|onsite|any`,
+  builds a `Profile` (work_type gate, locations, target roles, salary floor),
+  stores it in the in-memory repo. Returns `status: "parsed_and_stored"` + `pages`.
+- `POST /pipeline/run?profile_id=…` — **wired to the real agent**: `create_app`
+  builds `GeminiClient` (Vertex first, API-key fallback) + `HireflowTools`
+  (Freehire/RemoteOK/Remotive) + `HireflowAgent` by default. Runs
+  search → score → research → prepare server-side, persists discovered jobs +
+  applications, returns `status:"completed"` + matches/applications/needs_human.
+  Caps: ≤25 jobs, ≤10 scored, ≤5 prepared (env-tunable). A down board degrades to
+  `[]` and is recorded in `errors`, never a 500.
+- `GET /dashboard` — live counts + by-status breakdown.
 - `GET /jobs` / `GET /applications` — list repository contents.
-- `POST /approve` — flips an application to approved.
-- `POST /pipeline/run` — **returns `agent_not_configured`** because `create_app()` default `agent=None` (see `hireflow/api/app.py:71`). THIS ONLY RUNS WHEN AGENT IS SELF-WIRED. **TODO: construct real `GeminiClient` + `HireflowTools` + `HireflowAgent` in `create_app` and pass it in.**
+- `POST /approve?application_id=…` — flips an application to approved (human gate).
+
+**Live Cloud Run** (`https://hireflow-backend-296941301245.us-central1.run.app`)
+still predates the pipeline wiring (its `/pipeline/run` answers
+`agent_not_configured`); the NEW build is the acceptance target — see
+`docs/DEPLOY.md` for the redeploy and `docs/CURL_E2E.md` for the curl proof.
 
 ---
 
 ## 9. Current state of the repo (the honest truth — verified by me, do not trust the old AGENTS claims)
 
-- **Chat breaks on import:** `chat/chat.py` and anything importing `hireflow.tools.gemini` fails with `ImportError: cannot import name 'ResumeFinding' from 'hireflow.domain'` — because `ResumeFinding` (and `WorkTypeClassifier`) were committed. This single missing class is the reason **tests today are brick-red** (`tests/test_app.py` fails at collection) and the reason chat can't even be tested.
-- **Live Cloud Run** (`https://hireflow-backend-296941301245.us-central1.run.app`) is ALIVE and returns `{"status":"ok"}` (verified Aug 22) — it predates the broken import.
-- There is **no real end-to-end path** through anything today until we: (1) add `ResumeFinding` (fix import -> chat works); (2) wire `GeminiClient` into `create_app` (fix `/pipeline/run`); (3) deploy those two fixes to Cloud Run; (4) verify e2e via curl with a real `.pdf`.
+- **Import tree is unblocked.** `ResumeFinding` + `WorkTypeClassifier` are in
+  `hireflow/domain/__init__.py` and `hireflow.tools.gemini` imports cleanly.
+  **No offline tests exist** — `tests/` was deleted; the acceptance gate is the
+  online curl e2e (`docs/CURL_E2E.md`). `python -m hireflow.cli` and `hireflow.sh`
+  are thin clients of the deployed API.
+- **`create_app` now wires the real agent** — `GeminiClient` (Vertex first,
+  API-key fallback) + `HireflowTools` + `HireflowAgent`; `POST /pipeline/run`
+  runs search → score → research → prepare server-side. The deployed build still
+  predates this: the live `/pipeline/run` answers `agent_not_configured` until
+  the redeploy in `docs/DEPLOY.md` lands.
+- **Live Cloud Run** (`https://hireflow-backend-296941301245.us-central1.run.app`)
+  is ALIVE and returns `{"status":"ok"}` (verified Aug 22) — it predates the
+  pipeline wiring.
+- **Not yet done (must be proven live, AGENTS.md §16):** the new build is not
+  deployed; the online curl e2e (upload → run → jobs → approve) against the live
+  URL has not run with this code; `hireflow-frontend.html` is still a mock; CSE /
+  JSON-LD / Layer II (Playwright) are designed but not implemented.
 
-**The old AGENTS.md claimed Phases "1 & 1.5 done": that is FALSE.** Phase 0/EA scaffolded; Phase 1 partially (ADK graph exists, but pipeline never walked end-to-end); Phase 1.5 (CLI) was built locally then never committed, and never tested online. Everything must be re-supported by LIVE tests.
+**The old AGENTS.md claimed Phases "1 & 1.5 done": that was FALSE at the time**
+(import was broken, no live pipeline). Today the code paths exist and are green
+offline; the phase is done ONLY when the redeploy + curl e2e on the `.run.app`
+URL pass.
 
 ---
 
@@ -199,17 +238,22 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 - **freehire.me** (covers **193 countries**; verified `regions=apac`/`countries=jp|id|my|...`; `work_mode` remote/hybrid/onsite; `enrichment.salary_min/max`; full description in-search via `include_description=true`). It is a **personal project (no SLA, tier badges)** — plan a one-line swap via `FREEHIRE_API_URL`.
 - **RemoteOK, Remotive** — remote-only, good EU/US.
 
+**Layer II — browser automation (last resort, officially supported, still no VPS):**
+- **Playwright/Puppeteer + headless Chromium inside the Cloud Run container** — documented by Google ("Browser and OS automation in Cloud Run"): install Chromium in the image, drive it from an ADK tool (`FunctionTool` wrapping a Playwright client, or ADK `web_access_tool`), extract content, feed to Gemini. Use ONLY for JS-heavy SPA career pages with no JSON-LD and no API (e.g. Kalibrr, Wantedly, MyCareersFuture, anti-bot pages).
+- **Cost caveat:** headless Chrome needs a bigger instance (more RAM, CPU stays billed during the request, slower cold start) — so keep it a scoped last-resort layer, never the default per-source path.
+- A **full desktop OS via VNC streaming** (WebSockets) is also documented for complex interaction — not needed for the demo.
+
 **C — Regions, currently curated:**
 - **MY**: freehire(my) · JobStreet MY · Maukerja
-- **ID**: freehire(id) + JobStreet ID · (Kalibrr is SPA-only; use page/JSON-LD)
-- **JP**: freehire(jp) · Wantedly/Sapphire are SPA/anti-bot → use **CSE scoped to jp career pages** · K-Worknet (KR)
+- **ID**: freehire(id) + JobStreet ID · (Kalibrr is SPA-only; JSON-LD first, else **Layer II** Playwright)
+- **JP**: freehire(jp) · Wantedly/Sapphire are SPA/anti-bot → **CSE scoped to jp career pages**, else **Layer II** Playwright · K-Worknet (KR)
 - **KR**: K-Worknet (**official public job API**, free key, ktor-friendly)
-- **SG**: freehire(sg) · MyCareersFuture (SPA — read its real JSON feed if you can establish it; else CSE `domain:careers.gov.sg`)
+- **SG**: freehire(sg) · MyCareersFuture (SPA — read its real JSON feed if you can establish it; else CSE `domain:careers.gov.sg`, else **Layer II** Playwright)
 - **EU/NA**: freehire + RemoteOK/Remotive + ATS boards (Greenhouse/Lever/Ashby/Workable — verified keyless for Greenhouse-GitLab, Ashby-Notion, Workable-Tokopedia)
 
 **D — verification rule (REQUIREMENT):** Before any country/source is "supported", run a real `curl` and post the HTTP code + job count in the PR/commit. No `curl` = not supported. Update this section each time we verify a new one.
 
-**The golden rule:** never scrape a site with a brute-force bot or pretend a job board is something it isn't. Job boards are public APIs; career pages are JSON-LD or ATS-APIs; everything runs on Cloud Run (no VPS).
+**The golden rule:** never scrape a site with a brute-force bot or pretend a job board is something it isn't. Job boards are public APIs; career pages are JSON-LD or ATS-APIs; the only sanctioned browser path is **Layer II** (Playwright + Chromium on Cloud Run) for SPA-only career pages. Everything runs on Cloud Run (no VPS).
 
 ---
 
@@ -227,18 +271,18 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 ## 12. Roadmap — realistic, online-e2e (to Aug 31)
 
 **Now (the base, mandatory — stops the "partial runtime" myth):**
-1. **Unblock the import tree**: add `ResumeFinding` (+ `WorkTypeClassifier`) to `hireflow/domain/__init__.py` — `GeminiClient.audit_resume` needs the ready-made mapping.
-2. **Wire real agent into API**: in `create_app`, construct real `GeminiClient` (Vertex FIRST, API-key fallback) + `HireflowTools` + `HireflowAgent`; pass into the factory. `POST /pipeline/run` now actually runs.
-3. **Fix `freehire.py`** to the live endpoint (`/api/v1/agent/jobs/search` + facets) + make `source`/`title`/etc. core schema stable across all sources.
-4. **Run `.venv/bin/python -m pytest`** — green.
-5. **Re-deploy to Cloud Run** → curl `/health`, then curl a **real** e2e: upload a real `.pdf` → `/pipeline/run` → `/jobs` shows live results → `/dashboard` reflects it → `/approve`. **Video-record the curl-to-cloud proof.**
-6. Build the **terminal CLI test** (`.py`) but as a thin client hitting the live API (not a separate runtime).
+1. ~~Unblock the import tree~~ — **DONE**: `ResumeFinding` + `WorkTypeClassifier` are in `hireflow/domain/__init__.py` and `hireflow.tools.gemini` imports cleanly.
+2. ~~Wire real agent into API~~ — **DONE**: `create_app` builds real `GeminiClient` (Vertex FIRST, API-key fallback) + `HireflowTools` + `HireflowAgent`; `POST /pipeline/run` runs server-side.
+3. ~~Fix `freehire.py`~~ — **DONE**: live endpoint (`/api/v1/agent/jobs/search`) + facets, `LocationMapper` geo codes, stable `source`/`title`/etc. core schema across all sources.
+4. ~~Offline tests removed~~ — **DONE**: `tests/` deleted (stub agent, `_StubGemini`, `TestClient`). There is no offline gate — the acceptance gate is the online curl e2e in steps 5 & 6 against the live Cloud Run URL (real `.pdf`, real Gemini via Vertex).
+5. **Re-deploy to Cloud Run** (docs/DEPLOY.md) → curl `/health`, then a **real** e2e: upload a real `.pdf` → `/pipeline/run` → `/jobs` live results → `/dashboard` reflects it → `/approve`. **Video-record the curl-to-cloud proof.**
+6. ~~Terminal CLI test~~ — **DONE**: `hireflow/cli.py` + `hireflow.sh` are thin clients hitting the live API (not a separate runtime).
 
 **Next (global + demo):**
 7. Complete the **global job-source registry** §10 with live-verified rows + the ATS-brand detector (Greenhouse/Lever/Ashby/Workable per company).
-8. Add **Google CSE** + **JSON-LD** carriage as catch-alls (needs CSE API key from Zach).
+8. Add **Google CSE** + **JSON-LD** as catch-alls (needs CSE API key from Zach) + **Layer II** Playwright/Chromium (Chromium in the Dockerfile, ADK `FunctionTool`) for SPA-only career pages.
 9. Wire `hireflow-frontend.html` to the live backend (fetch) — the dashboard calls the same endpoints the CLI calls.
-10. **Demo & docs**: architecture diagram, README spin-up, ≤4-min unedited video showing Cloud Run console + Vertex AI logs + live `.run` calls. Email `testing@devpost.com` / `cloudhackathons@google.com` access.
+10. **Demo & docs**: clean architecture diagram image (README currently has ASCII), README spin-up, ≤4-min unedited video showing Cloud Run console + Vertex AI logs + live `.run` calls. Email `testing@devpost.com` / `cloudhackathons@google.com` access.
 
 ---
 
@@ -249,6 +293,7 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 - Rules: `RULES.md` is the full official text — trust it over any summary.
 - Google ADK: `google.github.io/adk-docs`, `github.com/google/adk-python`
 - Gemini: `ai.google.dev` (API key), Vertex AI docs
+- Cloud Run browser automation (Playwright/Chromium, VNC): `cloud.google.com/run/docs/browser-automation`
 - Inspo sources — ideas only, NOT code:
   - `github.com/MadsLorentzen/ai-job-search` — fits the query-by-function search, gates-before-scoring, seen-job adoption; **their runtime is local (Claude Code) — we are Cloud Run**.
   - `github.com/strelov1/freehire` — freehire.me is MIT open-source backend (Go+Postgres+Meilisearch); `FREEHIRE_API_URL` env-swap is our one-line failover.
@@ -266,12 +311,11 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 
 ## 14. Next session: where to pick up
 
-1. Add `ResumeFinding` (+ `WorkTypeClassifier`) to domain to unblock `GeminiClient.audit_resume` → then `pytest` green, `chat.chat` works.
-2. Wire a real `GeminiClient → HireflowAgent` into `create_app` so `/pipeline/run` is real.
-3. Re-deploy to Cloud Run → live curl e2e with a real `.pdf` (see §12-5): upload → run → jobs → approve.
-4. Build the **CLI as a client of the deployed API**.
-5. Global registry column §10.
-6. Frontend wiring + docs + video.
+1. Re-deploy to Cloud Run (`docs/DEPLOY.md`) → curl `/health`, then the live curl e2e with a real `.pdf` (`docs/CURL_E2E.md`): upload → run → jobs → approve. **This proves the phase — not the offline green.**
+2. Wire `hireflow-frontend.html` to the deployed API via fetch (dashboard + approve).
+3. Global registry column §10 (CSE key from Zach, JSON-LD, Layer II Playwright).
+4. Demo & docs: clean diagram image, ≤4-min video with Cloud Run console + Vertex logs, grant repo access to `testing@devpost.com` / `cloudhackathons@google.com`.
+5. Optional: Cloud Scheduler → POST `/pipeline/run` hourly.
 
 ---
 
@@ -281,7 +325,7 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 1. `GCP_PROJECT_ID` (we have `hireflow-506207` in-use — confirm).
 2. Service-account credentials JSON (path → `GOOGLE_APPLICATION_CREDENTIALS`) — **Vertex AI** permission only; no DB.
 3. Enabled APIs: **Vertex AI** (required), **Cloud Run** (later), Cloud Scheduler (optional).
-4. `GEMINI_API_KEY` (Gemini API fallback) — need it to run chat/Vertex-less; we have a real one on-disk (last verified live at repo time).
+4. `GEMINI_API_KEY` (Gemini API fallback) — only if we ever run Vertex-less; we have a real one on-disk (last verified live at repo time).
 5. Is model string `gemini-3.5-flash` valid in the project? (RULES require Gemini 3.5+.)
 6. **Green light/help for Google-CSE API key + JSON-LD** — single key for the catch-all search.
 
@@ -300,6 +344,6 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 - **Never trust a dataset / my mind-guessed facts for architecture.** If a source/endpoint/API is about to be used, verify it with a `curl` first — today's job landscape changes fast.
 - **No "this will do".** "Global" means a country gets at least one real path (aggregator keyless → native/reg API → CSE catch-all), not "freehire covers enough".
 - **Keep the `README.md` truthful** — after every change, update URLs, verified sources, and the two-line "what's real now" section.
-- **Never call two things "done" until a live e2e on that deploy proves it.** Phase labels in the old AGENTS.md were fiction; the repo has broken imports and no live pipeline — fix, verify, THEN write done in the file.
+- **Never call two things "done" until a live e2e on that deploy proves it.** The tree is green offline today (imports unblocked, agent wired), but the repo is only "done" when the redeploy + curl e2e on the `.run.app` URL pass — verify, THEN write done in the file.
 
 *Bismillah.*

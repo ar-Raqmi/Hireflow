@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 from hireflow.config import SETTINGS
 from hireflow.domain import Application, JobPosting, Profile
 from hireflow.storage.firestore_repository import FirestoreRepository
@@ -12,13 +10,14 @@ from hireflow.storage.repository import Repository
 class StorageFactory:
     """Builds repositories for each entity, choosing Firestore or in-memory.
 
-    Falls back to in-memory when no Google Cloud credentials are configured so
-    the app runs locally without Zach's service account. Repositories are cached
-    so repeated access returns the same instance.
+    In-memory by default — the backend is stateless by design (AGENTS.md §5);
+    the online curl e2e is the acceptance gate, not offline tests. Firestore is
+    only used when ``HIREFLOW_STORAGE`` is set to ``firestore``. Repositories are
+    cached so repeated access returns the same instance.
     """
 
     def __init__(self) -> None:
-        self._use_firestore = bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS")) and bool(SETTINGS.project_id)
+        self._use_firestore = SETTINGS.storage_backend == "firestore"
         self._cache: dict[str, Repository] = {}
 
     def profiles(self) -> Repository:

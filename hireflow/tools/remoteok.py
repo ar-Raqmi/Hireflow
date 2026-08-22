@@ -18,5 +18,6 @@ class RemoteOKSource(JobSource):
             company=str(row.get("company", "") or ""),
             location="Remote",
             post_url=str(row.get("url", "") or ""),
+            posted_at=self._parse_iso(row.get("date")),
             raw_data=row,
         )

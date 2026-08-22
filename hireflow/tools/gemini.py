@@ -15,11 +15,7 @@ class GeminiClient:
         from google import genai
 
         self._model = model or SETTINGS.gemini_model
-        use_vertex = (
-            SETTINGS.gemini_use_vertex
-            and bool(SETTINGS.project_id)
-            and bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS"))
-        )
+        use_vertex = SETTINGS.gemini_use_vertex and bool(SETTINGS.project_id)
         if use_vertex:
             if SETTINGS.vertex_location == "global":
                 os.environ["GOOGLE_GENAI_USE_ENTERPRISE"] = "True"

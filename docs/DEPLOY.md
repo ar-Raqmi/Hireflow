@@ -1,0 +1,59 @@
+# Hireflow — Cloud Run redeploy (for Izaaz)
+
+Target: the **existing** Cloud Run service `hireflow-backend` in `us-central1`
+(project `hireflow-506207`) — the one already serving
+`https://hireflow-backend-296941301245.us-central1.run.app`. Redeploying updates
+it in place; the URL does not change. No secrets are needed on the command line
+(ADC / runtime SA handles Vertex auth).
+
+## 0. One-time: confirm APIs + runtime SA permission
+
+```bash
+gcloud config set project hireflow-506207
+gcloud services enable run.googleapis.com aiplatform.googleapis.com
+
+# Give the Cloud Run runtime service account permission to call Vertex AI.
+# (Default runtime SA = <PROJECT_NUMBER>-compute@developer.gserviceaccount.com)
+gcloud projects add-iam-policy-binding hireflow-506207 \
+  --member "serviceAccount:$(gcloud projects describe hireflow-506207 --format='value(projectNumber)')-compute@developer.gserviceaccount.com" \
+  --role roles/aiplatform.user
+```
+
+Without `roles/aiplatform.user` the app boots but every Gemini call fails with
+401/PERMISSION_DENIED on Vertex. If you deployed with a custom `--service-account`,
+grant the role to that SA instead.
+
+## 1. Redeploy (single command)
+
+```bash
+gcloud run deploy hireflow-backend --region us-central1 --source . \
+  --allow-unauthenticated \
+  --set-env-vars GCP_PROJECT_ID=hireflow-506207,GEMINI_USE_VERTEX=true,VERTEX_LOCATION=global,GEMINI_MODEL=gemini-3.5-flash \
+  --memory 512Mi --timeout 600
+```
+
+- `--source .` builds the `Dockerfile` via Cloud Build. `.dockerignore`
+  excludes `.env`, `API.md`, `*-credential.json`, `.venv`, etc. from the build
+  context.
+- `--timeout 600` gives the pipeline (search→score→research→prepare) room to
+  finish inside one request; Cloud Run max is 3600s.
+- Optional tuning (defaults are fine for the demo):
+  `PIPELINE_MAX_JOBS=25`, `PIPELINE_MAX_SCORE=10`, `PIPELINE_MAX_PREP=5`,
+  `PIPELINE_MAX_RESEARCH=8`, `FREEHIRE_POSTED_WITHIN_DAYS=14`.
+
+## 2. Verify
+
+```bash
+curl -s https://hireflow-backend-296941301245.us-central1.run.app/health
+# {"status":"ok"}
+```
+
+Then run the full acceptance sequence in `docs/CURL_E2E.md`
+(upload → pipeline/run → jobs → applications → approve). Watch the service logs
+for Vertex calls:
+
+```bash
+gcloud run services logs read hireflow-backend --region us-central1 --limit 50
+```
+
+Screen-capture the console/logs for the demo video.
