@@ -62,7 +62,7 @@ Submit: ≤4-min unedited demo video (YouTube/Vimeo, English/subtitled), code re
 | Work-type pref | Hard filter `remote | onsite | hybrid | any`, asked in its own dialog after the audit gate; skippable → `any` |
 | Location pref | Preferred *work* locations — separate dialog, NEVER defaulted from resume residence; skippable → anywhere |
 | History | New tab, `localStorage`, its own "Clear history" button (reset button does NOT touch it) |
-| Gemini client | `MockGeminiClient` (offline/deterministic) when no creds; `GeminiClient` (Vertex/API-key) via a factory when creds exist |
+| Gemini client | **`GeminiClient` only** (Vertex AI first, API-key fallback). **No mock/fake/stub/deterministic stand-in.** Use `GeminiClient` against the real model in every run and test. |
 
 ---
 
@@ -97,12 +97,12 @@ State story (judge-grade): **client-side persistence, stateless backend.** The b
   - `hireflow/storage/` → `Repository` (ABC): `InMemoryRepository` (Firestore optional, not default)
   - `hireflow/agents/` → `BaseAgent` (ABC): `SearchAgent`, `MatchAgent`, `ResearchAgent`, `PrepareAgent`, `RouterAgent`
   - `hireflow/tools/` → `JobSource` (ABC): `RemoteOKSource`, `RemotiveSource`, `FreehireSource`
-  - `hireflow/tools/` → `GeminiClient` / `MockGeminiClient` share one interface; a factory picks real vs. offline mock from env creds
+  - `hireflow/tools/` → `GeminiClient` — the REAL client, used everywhere (Vertex AI first, API-key fallback). No fake/mock/stub.
 - Domain models in `hireflow/domain/`: `Profile` (incl. `residence`, `work_type`, preferred `locations`), `JobPosting`, `JobMatch`, `Application`, `ResumeFinding`, `WorkTypeClassifier` — plain classes with typed fields and behaviour, no framework imports.
 - **Naming:** classes `PascalCase`, methods/vars `snake_case`, constants `UPPER_SNAKE`. Private helpers `_underscore`.
 - **No code comments unless asked** — intent lives in class/method names and in AGENTS.md / docs.
 - Type hints everywhere (Python 3.11+).
-- Frontend (when built): apply OOP where natural (classes/factories for API client, stores); React components stay functional.
+- Frontend: single-file HTML prototype (`hireflow-frontend.html`) — mock-driven UI; backend wiring is a later phase. OOP applies to backend only; don't introduce a build tool.
 
 ---
 
@@ -130,17 +130,16 @@ Repo/hireflow/
 │   │   ├── base_agent.py
 │   │   ├── router.py         # Search/Match/Research/Prepare/Router (step executors)
 │   │   └── adk_router.py     # HireflowAgent + HireflowTools (Google ADK graph)
-│   ├── tools/                # job sources (ABC + concrete), gemini client + mock, resume parser
+│   ├── tools/                # job sources (ABC + concrete), gemini client, resume parser
 │   │   ├── job_source.py
 │   │   ├── remoteok.py
 │   │   ├── remotive.py
 │   │   ├── freehire.py
-│   │   ├── gemini.py         # real GeminiClient (Vertex/API-key)
-│   │   ├── mock_gemini.py    # deterministic offline stand-in
+│   │   ├── gemini.py         # real GeminiClient (Vertex-first, API-key fallback)
 │   │   └── resume_parser.py  # .txt/.pdf/.docx → text
 │   └── api/                  # FastAPI
 │       └── app.py
-├── tests/
+├── tests/                    # tests: pure-logic offline + REAL live tests via `.venv/bin/python -m pytest`
 └── web/                      # unused — frontend lives in hireflow-frontend.html
 ```
 
@@ -160,8 +159,8 @@ Repo/hireflow/
 ## 9. Roadmap / build order (to Aug 31)
 
 - **Phase 0** (done): repo scaffold + AGENTS.md + OOP skeleton
-- **Phase 1** (done): ADK wiring (`HireflowAgent` + `HireflowTools` via `google.adk`), Gemini client (Vertex/API-key, 3.5 flash) + offline `MockGeminiClient`, in-memory storage, real API endpoints, 5 passing tests
-- **Phase 1.5** (in progress): terminal CLI end-to-end — parse/audit, work-type + location preference gate, search, rank, prepare, human approval, tracking
+- **Phase 1** (done): ADK wiring (`HireflowAgent` + `HireflowTools` via `google.adk`), Gemini client (Vertex/API-key, 3.5 flash), in-memory storage, real API endpoints, 5 passing tests
+- **Phase 1.5** (done): terminal CLI end-to-end — parse/audit, work-type + location preference gate, search, rank, prepare, human approval, tracking
 - **Phase 2**: job-source clients live (RemoteOK/Remotive/freehire real API params) + end-to-end router run
 - **Phase 3**: drafter→reviewer prepare pipeline + sandboxed ATS + approval gate
 - **Phase 4**: production hardening + Docker + Cloud Run deploy (Zach)
@@ -186,7 +185,7 @@ Repo/hireflow/
 1. Read `AGENTS.md` + `README.md` (done — that's this file).
 2. Confirm stack + OOP skeleton under `hireflow/` is intact.
 3. Finish **Phase 1.5**: terminal CLI end-to-end run (parse → audit → prefs gate → search → rank → prepare → approve), then wire the API + frontend HTML.
-4. Live job sources + Gemini need Zach's credentials (service-account JSON or `GEMINI_API_KEY`); use `MockGeminiClient` until then.
+4. Live job sources + Gemini need Zach's credentials (service-account JSON or `GEMINI_API_KEY`); use the real `GeminiClient` everywhere — **no mock/stub**. The tests must run **live** against the real APIs.
 5. Keep name `Hireflow` lowercase everywhere. Ask user for Zach's credentials when needed.
 
 ---
