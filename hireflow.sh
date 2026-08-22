@@ -62,13 +62,14 @@ printf '\nPreferred work locations (comma separated; blank = anywhere):\n'
 printf '> '
 IFS= read -r line
 if [[ -n "$line" ]]; then
-  while IFS= read -r part; do
+  IFS=',' read -r -a parts <<< "$line"
+  for part in "${parts[@]}"; do
     part="${part#"${part%%[![:space:]]*}"}"   # trim leading whitespace
     part="${part%"${part##*[![:space:]]}"}"    # trim trailing whitespace
     [[ -n "$part" ]] && LOCS+=("$part")
-  done < <(printf '%s' "$line" | tr ',' '\n')
+  done
 fi
-[[ "${#LOCS[@]}" -gt 0 ]] && echo "locations: ${LOCS[*]} (${#LOCS[@]})" || echo "locations: any"
+[[ "${#LOCS[@]}" -gt 0 ]] && echo "locations: ${LOCS[*]} (${#LOCS[@]})" || echo "locations: stay"
 
 # --- 4. target roles (optional) ---
 TARGET=""
