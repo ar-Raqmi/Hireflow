@@ -22,6 +22,7 @@ class ApplicationStatus(str, Enum):
     ROUTED = "routed"
     DRAFTED = "drafted"
     APPROVED = "approved"
+    SUBMITTED = "submitted"
 
 
 @dataclass
@@ -148,6 +149,8 @@ class Application:
     followup_due: datetime | None = None
     human_handoff: bool = False
     notes: list[str] = field(default_factory=list)
+    drafts: dict[str, str] = field(default_factory=dict)
+    ats_confirmation: str = ""
 
     @classmethod
     def from_mapping(cls, data: dict[str, Any]) -> Application:
@@ -162,6 +165,8 @@ class Application:
             followup_due=_parse_datetime(data.get("followup_due")),
             human_handoff=bool(data.get("human_handoff", False)),
             notes=list(data.get("notes", [])),
+            drafts=dict(data.get("drafts", {}) or {}),
+            ats_confirmation=str(data.get("ats_confirmation", "") or ""),
         )
 
     def to_mapping(self) -> dict[str, Any]:
@@ -175,6 +180,8 @@ class Application:
             "followup_due": self.followup_due.isoformat() if self.followup_due else None,
             "human_handoff": self.human_handoff,
             "notes": self.notes,
+            "drafts": self.drafts,
+            "ats_confirmation": self.ats_confirmation,
         }
 
 

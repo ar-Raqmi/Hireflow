@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import math
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
 
 from hireflow.agents.base_agent import BaseAgent
 from hireflow.config import SETTINGS
 from hireflow.domain import Application, ApplicationStatus, JobPosting, Profile, WorkTypeClassifier
+from hireflow.tools.embeddings import EmbeddingRanker
+from hireflow.tools.expander import QueryExpander
 from hireflow.tools.gemini import GeminiClient
+from hireflow.tools.geo import LocationMapper
 from hireflow.tools.job_source import JobSource
 
 _WORK_MODE_VALUES = {"remote", "hybrid", "onsite"}
+_REMOTEISH_MARKERS = ("remote", "worldwide", "anywhere", "distributed")
+_GEO_CAPABLE = {"freehire", "freehire:seek", "freehire:mycareersfuture", "linkedin"}
 
 
 def _default_caps() -> dict[str, int]:
@@ -22,57 +29,183 @@ def _default_caps() -> dict[str, int]:
 
 
 class SearchAgent(BaseAgent):
-    """Discovers and de-duplicates jobs from the keyless source registry.
+    """Discovers jobs from the keyless source registry as a search agent, not a keyword fetcher.
 
-    Prompt-engineering lives in ``_build_query``: target roles first, falling
-    back to the resume's opening text when no roles are declared. A source that
-    is down degrades to ``[]`` and is recorded in ``context["errors"]``.
+    Uses ``QueryExpander`` (Gemini) to turn target roles into many related role
+    queries, issues multiple query variants against geo-capable sources so
+    results vary run-to-run, then gate-then-caps: work-type gate -> location
+    gate -> recency filter -> cross-run seen-job dedup -> per-company diversity
+    -> cap. A source that is down degrades to ``[]`` and is recorded in
+    ``context["errors"]``.
     """
 
     name = "search"
 
-    def __init__(self, sources: list[JobSource], caps: dict[str, int] | None = None) -> None:
+    def __init__(
+        self,
+        sources: list[JobSource],
+        caps: dict[str, int] | None = None,
+        expander: QueryExpander | None = None,
+    ) -> None:
         self._sources = sources
         self._caps = caps or _default_caps()
+        self._expander = expander if expander is not None else QueryExpander(gemini=None)
+        self._mapper = LocationMapper()
 
     async def run(self, context: dict) -> dict:
         profile: Profile = context["profile"]
         errors: list[str] = context["errors"]
-        query = self._build_query(profile)
-        jobs: list[JobPosting] = []
-        seen: set[str] = set()
-        per_source = max(1, self._caps["max_jobs"] // max(1, len(self._sources)))
-        for source in self._sources:
-            try:
-                found = await source.search(
-                    query=query,
-                    limit=per_source,
-                    work_type=profile.work_type,
-                    locations=profile.locations,
-                )
-            except Exception as exc:  # noqa: BLE001 - a down source is non-fatal
-                errors.append(f"{source.name}: {type(exc).__name__}: {str(exc)[:200]}")
-                found = []
-            if source.last_error:
-                errors.append(f"{source.name}: {source.last_error}")
-            label = source.name
-            if source.name == "freehire" and profile.locations:
-                label = f"freehire({','.join(profile.locations)})"
-            await self._emit("search", f"{label}: {len(found)} found")
-            for job in found:
-                if not job.id or job.id in seen:
-                    continue
-                if not self._passes_work_gate(job, profile.work_type):
-                    continue
-                seen.add(job.id)
-                jobs.append(job)
-                if len(jobs) >= self._caps["max_jobs"]:
-                    return {"jobs": [job.to_mapping() for job in jobs]}
-        return {"jobs": [job.to_mapping() for job in jobs]}
+        seed = int(context.get("seed", 0) or 0)
+        seen: set[str] = set(context.get("seen_jobs") or [])
 
-    def _build_query(self, profile: Profile) -> str:
-        query = " ".join(profile.target_roles).strip()
-        return query or profile.resume_text[:300]
+        base = self._build_query(profile)
+        if SETTINGS.query_expansion:
+            queries = await self._expander.expand(base, profile.skills, limit=SETTINGS.expansion_terms)
+        else:
+            queries = base
+        queries = self._rotate(queries, seed) if queries else base
+        await self._emit(
+            "search",
+            f"expanded {len(base)} role(s) → {len(queries)} queries · {len(seen)} already seen",
+        )
+
+        per_source = self._per_source_cap()
+        gathered: list[JobPosting] = []
+        sources = self._rotate(self._sources, seed)
+        for source in sources:
+            variants = queries if source.name in _GEO_CAPABLE else queries[:1]
+            raw: list[JobPosting] = []
+            for query in variants:
+                try:
+                    found = await source.search(
+                        query=query,
+                        limit=per_source,
+                        work_type=profile.work_type,
+                        locations=profile.locations,
+                    )
+                except Exception as exc:  # noqa: BLE001 - a down source is non-fatal
+                    errors.append(f"{source.name}: {type(exc).__name__}: {str(exc)[:200]}")
+                    found = []
+                if source.last_error:
+                    errors.append(f"{source.name}: {source.last_error}")
+                for job in found:
+                    if not job.id or job.id in seen:
+                        continue
+                    if not self._passes_work_gate(job, profile.work_type):
+                        continue
+                    if not self._passes_location(job, profile):
+                        continue
+                    if self._is_stale(job):
+                        continue
+                    seen.add(job.id)
+                    raw.append(job)
+            raw = self._dedupe(raw)
+            raw = self._cap_company(raw, SETTINGS.diversity_max_same_company)
+            label = self._source_label(source, profile)
+            summary = getattr(source, "last_summary", "")
+            detail = f"{label}: {len(raw)} new" if not summary else f"{source.name}: {summary}"
+            await self._emit("search", detail)
+            gathered.extend(raw)
+
+        jobs = self._dedupe(gathered)
+        jobs = self._cap_company(jobs, SETTINGS.diversity_max_same_company)
+        jobs = self._rotate(jobs, seed)
+        jobs = jobs[: self._caps["max_jobs"]]
+        return {"jobs": [job.to_mapping() for job in jobs], "new_jobs": len(jobs)}
+
+    def _build_query(self, profile: Profile) -> list[str]:
+        roles = [role for role in profile.target_roles if role]
+        if roles:
+            return roles
+        text = (profile.resume_text or "").strip()
+        if text:
+            return [text[:120]]
+        return ["software engineer"]
+
+    def _per_source_cap(self) -> int:
+        divisor = max(1, len(self._sources))
+        return max(4, math.ceil(self._caps["max_jobs"] / divisor) * 2)
+
+    def _source_label(self, source: JobSource, profile: Profile) -> str:
+        if source.name == "freehire" and profile.locations:
+            return f"freehire({','.join(profile.locations)})"
+        return source.name
+
+    def _passes_location(self, job: JobPosting, profile: Profile) -> bool:
+        if profile.work_type == "remote":
+            return True
+        location = (job.location or "").strip()
+        if not location:
+            return True
+        lowered = location.lower()
+        if any(marker in lowered for marker in _REMOTEISH_MARKERS):
+            return True
+        if not profile.locations:
+            return True
+        tokens = self._location_tokens(profile)
+        return any(token and token in lowered for token in tokens)
+
+    def _location_tokens(self, profile: Profile) -> list[str]:
+        tokens: list[str] = []
+        for loc in profile.locations:
+            token = loc.strip().lower()
+            if token and token not in tokens:
+                tokens.append(token)
+        geo = self._mapper.map(profile.locations)
+        for code in geo["countries"]:
+            name = self._mapper.country_name(code)
+            if name and name not in tokens:
+                tokens.append(name)
+        return tokens
+
+    def _is_stale(self, job: JobPosting) -> bool:
+        if not job.posted_at or SETTINGS.job_recency_days <= 0:
+            return False
+        age = self._utcnow() - self._as_utc(job.posted_at)
+        return age.days > SETTINGS.job_recency_days
+
+    def _dedupe(self, jobs: list[JobPosting]) -> list[JobPosting]:
+        seen: set[str] = set()
+        unique: list[JobPosting] = []
+        for job in jobs:
+            if not job.id or job.id in seen:
+                continue
+            seen.add(job.id)
+            unique.append(job)
+        return unique
+
+    def _cap_company(self, jobs: list[JobPosting], max_per_company: int) -> list[JobPosting]:
+        if max_per_company <= 0:
+            return jobs
+        counts: dict[str, int] = {}
+        capped: list[JobPosting] = []
+        for job in jobs:
+            company = (job.company or "").strip().lower()
+            if not company:
+                capped.append(job)
+                continue
+            if counts.get(company, 0) >= max_per_company:
+                continue
+            counts[company] = counts.get(company, 0) + 1
+            capped.append(job)
+        return capped
+
+    @staticmethod
+    def _rotate(items: list[Any], seed: int) -> list[Any]:
+        if not items:
+            return items
+        offset = seed % len(items)
+        return items[offset:] + items[:offset]
+
+    @staticmethod
+    def _utcnow() -> datetime:
+        return datetime.now(timezone.utc)
+
+    @staticmethod
+    def _as_utc(value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
 
     def _passes_work_gate(self, job: JobPosting, work_type: str) -> bool:
         preference = (work_type or "any").strip().lower()
@@ -124,7 +257,48 @@ class MatchAgent(BaseAgent):
                 detail += f" (best so far: {best[0]} {best[1]} · {best[2]})"
             await self._emit("match", detail)
         scored.sort(key=lambda match: match["score"], reverse=True)
+        await self._semantic_rerank(profile, scored, errors)
         return {"matches": scored}
+
+    async def _semantic_rerank(
+        self, profile: Profile, scored: list[dict[str, Any]], errors: list[str]
+    ) -> None:
+        if not SETTINGS.semantic_search or not scored:
+            await self._emit("match", "semantic re-rank off (SEMANTIC_SEARCH disabled)")
+            return
+        jobs = [JobPosting.from_mapping(match["job"]) for match in scored]
+        try:
+            ranker = EmbeddingRanker(self._gemini)
+            ranked = await ranker.rank(jobs, self._rerank_query(profile))
+        except Exception as exc:  # noqa: BLE001 - never let embeddings sink scoring
+            errors.append(f"semantic re-rank: {type(exc).__name__}: {str(exc)[:200]}")
+            ranked = None
+        if ranked is None:
+            await self._emit(
+                "match", "semantic re-rank off (embeddings unavailable — Gemini scores kept)"
+            )
+            return
+        order = {job.id: index for index, job in enumerate(ranked)}
+        scored.sort(
+            key=lambda match: (
+                -int(match.get("score", 0)),
+                order.get(match["job"].get("id", ""), len(order)),
+            )
+        )
+        await self._emit("match", "semantic re-rank on (cosine tie-break on scored jobs)")
+
+    @staticmethod
+    def _rerank_query(profile: Profile) -> str:
+        parts = [
+            part
+            for part in (
+                *(profile.target_roles or []),
+                *(profile.skills or []),
+                *(profile.locations or []),
+            )
+            if part
+        ]
+        return " ".join(parts).strip() or "software engineer"
 
 
 class ResearchAgent(BaseAgent):
@@ -234,7 +408,11 @@ class RouterAgent(BaseAgent):
     ) -> None:
         self._gemini = gemini
         self._caps = caps or _default_caps()
-        self._search = SearchAgent(sources=sources, caps=self._caps)
+        self._search = SearchAgent(
+            sources=sources,
+            caps=self._caps,
+            expander=QueryExpander(gemini=gemini),
+        )
         self._match = MatchAgent(gemini=gemini, caps=self._caps)
         self._research = ResearchAgent(gemini=gemini, caps=self._caps)
         self._prepare = PrepareAgent(gemini=gemini, caps=self._caps)
@@ -257,13 +435,20 @@ class RouterAgent(BaseAgent):
         self,
         profile: Profile,
         progress: Callable[[str, str], Awaitable[None]] | None = None,
+        seed: int = 0,
+        seen_jobs: list[str] | None = None,
     ) -> dict[str, Any]:
         if progress is not None:
             for agent in (self._search, self._match, self._research, self._prepare):
                 agent.progress = progress
             self._progress = progress
         errors: list[str] = []
-        context: dict[str, Any] = {"profile": profile, "errors": errors}
+        context: dict[str, Any] = {
+            "profile": profile,
+            "errors": errors,
+            "seed": seed,
+            "seen_jobs": seen_jobs or [],
+        }
 
         await self._emit(
             "parse",
@@ -378,6 +563,7 @@ class RouterAgent(BaseAgent):
                     "source": job.source,
                     "post_url": job.post_url,
                     "location": job.location,
+                    "posted_at": job.posted_at.isoformat() if job.posted_at else None,
                     "score": match["score"],
                     "reasons": match.get("reasons", []),
                     "research": match.get("research", {}),

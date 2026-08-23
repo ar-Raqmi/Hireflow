@@ -15,7 +15,8 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from hireflow.export_html import HtmlExporter  # noqa: E402
+from hireflow.export_html import HtmlExporter, ago, is_expired  # noqa: E402
+from hireflow.config import SETTINGS  # noqa: E402
 
 EMOJI = {
     "parse": "Reading resume",
@@ -99,8 +100,11 @@ def _upload(base: str, resume: str, work: str, locs: list[str], target: str) -> 
     return payload["id"]
 
 
-def _start_run(base: str, profile_id: str) -> str:
-    url = f"{base}/pipeline/run?profile_id={urllib.parse.quote(profile_id)}"
+def _start_run(base: str, profile_id: str, seed: int = 0, seen: list[str] | None = None) -> str:
+    params = [("profile_id", profile_id), ("seed", str(seed))]
+    if seen:
+        params.append(("seen", ",".join(seen)))
+    url = f"{base}/pipeline/run?{urllib.parse.urlencode(params)}"
 
     req = urllib.request.Request(
         url,
@@ -173,6 +177,26 @@ def _stream(base: str, run_id: str) -> dict:
     return result
 
 
+def _approve_top(base: str, result: dict) -> dict:
+    apps = result.get("applications") or []
+    targets = [a for a in apps if a.get("status") in {"drafted", "routed"}]
+    if not targets:
+        print("\n[approve] no drafted/routed application to submit.")
+        return result
+    app_id = str(targets[0].get("id", ""))
+    url = f"{base}/approve?application_id={urllib.parse.quote(app_id)}"
+    req = urllib.request.Request(url, data=b"", method="POST")
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        payload = json.loads(resp.read().decode())
+    for a in apps:
+        if str(a.get("id", "")) == app_id:
+            a["status"] = payload.get("status", "submitted")
+            a["submitted_at"] = payload.get("submitted_at")
+            a["ats_confirmation"] = payload.get("ats_confirmation")
+    print(f"[approve] {app_id[:8]} -> {payload.get('status')} {payload.get('ats_confirmation')} {payload.get('submitted_at')}")
+    return result
+
+
 def _render(result: dict) -> None:
     pid = result.get("profile_id", "")
     print("\n" + "=" * 64)
@@ -184,8 +208,11 @@ def _render(result: dict) -> None:
     matches = result.get("matches") or []
     print(f"\nTOP MATCHES ({len(matches)})")
     for m in matches[:10]:
+        when = ago(m.get("posted_at"), SETTINGS.job_recency_days)
+        if is_expired(m.get("posted_at"), SETTINGS.job_recency_days):
+            when += " · ⚠ expired"
         print(f'  {m.get("score",0):>3}  {str(m.get("title",""))[:46]:<46} @ {str(m.get("company",""))[:28]:<28}')
-        print(f'      loc:{str(m.get("location",""))[:40]:<40} url:{str(m.get("post_url",""))[:70]}')
+        print(f'      loc:{str(m.get("location",""))[:30]:<30} {when:<16} url:{str(m.get("post_url",""))[:70]}')
         reasons = m.get("reasons") or []
         if reasons:
             print(f'      why: {str(reasons[0])[:110]}')
@@ -195,10 +222,11 @@ def _render(result: dict) -> None:
     for a in apps:
         drafted = "  [draft ready]" if a.get("drafted") else ""
         handoff = "  needs_human" if a.get("human_handoff") else ""
-        print(f'  {str(a.get("id",""))[:12]}  status={a.get("status","")}  score={a.get("score","")}{handoff}  {str(a.get("title",""))[:44]}{drafted}')
+        submitted = f"  submitted {a.get('ats_confirmation','')}" if a.get("ats_confirmation") else ""
+        print(f'  {str(a.get("id",""))[:12]}  status={a.get("status","")}  score={a.get("score","")}{handoff}  {str(a.get("title",""))[:44]}{drafted}{submitted}')
 
     print("\nneeds_human:", result.get("needs_human") or [])
-    print("\nNext: POST /approve?application_id=<id> to act on a drafted app.")
+    print("\nNext: POST /approve?application_id=<id> to submit to the sandbox ATS (confirmation in /sandbox/ats/submissions).")
     print("=" * 64)
 
 
@@ -206,13 +234,17 @@ def main() -> int:
     import uuid  # noqa: F401 - used in _upload
 
     if len(sys.argv) < 2:
-        print("usage: python hireflow_run.py <base_url> <resume> [work_type] [locations_csv] [target]")
+        print("usage: python hireflow_run.py <base_url> <resume> [work_type] [locations_csv] [target] [seed] [seen_csv] [approve]")
         return 2
     base = sys.argv[1].rstrip("/")
     resume = sys.argv[2]
     work = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] else "any"
     locs_raw = sys.argv[4] if len(sys.argv) > 4 else ""
     target = sys.argv[5] if len(sys.argv) > 5 else ""
+    seed = int(sys.argv[6]) if len(sys.argv) > 6 and sys.argv[6].isdigit() else 0
+    seen_raw = sys.argv[7] if len(sys.argv) > 7 else ""
+    approve = bool(sys.argv[8]) if len(sys.argv) > 8 else False
+    seen = [p.strip() for p in seen_raw.split(",") if p.strip()]
     locs = [p.strip() for p in locs_raw.split(",") if p.strip()]
 
     # interactive if no explicit args were passed
@@ -227,11 +259,13 @@ def main() -> int:
     profile_id = _upload(base, resume, work, locs, target)
 
     print("\nStarting pipeline (SSE live progress) ...")
-    run_id = _start_run(base, profile_id)
+    run_id = _start_run(base, profile_id, seed=seed, seen=seen)
     print(f"run_id: {run_id}")
     print()
 
     result = _stream(base, run_id)
+    if approve:
+        result = _approve_top(base, result)
     _render(result)
     exporter = HtmlExporter()
     exporter.export(result, "result-demo.html")

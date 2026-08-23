@@ -37,29 +37,47 @@ class LocationMapper:
         "vietnam": "vn", "yemen": "ye", "zimbabwe": "zw",
     }
     _CITIES = {
-        "tokyo": "jp", "osaka": "jp", "kyoto": "jp", "yokohama": "jp", "nagoya": "jp",
-        "kuala lumpur": "my", "penang": "my", "kuching": "my", "george town": "my",
-        "jakarta": "id", "bali": "id", "bandung": "id", "surabaya": "id",
-        "seoul": "kr", "busan": "kr", "incheon": "kr",
-        "singapore": "sg",
-        "manila": "ph", "cebu": "ph",
-        "hong kong": "hk",
-        "bangkok": "th", "ho chi minh": "vn", "hanoi": "vn",
-        "beijing": "cn", "shanghai": "cn", "shenzhen": "cn",
-        "london": "gb", "manchester": "gb", "birmingham": "gb", "edinburgh": "gb",
-        "paris": "fr", "lyon": "fr",
-        "dublin": "ie",
-        "new york": "us", "san francisco": "us", "los angeles": "us", "seattle": "us",
-        "austin": "us", "chicago": "us", "boston": "us", "denver": "us",
-        "bangalore": "in", "bengaluru": "in", "mumbai": "in", "delhi": "in",
-        "hyderabad": "in", "pune": "in", "chennai": "in", "kolkata": "in",
-        "berlin": "de", "munich": "de", "hamburg": "de", "cologne": "de",
-        "amsterdam": "nl", "rotterdam": "nl",
-        "madrid": "es", "barcelona": "es",
-        "rome": "it", "milan": "it",
-        "toronto": "ca", "vancouver": "ca", "montreal": "ca", "ottawa": "ca",
-        "sydney": "au", "melbourne": "au", "brisbane": "au",
-        "dubai": "ae", "abu dhabi": "ae", "doha": "qa", "istanbul": "tr",
+        "tokyo": ("jp", "Tokyo"), "osaka": ("jp", "Osaka"), "kyoto": ("jp", "Kyoto"),
+        "yokohama": ("jp", "Yokohama"), "nagoya": ("jp", "Nagoya"), "sendai": ("jp", "Sendai"),
+        "fukuoka": ("jp", "Fukuoka"), "sapporo": ("jp", "Sapporo"), "kobe": ("jp", "Kobe"),
+        "hiroshima": ("jp", "Hiroshima"),
+        "kuala lumpur": ("my", "Kuala Lumpur"), "penang": ("my", "Penang"),
+        "george town": ("my", "George Town"),
+        "jakarta": ("id", "Jakarta"), "bali": ("id", "Bali"), "bandung": ("id", "Bandung"),
+        "seoul": ("kr", "Seoul"), "busan": ("kr", "Busan"), "incheon": ("kr", "Incheon"),
+        "singapore": ("sg", "Singapore"),
+        "manila": ("ph", "Manila"), "cebu": ("ph", "Cebu"),
+        "hong kong": ("hk", "Hong Kong"),
+        "bangkok": ("th", "Bangkok"), "ho chi minh": ("vn", "Ho Chi Minh"), "hanoi": ("vn", "Hanoi"),
+        "beijing": ("cn", "Beijing"), "shanghai": ("cn", "Shanghai"), "shenzhen": ("cn", "Shenzhen"),
+        "london": ("gb", "London"), "manchester": ("gb", "Manchester"), "birmingham": ("gb", "Birmingham"),
+        "edinburgh": ("gb", "Edinburgh"),
+        "paris": ("fr", "Paris"), "lyon": ("fr", "Lyon"), "lyons": ("fr", "Lyon"),
+        "dublin": ("ie", "Dublin"),
+        "new york": ("us", "New York"), "san francisco": ("us", "San Francisco"),
+        "los angeles": ("us", "Los Angeles"), "seattle": ("us", "Seattle"),
+        "austin": ("us", "Austin"), "chicago": ("us", "Chicago"), "boston": ("us", "Boston"),
+        "denver": ("us", "Denver"),
+        "bangalore": ("in", "Bangalore"), "bengaluru": ("in", "Bengaluru"),
+        "mumbai": ("in", "Mumbai"), "delhi": ("in", "Delhi"), "hyderabad": ("in", "Hyderabad"),
+        "pune": ("in", "Pune"), "chennai": ("in", "Chennai"), "kolkata": ("in", "Kolkata"),
+        "berlin": ("de", "Berlin"), "munich": ("de", "Munich"), "hamburg": ("de", "Hamburg"),
+        "cologne": ("de", "Cologne"),
+        "amsterdam": ("nl", "Amsterdam"), "rotterdam": ("nl", "Rotterdam"),
+        "madrid": ("es", "Madrid"), "barcelona": ("es", "Barcelona"),
+        "rome": ("it", "Rome"), "milan": ("it", "Milan"),
+        "toronto": ("ca", "Toronto"), "vancouver": ("ca", "Vancouver"),
+        "montreal": ("ca", "Montreal"), "ottawa": ("ca", "Ottawa"),
+        "sydney": ("au", "Sydney"), "melbourne": ("au", "Melbourne"), "brisbane": ("au", "Brisbane"),
+        "dubai": ("ae", "Dubai"), "abu dhabi": ("ae", "Abu Dhabi"), "doha": ("qa", "Doha"),
+        "istanbul": ("tr", "Istanbul"),
+    }
+    _STATES = {
+        "johor": ("my", "Johor"), "selangor": ("my", "Selangor"),
+        "penang": ("my", "Penang"), "kuala kuala": ("my", "Kuala Lumpur"),
+        "aichi": ("jp", "Nagoya"), "osaka": ("jp", "Osaka"), "kanto": ("jp", "Kanto"),
+        "surabaya": ("id", "Surabaya"),
+        "karnataka": ("in", "Bangalore"),
     }
     _REGIONS = {
         "asia": "apac", "apac": "apac", "south east asia": "apac", "asean": "apac",
@@ -87,6 +105,65 @@ class LocationMapper:
         return {"countries": countries, "regions": regions}
 
     @classmethod
+    def map_full(cls, locations: list[str] | None) -> dict[str, list[str]]:
+        countries: list[str] = []
+        regions: list[str] = []
+        cities: list[str] = []
+        linkedin_parts: list[str] = []
+        for raw in locations or []:
+            stripped = raw.strip()
+            if not stripped or stripped.lower() in cls._ANYWHERE:
+                continue
+            resolved = cls._resolve_city(stripped)
+            if resolved is not None:
+                code, city = resolved
+                if city and city not in cities:
+                    cities.append(city)
+                if code in cls._REGION_CODES:
+                    if code not in regions:
+                        regions.append(code)
+                elif code and code not in countries:
+                    countries.append(code)
+                if city and city not in linkedin_parts:
+                    linkedin_parts.append(city)
+                continue
+            code = cls._resolve(stripped)
+            if code in cls._REGION_CODES:
+                if code not in regions:
+                    regions.append(code)
+                linkedin_parts.append(stripped)
+            elif code:
+                if code not in countries:
+                    countries.append(code)
+                linkedin_parts.append(stripped)
+            else:
+                cities.append(stripped)
+                linkedin_parts.append(stripped)
+        return {
+            "countries": countries,
+            "regions": regions,
+            "cities": cities,
+            "linkedin_location": ", ".join(linkedin_parts),
+        }
+
+    @classmethod
+    def _resolve_city(cls, token: str) -> tuple[str, str] | None:
+        lowered = token.lower()
+        if lowered in cls._CITIES:
+            return cls._CITIES[lowered]
+        for key, pair in cls._STATES.items():
+            if key == lowered or key in lowered:
+                return pair
+        return None
+
+    @classmethod
+    def country_name(cls, code: str) -> str:
+        for name, country_code in cls._COUNTRIES.items():
+            if country_code == code:
+                return name
+        return ""
+
+    @classmethod
     def _resolve(cls, raw: str) -> str:
         token = raw.strip().lower()
         if not token or token in cls._ANYWHERE:
@@ -94,12 +171,13 @@ class LocationMapper:
         iso = token.split("/")[-1].strip() if "/" in token else token
         if len(iso) == 2 and iso in cls._COUNTRY_CODES | cls._REGION_CODES:
             return iso
-        if token in cls._CITIES:
-            return cls._CITIES[token]
         for key, code in cls._COUNTRIES.items():
             if key in token:
                 return code
         for key, region in cls._REGIONS.items():
             if key in token:
                 return region
+        resolved = cls._resolve_city(token)
+        if resolved is not None:
+            return resolved[0]
         return ""

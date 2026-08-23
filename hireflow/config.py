@@ -21,6 +21,13 @@ def _int_env(name: str, default: int) -> int:
         return default
 
 
+def _float_env(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
 @dataclass(frozen=True)
 class Settings:
     project_id: str = field(default_factory=lambda: _env("GCP_PROJECT_ID", ""))
@@ -45,6 +52,72 @@ class Settings:
     )
     resume_parse_mode: str = field(
         default_factory=lambda: _env("RESUME_PARSE_MODE", "hybrid").strip().lower()
+    )
+    query_expansion: bool = field(
+        default_factory=lambda: _env("QUERY_EXPANSION", "true").lower() in {"1", "true", "yes"}
+    )
+    expansion_terms: int = field(
+        default_factory=lambda: _int_env("QUERY_EXPANSION_TERMS", 6)
+    )
+    job_recency_days: int = field(
+        default_factory=lambda: _int_env("JOB_RECENCY_DAYS", 14)
+    )
+    diversity_max_same_company: int = field(
+        default_factory=lambda: _int_env("DIVERSITY_MAX_SAME_COMPANY", 2)
+    )
+    use_unverified_sources: bool = field(
+        default_factory=lambda: _env("USE_UNVERIFIED_SOURCES", "").lower() in {"1", "true", "yes"}
+    )
+    freehire_sources: list[str] = field(
+        default_factory=lambda: [
+            part.strip()
+            for part in os.getenv("FREEHIRE_SOURCES", "seek,mycareersfuture").split(",")
+            if part.strip()
+        ]
+    )
+    web_search_endpoint: str = field(
+        default_factory=lambda: _env(
+            "WEB_SEARCH_ENDPOINT", "https://lite.duckduckgo.com/lite/"
+        )
+    )
+    web_fetch_enabled: bool = field(
+        default_factory=lambda: _env("WEB_FETCH", "true").lower() in {"1", "true", "yes"}
+    )
+    web_fetch_timeout: float = field(
+        default_factory=lambda: _float_env("WEB_FETCH_TIMEOUT", 12.0)
+    )
+    web_discovery_enabled: bool = field(
+        default_factory=lambda: _env("WEB_DISCOVERY", "true").lower()
+        in {"1", "true", "yes"}
+    )
+    web_discovery_max_links: int = field(
+        default_factory=lambda: _int_env("WEB_DISCOVERY_MAX_LINKS", 8)
+    )
+    web_discovery_companies: list[str] = field(
+        default_factory=lambda: [
+            part.strip()
+            for part in os.getenv("WEB_DISCOVERY_COMPANIES", "").split(",")
+            if part.strip()
+        ]
+    )
+    semantic_search: bool = field(
+        default_factory=lambda: _env("SEMANTIC_SEARCH", "").lower() in {"1", "true", "yes"}
+    )
+    embedding_model: str = field(
+        default_factory=lambda: _env("EMBEDDING_MODEL", "gemini-embedding-001")
+    )
+    playwright_enabled: bool = field(
+        default_factory=lambda: _env("HIREFLOW_PLAYWRIGHT", "").lower() in {"1", "true", "yes"}
+    )
+    playwright_spa_urls: list[str] = field(
+        default_factory=lambda: [
+            part.strip()
+            for part in os.getenv("PLAYWRIGHT_SPA_URLS", "").split(",")
+            if part.strip()
+        ]
+    )
+    sandbox_ats_file: str = field(
+        default_factory=lambda: _env("SANDBOX_ATS_FILE", "sandbox_ats.json")
     )
 
 

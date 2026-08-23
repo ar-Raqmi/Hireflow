@@ -199,11 +199,12 @@ apps = result.get("applications") or []
 print(f"\nAPPLICATIONS ({len(apps)})")
 for a in apps:
     drafted = "  [draft ready]" if a.get("drafted") else ""
+    submitted = f"  submitted {a.get('ats_confirmation','')}" if a.get("ats_confirmation") else ""
     print(f'  {str(a.get("id",""))[:12]}  status={a.get("status","")}  score={a.get("score","")}'
-          f'{"  needs_human" if a.get("human_handoff") else ""}  {str(a.get("title",""))[:44]}{drafted}')
+          f'{"  needs_human" if a.get("human_handoff") else ""}  {str(a.get("title",""))[:44]}{drafted}{submitted}')
 
 print("\nneeds_human:", result.get("needs_human") or [])
-print("\nNext: POST /approve?application_id=<id> to act on a drafted app.")
+print("\nNext: POST /approve?application_id=<id> to submit to the sandbox ATS (confirmation in /sandbox/ats/submissions).")
 print("=" * 64)
 
 try:

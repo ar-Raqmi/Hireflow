@@ -107,6 +107,68 @@ class GeminiClient:
         except (TypeError, ValueError):
             return 0
 
+    async def embed(
+        self, texts: list[str], model: str | None = None
+    ) -> list[list[float]] | None:
+        """Embed texts via Vertex (real call). Returns None on any failure — never fakes.
+
+        Uses ``SETTINGS.embedding_model`` (default ``gemini-embedding-001``)
+        with a ``text-embedding-005`` retry, since availability varies per
+        project. Any failure degrades to ``None`` so callers keep their
+        existing ordering instead of crashing.
+        """
+        if not texts:
+            return []
+        preferred = model or SETTINGS.embedding_model
+        candidates = [preferred]
+        if preferred.lower() != "text-embedding-005":
+            candidates.append("text-embedding-005")
+        for candidate in candidates:
+            vectors = await self._embed_content(candidate, texts)
+            if vectors:
+                return vectors
+        return None
+
+    async def _embed_content(self, model: str, texts: list[str]) -> list[list[float]] | None:
+        response = await self._async_client.models.embed_content(model=model, contents=texts)
+        embeddings = getattr(response, "embeddings", None)
+        if not embeddings:
+            return None
+        vectors: list[list[float]] = []
+        for embedding in embeddings:
+            values = getattr(embedding, "values", None)
+            if not values:
+                return None
+            vectors.append([float(value) for value in values])
+        return vectors or None
+
+
+    async def expand_query(self, roles: list[str], skills: list[str] | None = None) -> list[str]:
+        if not roles:
+            return []
+        prompt = (
+            "You are expanding a job search into broader role synonyms so a job "
+            "agent retrieves more matches. Return ONLY a JSON array of strings. "
+            "For each role, give the original plus 2-4 closely-related role "
+            "titles a recruiter would actually post. Be concrete (e.g. "
+            "'Machine Learning Engineer'), not abstract. Do not add seniority "
+            "tiers or locations.\n"
+            f"ROLES: {json.dumps(roles)}\n"
+            f"SKILLS: {json.dumps(skills or [])}\n"
+            'Return ONLY JSON: ["related role 1", "related role 2", ...]'
+        )
+        try:
+            payload = await self._generate_json(prompt)
+        except Exception:
+            return list(roles)
+        terms: list[str] = []
+        if isinstance(payload, list):
+            terms = [str(item).strip() for item in payload if str(item).strip()]
+        elif isinstance(payload, dict):
+            for value in payload.values():
+                if isinstance(value, list):
+                    terms.extend(str(item).strip() for item in value if str(item).strip())
+        return terms or list(roles)
 
     async def score_fit(self, job: JobPosting, profile: Profile) -> tuple[int, list[str]]:
         prompt = (

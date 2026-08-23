@@ -11,7 +11,7 @@ import httpx
 
 from hireflow.config import SETTINGS
 from hireflow.domain import WorkTypeClassifier
-from hireflow.export_html import HtmlExporter
+from hireflow.export_html import HtmlExporter, ago, is_expired
 
 
 class InputPrefs:
@@ -42,18 +42,21 @@ class HireflowCli:
         self._resume_path = Path(resume_path)
 
     def run(self, args: argparse.Namespace) -> int:
-        self._require_file()
         prefs = self._resolve_prefs(args)
         try:
             profile_id = self._upload(prefs)
         except httpx.HTTPError as exc:
             print(f"upload failed: {exc.__class__.__name__}: {exc}")
             return 1
+        seed = args.seed
+        seen = list(args.seen or [])
         try:
-            result = self._run_pipeline(profile_id)
+            result = self._run_pipeline(profile_id, seed=seed, seen=seen)
         except httpx.HTTPError as exc:
             print(f"pipeline failed: {exc.__class__.__name__}: {exc}")
             return 1
+        if args.approve:
+            result = self._approve(result)
         self._render(result)
         self._export(result)
         return 0
@@ -145,11 +148,12 @@ class HireflowCli:
         print()
         return payload["id"]
 
-    def _run_pipeline(self, profile_id: str) -> dict[str, Any]:
+    def _run_pipeline(self, profile_id: str, seed: int = 0, seen: list[str] | None = None) -> dict[str, Any]:
+        params: dict[str, Any] = {"profile_id": profile_id, "seed": seed}
+        if seen:
+            params["seen"] = ",".join(seen)
         with httpx.Client(timeout=60) as client:
-            response = client.post(
-                f"{self._base_url}/pipeline/run", params={"profile_id": profile_id}
-            )
+            response = client.post(f"{self._base_url}/pipeline/run", params=params)
             response.raise_for_status()
         payload = response.json()
         if payload.get("status") != "started" or not payload.get("run_id"):
@@ -233,6 +237,30 @@ class HireflowCli:
         print(f"  [+{elapsed:>5.0f}s] {emoji}  {detail}")
         sys.stdout.flush()
 
+    def _approve(self, result: dict[str, Any]) -> dict[str, Any]:
+        apps = result.get("applications") or []
+        targets = [app for app in apps if app.get("status") in {"drafted", "routed"}]
+        if not targets:
+            print("\n  [approve] no drafted/routed application to submit — nothing sent.")
+            return result
+        application_id = str(targets[0].get("id", ""))
+        with httpx.Client(timeout=60) as client:
+            response = client.post(
+                f"{self._base_url}/approve", params={"application_id": application_id}
+            )
+            response.raise_for_status()
+        payload = response.json()
+        for app in apps:
+            if str(app.get("id", "")) == application_id:
+                app["status"] = payload.get("status", "submitted")
+                app["submitted_at"] = payload.get("submitted_at")
+                app["ats_confirmation"] = payload.get("ats_confirmation")
+        print(
+            f"  [approve] {application_id[:8]} → {payload.get('status')}"
+            f" · {payload.get('ats_confirmation')} · {payload.get('submitted_at')}"
+        )
+        return result
+
     def _render(self, result: dict[str, Any]) -> None:
         print("=" * 64)
         print("  HIREFLOW · pipeline report")
@@ -250,8 +278,11 @@ class HireflowCli:
             print("\n  TOP MATCHES")
             print("  " + "-" * 60)
             for match in matches:
+                when = ago(match.get("posted_at"), SETTINGS.job_recency_days)
+                if is_expired(match.get("posted_at"), SETTINGS.job_recency_days):
+                    when += " · ⚠ expired"
                 print(f"  #{match['rank']:<2} {match['score']:>3}  {match['title']} @ {match['company']}")
-                print(f"       {match.get('location', '')} · {match.get('source', '')}")
+                print(f"       {match.get('location', '')} · {when} · {match.get('source', '')}")
                 print(f"       {match.get('post_url', '')}")
                 for reason in match.get("reasons", [])[:3]:
                     print(f"       - {reason}")
@@ -266,7 +297,10 @@ class HireflowCli:
         for app in applications:
             drafted = " [draft ready]" if app.get("drafted") else ""
             handoff = " [needs human]" if app.get("human_handoff") else ""
-            print(f"   {app['status']:<20} {app['score']:>3}  {app['title']} @ {app['company']}{drafted}{handoff}")
+            submitted = (
+                f" [submitted {app.get('ats_confirmation', '')}]" if app.get("ats_confirmation") else ""
+            )
+            print(f"   {app['status']:<20} {app['score']:>3}  {app['title']} @ {app['company']}{drafted}{handoff}{submitted}")
 
         if needs_human:
             print("\n  NEEDS HUMAN")
@@ -279,7 +313,7 @@ class HireflowCli:
             for message in errors[:8]:
                 print(f"   warning: {message}")
 
-        print("\n  next step: go to the dashboard and approve an application.")
+        print("\n  next step: POST /approve?application_id=<id> → sandbox ATS submit (or re-run with --approve).")
         print("=" * 64)
 
     def _export(self, result: dict[str, Any]) -> None:
@@ -308,6 +342,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--location", action="append", help="preferred work location (repeatable, e.g. Tokyo)")
     parser.add_argument("--target-role", action="append", help="target role (repeatable)")
     parser.add_argument("--salary-floor", type=int, help="minimum expected salary floor (0..)")
+    parser.add_argument("--seed", type=int, default=0, help="run rotation seed (0..) so results vary run-to-run")
+    parser.add_argument("--seen", action="append", help="job id/post_url already seen (repeatable; cross-run dedup)")
+    parser.add_argument("--approve", action="store_true", help="after the run, submit the top drafted application to the sandbox ATS")
     parser.add_argument("--url", default=SETTINGS.base_url, help=f"backend base URL (default: {SETTINGS.base_url})")
     return parser
 

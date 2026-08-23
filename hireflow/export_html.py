@@ -2,8 +2,58 @@ from __future__ import annotations
 
 import html
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from hireflow.config import SETTINGS
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def ago(posted_at: Any, recency_days: int = 14) -> str:
+    """Human "posted X ago" label for a job; 'date unknown' when absent."""
+    parsed = _parse_dt(posted_at)
+    if parsed is None:
+        return "date unknown"
+    delta = datetime.now(timezone.utc) - _as_utc(parsed)
+    days = delta.days
+    if days < 0:
+        days = 0
+    if days == 0:
+        return "today"
+    if days < 7:
+        return f"{days}d ago"
+    if days < 30:
+        return f"{days // 7}w ago"
+    if days < 365:
+        return f"{days // 30}mo ago"
+    return f"{days // 365}y ago"
+
+
+def is_expired(posted_at: Any, recency_days: int) -> bool:
+    parsed = _parse_dt(posted_at)
+    if parsed is None:
+        return False
+    if recency_days <= 0:
+        return False
+    delta = datetime.now(timezone.utc) - _as_utc(parsed)
+    return delta.days > recency_days
+
+
+def _parse_dt(value: Any) -> datetime | None:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
 
 
 class HtmlExporter:
@@ -83,6 +133,9 @@ class HtmlExporter:
         details: list[str] = []
         for match in matches:
             url = self._esc(match.get("post_url", ""))
+            when = ago(match.get("posted_at"))
+            if is_expired(match.get("posted_at"), SETTINGS.job_recency_days):
+                when += " · ⚠ expired"
             rows.append(
                 "<tr>"
                 f'<td class="num">{self._esc(match.get("rank", ""))}</td>'
@@ -90,6 +143,7 @@ class HtmlExporter:
                 f'<td>{self._esc(match.get("title", ""))}</td>'
                 f'<td>{self._esc(match.get("company", ""))}</td>'
                 f'<td>{self._esc(match.get("location", ""))}</td>'
+                f'<td>{self._esc(when)}</td>'
                 f'<td>{self._esc(match.get("source", ""))}</td>'
                 f'<td><a href="{url}">{url}</a></td>'
                 "</tr>"
@@ -109,7 +163,7 @@ class HtmlExporter:
         table = (
             "<table>"
             "<thead><tr><th>#</th><th>Score</th><th>Title</th><th>Company</th>"
-            "<th>Location</th><th>Source</th><th>Link</th></tr></thead>"
+            "<th>Location</th><th>Posted</th><th>Source</th><th>Link</th></tr></thead>"
             f"<tbody>{''.join(rows)}</tbody>"
             "</table>"
         )
@@ -122,18 +176,22 @@ class HtmlExporter:
         rows: list[str] = []
         for job in jobs:
             url = self._esc(job.get("post_url", ""))
+            when = ago(job.get("posted_at"))
+            if is_expired(job.get("posted_at"), SETTINGS.job_recency_days):
+                when += " · ⚠ expired"
             rows.append(
                 "<tr>"
                 f'<td>{self._esc(job.get("title", ""))}</td>'
                 f'<td>{self._esc(job.get("company", ""))}</td>'
                 f'<td>{self._esc(job.get("location", ""))}</td>'
+                f'<td>{self._esc(when)}</td>'
                 f'<td>{self._esc(job.get("source", ""))}</td>'
                 f'<td><a href="{url}">{url}</a></td>'
                 "</tr>"
             )
         table = (
             "<table><thead><tr><th>Title</th><th>Company</th><th>Location</th>"
-            "<th>Source</th><th>Link</th></tr></thead>"
+            "<th>Posted</th><th>Source</th><th>Link</th></tr></thead>"
             f"<tbody>{''.join(rows)}</tbody>"
             "</table>"
         )
@@ -154,15 +212,26 @@ class HtmlExporter:
                 f'<td>{self._esc(app.get("company", ""))}</td>'
                 f'<td>{"yes" if app.get("human_handoff") else ""}</td>'
                 f'<td>{"yes" if app.get("drafted") else ""}</td>'
+                f'<td>{self._submission_cell(app)}</td>'
                 "</tr>"
             )
         table = (
             "<table><thead><tr><th>ID</th><th>Status</th><th>Score</th><th>Title</th>"
-            "<th>Company</th><th>Needs human</th><th>Draft</th></tr></thead>"
+            "<th>Company</th><th>Needs human</th><th>Draft</th><th>ATS submission</th></tr></thead>"
             f"<tbody>{''.join(rows)}</tbody>"
             "</table>"
         )
         return self._section(f"Applications ({len(apps)})", table)
+
+    def _submission_cell(self, app: dict[str, Any]) -> str:
+        confirmation = str(app.get("ats_confirmation", "") or "")
+        submitted_at = str(app.get("submitted_at", "") or "")
+        if not confirmation and not submitted_at:
+            return ""
+        parts = [confirmation] if confirmation else []
+        if submitted_at:
+            parts.append(submitted_at[:16].replace("T", " "))
+        return self._esc(" · ".join(parts))
 
     def _needs_human(self, result: dict[str, Any]) -> str:
         items = result.get("needs_human") or []

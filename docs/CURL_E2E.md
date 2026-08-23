@@ -75,10 +75,13 @@ PROFILE_ID="<id from step 1>"
 
 The pipeline now runs **in the background**; `/pipeline/run` returns a `run_id`
 immediately, and a second endpoint streams Server-Sent Events showing each
-pipeline stage live:
+pipeline stage live. Pass the browser's seen-job list (`?seen=` — comma-separated
+job ids the user already viewed, from client `localStorage`) so the agent
+de-duplicates across runs; `?seed=` rotates query/source order run-to-run:
 
 ```bash
-RUN_ID="$(curl -s -X POST "$BASE_URL/pipeline/run?profile_id=$PROFILE_ID" \
+SEEN="<comma-separated job ids the user already saw, or empty>"
+RUN_ID="$(curl -s -X POST "$BASE_URL/pipeline/run?profile_id=$PROFILE_ID&seed=0&seen=$SEEN" \
   | python3 -c "import json,sys; print(json.load(sys.stdin).get('run_id',''))")"
 echo "run_id: $RUN_ID"
 ```
@@ -105,11 +108,11 @@ data: {"seq":1,"stage":"parse","detail":"resume ready — 14 skills · 6.0 yrs �
 
 data: {"seq":2,"stage":"audit","detail":"ATS health 72/100 · 3 findings","ts":...}
 
-data: {"seq":3,"stage":"search","detail":"freehire(Singapore,Kuala Lumpur,Tokyo): 12 found","ts":...}
+data: {"seq":3,"stage":"search","detail":"freehire(Singapore,Kuala Lumpur,Tokyo): 12 found — queries: ['ML Engineer','Machine Learning Engineer','Deep Learning Engineer']","ts":...}
 
-data: {"seq":4,"stage":"search","detail":"remoteok: 9 found","ts":...}
+data: {"seq":4,"stage":"search","detail":"remoteok: 9 found — queries: ['ML Engineer','Machine Learning Engineer']","ts":...}
 
-data: {"seq":5,"stage":"search","detail":"remotive: 11 found","ts":...}
+data: {"seq":5,"stage":"search","detail":"remotive: 11 found — queries: ['ML Engineer','Machine Learning Engineer']","ts":...}
 
 data: {"seq":6,"stage":"match","detail":"scoring 10 jobs… 5/10 done (best so far: 87 Acme · ML Engineer)","ts":...}
 
@@ -157,6 +160,9 @@ curl -s -X POST "$BASE_URL/approve?application_id=$APP_ID"
 
 **Proves success:** `{"id":"<app-id>","status":"approved"}`. Re-query
 `/applications` to see the same id now `"approved"`.
+> Note: approval currently only flips the status — real submission to the
+> sandbox ATS (`/sandbox/ats/apply`, `ApplicationStatus.SUBMITTED`) is **in
+> flight (verify)** and not in this tree yet.
 
 ---
 
@@ -203,6 +209,9 @@ agent working before the final report renders.
 - [ ] Step 2 `pipeline/run` → `{"run_id":…,"status":"started"}`
 - [ ] `curl -N …/events` streams stage events and ends with `event: done`
       → `completed` with jobs + matches ≥ 1
+- [ ] `search` events show **expanded query terms** (post search-intelligence pass) and a
+      **Johor-style location never degrades to a global search** (location gate active)
+- [ ] results render **"posted X ago"** / mark expired (recency gate active, `JOB_RECENCY_DAYS`)
 - [ ] `dashboard` reflects the run
 - [ ] `approve` flips status
 - [ ] CLI run prints live progress + a report `--url $BASE_URL`

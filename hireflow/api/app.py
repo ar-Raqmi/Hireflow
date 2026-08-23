@@ -4,7 +4,7 @@ import asyncio
 import json
 import uuid
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
@@ -15,13 +15,99 @@ from hireflow.config import JSONLD_COMPANY_URLS, SETTINGS
 from hireflow.domain import Application, ApplicationStatus, JobPosting, Profile
 from hireflow.storage.factory import StorageFactory
 from hireflow.tools.ats import AtsBoardSource
+from hireflow.tools.browser import PlaywrightSource
+from hireflow.tools.discovery import WebDiscoverySource
 from hireflow.tools.freehire import FreehireSource
 from hireflow.tools.gemini import GeminiClient
+from hireflow.tools.japan_dev import JapanDevSource
 from hireflow.tools.jsonld import JsonLdSource
 from hireflow.tools.linkedin import LinkedInSource
 from hireflow.tools.remoteok import RemoteOKSource
 from hireflow.tools.remotive import RemotiveSource
 from hireflow.tools.resume_parser import ResumeParser
+from hireflow.tools.wantedly import WantedlySource
+
+
+class AtsSandbox:
+    """In-memory sandbox ATS — the demo's real submit destination.
+
+    Records every approved submission with the exact payload a real ATS would
+    receive (drafted CV + cover letter + job/profile) and returns a
+    confirmation code. Kept in memory plus a best-effort JSON file on the
+    instance's ephemeral disk (a redeploy starts empty). No real employer is
+    ever contacted — this is the honest "the agent sent the right info to the
+    right place" proof for the demo.
+    """
+
+    def __init__(self, file_path: str | None = None) -> None:
+        self._file_path = file_path or SETTINGS.sandbox_ats_file
+        self._submissions: list[dict] = []
+        self._load()
+
+    def submit(self, application: Application) -> dict:
+        now = datetime.now(timezone.utc)
+        record = {
+            "application_id": application.id,
+            "profile_id": application.profile_id,
+            "job": application.job.to_mapping() if application.job else None,
+            "cv": application.drafts.get("cv", ""),
+            "cover_letter": application.drafts.get("cover_letter", ""),
+            "submitted_at": now.isoformat(),
+            "ats_confirmation": f"HFS-{uuid.uuid4().hex[:8].upper()}",
+        }
+        self._submissions.append(record)
+        self._save()
+        return record
+
+    def list_all(self) -> list[dict]:
+        return list(self._submissions)
+
+    def _load(self) -> None:
+        try:
+            with open(self._file_path, encoding="utf-8") as handle:
+                data = json.loads(handle.read() or "[]")
+            if isinstance(data, list):
+                self._submissions = data
+        except (OSError, ValueError):
+            self._submissions = []
+
+    def _save(self) -> None:
+        try:
+            with open(self._file_path, "w", encoding="utf-8") as handle:
+                json.dump(self._submissions, handle, ensure_ascii=False, indent=2)
+        except OSError:
+            pass
+
+
+class FreehireRegionalSource(FreehireSource):
+    """Freehire sub-source pass (``source=seek`` / ``source=mycareersfuture``).
+
+    Same FreehireSource, different server-side ``source`` facet. ``seek`` is a
+    JobStreet APAC engine (MY/ID/SG/AU/NZ); ``mycareersfuture`` is the SG
+    government board. Lives here (app layer) so ``freehire.py`` stays a shared
+    source file owned by the parallel agent. Source is named
+    ``freehire:<source>`` for SSE attribution.
+    """
+
+    def __init__(self, source: str) -> None:
+        super().__init__()
+        self._region_source = source
+        self.name = f"freehire:{source}"
+
+    def _params(
+        self,
+        query: str,
+        location: str,
+        work_type: str = "any",
+        locations: list[str] | None = None,
+    ) -> dict[str, str]:
+        params = super()._params(query, location, work_type=work_type, locations=locations)
+        if self._region_source:
+            params["source"] = self._region_source
+            if self._region_source == "seek":
+                params.pop("countries", None)
+                params["regions"] = "apac"
+        return params
 
 
 async def _execute_run(
@@ -30,17 +116,31 @@ async def _execute_run(
     storage: StorageFactory,
     run_id: str,
     profile: Profile,
+    seed: int = 0,
+    seen_jobs: list[str] | None = None,
 ) -> None:
     async def progress(stage: str, detail: str) -> None:
         await runlog.emit(run_id, stage, detail)
 
     await runlog.start(run_id)
     try:
-        result = await agent.run_pipeline(profile, progress=progress)
+        result = await agent.run_pipeline(profile, progress=progress, seed=seed, seen_jobs=seen_jobs)
         for job_map in result.get("jobs", []):
             await storage.jobs().put(JobPosting.from_mapping(job_map))
+        drafts = result.get("drafts", {}) or {}
         for app_map in result.get("application_records", []):
-            await storage.applications().put(Application.from_mapping(app_map))
+            application = Application.from_mapping(app_map)
+            job_id = ""
+            if isinstance(app_map.get("job"), dict):
+                job_id = str(app_map["job"].get("id", "") or "")
+            if job_id:
+                package = drafts.get(job_id)
+                if isinstance(package, dict):
+                    application.drafts = {
+                        "cv": str(package.get("cv", "") or ""),
+                        "cover_letter": str(package.get("cover_letter", "") or ""),
+                    }
+            await storage.applications().put(application)
         result["status"] = "completed"
         result["run_id"] = run_id
         await runlog.finish(run_id, result)
@@ -78,12 +178,26 @@ def _build_default_agent() -> RouterAgent:
     gemini = GeminiClient()
     sources = [
         FreehireSource(),
+        *[FreehireRegionalSource(source) for source in SETTINGS.freehire_sources],
         RemoteOKSource(),
         RemotiveSource(),
         LinkedInSource(),
-        AtsBoardSource(),
         JsonLdSource(urls=JSONLD_COMPANY_URLS),
+        AtsBoardSource(),
     ]
+    if SETTINGS.web_discovery_enabled:
+        sources.append(
+            WebDiscoverySource(
+                max_links=SETTINGS.web_discovery_max_links,
+                companies=SETTINGS.web_discovery_companies,
+                timeout=SETTINGS.web_fetch_timeout,
+            )
+        )
+    if SETTINGS.use_unverified_sources:
+        sources.append(WantedlySource())
+        sources.append(JapanDevSource())
+    if SETTINGS.playwright_enabled:
+        sources.append(PlaywrightSource())
     return RouterAgent(sources=sources, gemini=gemini)
 
 
@@ -96,6 +210,7 @@ def create_app(
     api.state.agent = agent or _build_default_agent()
     api.state.parser = ResumeParser()
     api.state.runlog = RunLog()
+    api.state.ats = AtsSandbox()
 
     @api.get("/health")
     async def health() -> dict[str, str]:
@@ -184,21 +299,65 @@ def create_app(
         return [app.to_mapping() for app in await api.state.storage.applications().list_all()]
 
     @api.post("/approve")
-    async def approve(application_id: str) -> dict[str, str]:
+    async def approve(application_id: str) -> dict:
         repository = api.state.storage.applications()
-        application = await repository.get(application_id) or Application(id=application_id)
-        application.status = ApplicationStatus.APPROVED
+        application = await repository.get(application_id)
+        if application is None:
+            raise HTTPException(status_code=404, detail="application not found")
+        submission = api.state.ats.submit(application)
+        application.status = ApplicationStatus.SUBMITTED
+        application.ats_confirmation = submission["ats_confirmation"]
+        try:
+            application.submitted_at = datetime.fromisoformat(submission["submitted_at"])
+        except ValueError:
+            application.submitted_at = None
         await repository.put(application)
-        return {"id": application_id, "status": ApplicationStatus.APPROVED.value}
+        return {
+            "id": application.id,
+            "status": ApplicationStatus.SUBMITTED.value,
+            "submitted_at": submission["submitted_at"],
+            "ats_confirmation": submission["ats_confirmation"],
+        }
+
+    @api.post("/sandbox/ats/apply")
+    async def sandbox_ats_apply(payload: dict) -> dict:
+        job = (
+            JobPosting.from_mapping(payload["job"])
+            if isinstance(payload.get("job"), dict)
+            else None
+        )
+        application = Application(
+            id=str(payload.get("application_id", "") or uuid.uuid4()),
+            profile_id=str(payload.get("profile_id", "") or ""),
+            job=job,
+            drafts={
+                "cv": str(payload.get("cv", "") or ""),
+                "cover_letter": str(payload.get("cover_letter", "") or ""),
+            },
+        )
+        return api.state.ats.submit(application)
+
+    @api.get("/sandbox/ats/submissions")
+    async def sandbox_ats_submissions() -> list[dict]:
+        return api.state.ats.list_all()
 
     @api.post("/pipeline/run")
-    async def run_pipeline(profile_id: str) -> dict:
+    async def run_pipeline(profile_id: str, seed: int = 0, seen: str = "") -> dict:
         profile = await api.state.storage.profiles().get(profile_id)
         if profile is None:
             return {"profile_id": profile_id, "status": "profile_not_found"}
         run_id = str(uuid.uuid4())
+        seen_jobs = _split_csv(seen)
         asyncio.create_task(
-            _execute_run(api.state.runlog, api.state.agent, api.state.storage, run_id, profile)
+            _execute_run(
+                api.state.runlog,
+                api.state.agent,
+                api.state.storage,
+                run_id,
+                profile,
+                seed=seed,
+                seen_jobs=seen_jobs,
+            )
         )
         return {"run_id": run_id, "profile_id": profile_id, "status": "started"}
 
