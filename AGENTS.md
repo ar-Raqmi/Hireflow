@@ -160,7 +160,9 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 │   │                        #   pipeline), adk_router.py (HireflowAgent ADK graph + HireflowTools),
 │   │                        #   runlog.py (RunLog — in-memory per-run SSE event log)
 │   ├── tools/               # JobSource ABC, RemoteOK, Remotive, Freehire, geo (LocationMapper),
-│   │                        #   resume_parser, gemini.py (REAL GeminiClient, incl. vision parse)
+│   │                        #   resume_parser, gemini.py (REAL GeminiClient, incl. vision parse),
+│   │                        #   linkedin.py (LinkedInSource), jsonld.py (JsonLdSource),
+│   │                        #   ats.py (AtsBoardSource), browser.py (PlaywrightSource, opt-in)
 │   └── api/app.py           # FastAPI: health, upload (text+vision parse), dashboard, jobs,
 │                            #   applications, approve, pipeline/run (async), pipeline/run/{id}/events (SSE)
 └── frontend/                # Vite + React app (future — the real frontend; replaces hireflow-frontend.html)
@@ -254,27 +256,43 @@ URL pass.
 
 **No single API covers every country with structured JSON.** "Global" is a **layered registry** — every country above zero native feed; the long-tail catch-all is the web layer. Verify each source with a real `curl` before coding it (they rot fast; do not trust my available knowledge or datasets).
 
+### Verified-sources matrix (updated 2026-08-23 — each row curl-verified this session)
+
+| Source | Endpoint (live) | Layer | curl status | Jobs parsed | Countries/notes |
+|--------|-----------------|-------|-------------|-------------|-----------------|
+| freehire | `GET https://freehire.me/api/v1/agent/jobs/search` (+facets) | I | 200 | yes (JP/Tokyo, 193 countries) | keyless aggregator, remote/hybrid/onsite, salary enrichment |
+| RemoteOK | `GET https://remoteok.com/api` | I | 200 | yes | remote-only, EU/US-weighted |
+| Remotive | `GET https://remotive.com/api/remote-jobs` | I | 200 | yes | remote-only, EU/US-weighted |
+| LinkedIn guest | `GET https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=…&location=…&f_WT=…&start=0` | 0 | **200** | **yes** (Tokyo, 5+ cards; `engineer` → 3, `software` → 2) | keyless, global, low-volume/personal-use only (ToS) |
+| Greenhouse (ATS) | `GET https://boards-api.greenhouse.io/v1/boards/gitlab/jobs?content=true` | I | **200** | **204 jobs** | GitLab board; title/location/content/absolute_url |
+| Ashby (ATS) | `GET https://api.ashbyhq.com/posting-api/job-board/notion` | I | **200** | **128 jobs** | Notion board; title/location/jobUrl/descriptionHtml |
+| Lever (ATS) | `GET https://api.lever.co/v0/postings/{board}?mode=json` | I | **404** on all boards tested (dropbox/airtable/block/tesla/…) | 0 | endpoint appears retired/unreliable — **not enabled**, `ats.py` supports it but no live row |
+| Workable (ATS) | `GET https://apply.workable.com/api/v1/widget/accounts/{account}` | I | **200 but 0 jobs** on every account tried (tokopedia/wayfair/pearson/…) | 0 | API reachable but returns empty `jobs[]` for tested accounts — **not enabled**, `coded` only |
+| JSON-LD career pages | `GET https://www.greenhouse.io/careers` → `application/ld+json` → `@type=JobPosting` | 0 | **200** | **1 JobPosting** ("Multiple Open Positions", Greenhouse, Colorado US) | real page w/ schema.org `JobPosting`; registry = 1 verified URL (`JSONLD_COMPANY_URLS`); other big career pages tested (Atlassian, Shopify, Nike…) have **no** JobPosting ld+json |
+| Playwright Layer II | env-gated `HIREFLOW_PLAYWRIGHT=1` + Chromium in image | II | not run | n/a | **scaffolded only**, disabled by default, deploy wiring is a TODO |
+
 **Layer 0 — Universal catch-all (every country, everyone):**
-- **Google Custom Search JSON API** (CSE) — search expression restricted to job sites/ATS domains per country (e.g. `site:careers.x jp`). Needs a CSE **API key + engine ID** from Zach (one-time, free tier ~100 queries/day, fine for the demo, paid for scale). This is the "any country" floor — the moment CSE/CDN-JSON exists for a country, we can search it.
-- **JSON-LD / schema.org `JobPosting`** — parse structured data out of any company's career page HTML (`httpx` + regex). This is the true "career page" tap without scraping infra.
-- **LinkedIn guest API** (`jobs-guest` endpoints) — keyless, global, works for location strings (verified: Tokyo returned 200). Personal-use, low volume; keep it as a source, but not the demo centerpiece.
+- **Google Custom Search JSON API** (CSE) — search expression restricted to job sites/ATS domains per country (e.g. `site:careers.x jp`). Needs a CSE **API key + engine ID from Zach** (one-time, free tier ~100 queries/day, fine for the demo, paid for scale). **NOT DONE — needs Zach key.**
+- **JSON-LD / schema.org `JobPosting`** — ✅ **IMPLEMENTED + live-verified** (`hireflow/tools/jsonld.py`, `JsonLdSource`). Fetches career pages, regexes `application/ld+json`, walks for `@type=JobPosting`. This is the true "career page" tap without scraping infra.
+- **LinkedIn guest API** (`jobs-guest` endpoints) — ✅ **IMPLEMENTED + live-verified** (`hireflow/tools/linkedin.py`, `LinkedInSource`). Keyless, global, works for location strings (verified: Tokyo 200). Personal-use, low volume (`limit` ≤15); keep it a source, not the demo centerpiece. Respects ToS — no scraping, soft-fail on 403/999.
 
 **Layer I — keyless aggregators (remote, hybrid, onsite):**
 - **freehire.me** (covers **193 countries**; verified `regions=apac`/`countries=jp|id|my|...`; `work_mode` remote/hybrid/onsite; `enrichment.salary_min/max`; full description in-search via `include_description=true`). It is a **personal project (no SLA, tier badges)** — plan a one-line swap via `FREEHIRE_API_URL`.
 - **RemoteOK, Remotive** — remote-only, good EU/US.
+- **ATS boards** — ✅ **IMPLEMENTED + partially verified** (`hireflow/tools/ats.py`, `AtsBoardSource`). Unified keyless endpoint for Greenhouse/Ashby/Lever/Workable. **Greenhouse (gitlab 204) + Ashby (notion 128) verified live and ENABLED in `ATS_BOARDS`.** Lever 404s and Workable returns 0 jobs on all boards tested — coded but **disabled/no registry rows** until a live-verified board is found. `source="ats:{board}"`.
 
 **Layer II — browser automation (last resort, officially supported, still no VPS):**
-- **Playwright/Puppeteer + headless Chromium inside the Cloud Run container** — documented by Google ("Browser and OS automation in Cloud Run"): install Chromium in the image, drive it from an ADK tool (`FunctionTool` wrapping a Playwright client, or ADK `web_access_tool`), extract content, feed to Gemini. Use ONLY for JS-heavy SPA career pages with no JSON-LD and no API (e.g. Kalibrr, Wantedly, MyCareersFuture, anti-bot pages).
-- **Cost caveat:** headless Chrome needs a bigger instance (more RAM, CPU stays billed during the request, slower cold start) — so keep it a scoped last-resort layer, never the default per-source path.
+- **Playwright/Puppeteer + headless Chromium inside the Cloud Run container** — ✅ **scaffolded, OPT-IN** (`hireflow/tools/browser.py`, `PlaywrightSource`). Documented by Google ("Browser and OS automation in Cloud Run"): install Chromium in the image, drive it from an ADK tool, extract content, feed to Gemini. Use ONLY for JS-heavy SPA career pages with no JSON-LD and no API (e.g. Kalibrr, Wantedly, MyCareersFuture, anti-bot pages).
+- **Cost caveat:** headless Chrome needs a bigger instance (more RAM, CPU stays billed during the request, slower cold start) — keep it a scoped last-resort layer, never the default per-source path. Default OFF; Chromium-in-Dockerfile is a **documented TODO**.
 - A **full desktop OS via VNC streaming** (WebSockets) is also documented for complex interaction — not needed for the demo.
 
 **C — Regions, currently curated:**
 - **MY**: freehire(my) · JobStreet MY · Maukerja
-- **ID**: freehire(id) + JobStreet ID · (Kalibrr is SPA-only; JSON-LD first, else **Layer II** Playwright)
-- **JP**: freehire(jp) · Wantedly/Sapphire are SPA/anti-bot → **CSE scoped to jp career pages**, else **Layer II** Playwright · K-Worknet (KR)
+- **ID**: freehire(id) + JobStreet ID · (Kalaber is SPA-only; JSON-LD first, else **Layer II** Playwright)
+- **JP**: freehire(jp) · LinkedIn(guest) verified Tokyo · Wantingly/Sapphire are SPA/anti-bot → **CSE scoped to jp career pages**, else **Layer II** Playwright · K-Worknet (KR)
 - **KR**: K-Worknet (**official public job API**, free key, ktor-friendly)
-- **SG**: freehire(sg) · MyCareersFuture (SPA — read its real JSON feed if you can establish it; else CSE `domain:careers.gov.sg`, else **Layer II** Playwright)
-- **EU/NA**: freehire + RemoteOK/Remotive + ATS boards (Greenhouse/Lever/Ashby/Workable — verified keyless for Greenhouse-GitLab, Ashby-Notion, Workable-Tokopedia)
+- **SG**: freehire(sg) · LinkedIn(guest) verified · MyCareersFuture (SPA — read its real JSON feed if you can establish it; else CSE `domain:careers.gov.sg`, else **Layer II** Playwright)
+- **EU/NA**: freehire + RemoteOK/Remotive + **ATS boards (Greenhouse-GitLab, Ashby-Notion verified live)** · more ATS boards to add as they are curl-verified.
 
 **D — verification rule (REQUIREMENT):** Before any country/source is "supported", run a real `curl` and post the HTTP code + job count in the PR/commit. No `curl` = not supported. Update this section each time we verify a new one.
 
@@ -305,8 +323,8 @@ URL pass.
 6. ~~Terminal CLI test~~ — **DONE**: `hireflow/cli.py` + `hireflow.sh` are thin clients hitting the live API (not a separate runtime).
 
 **Next (global + demo):**
-7. Complete the **global job-source registry** §10 with live-verified rows + the ATS-brand detector (Greenhouse/Lever/Ashby/Workable per company).
-8. Add **Google CSE** + **JSON-LD** as catch-alls (needs CSE API key from Zach) + **Layer II** Playwright/Chromium (Chromium in the Dockerfile, ADK `FunctionTool`) for SPA-only career pages.
+7. **Global job-source registry** — ✅ **IMPLEMENTED + curl-verified (2026-08-23)**: `LinkedInSource` (guest API), `JsonLdSource` (schema.org career pages), `AtsBoardSource` (Greenhouse+Ashby). Registered in `_build_default_agent()` after RemoteOK/Remotive/Freehire. Lever (404) and Workable (0 jobs) are coded but **disabled** — add rows only once curl-verified. **Still pending: redeploy + live curl e2e** against the `.run.app` URL to prove this on the live deploy.
+8. Add **Google CSE** (needs CSE API key from Zach) + finish **Layer II** Playwright/Chromium (Chromium in the Dockerfile, ADK `FunctionTool`) for SPA-only career pages — currently scaffolded/opt-in.
 9. Build the **Vite + React app** (`frontend/`, to be scaffolded) wired to the live backend (fetch) — the dashboard calls the same endpoints the CLI calls; `hireflow-frontend.html` is retired as the reference prototype.
 10. **Demo & docs**: clean architecture diagram image (README currently has ASCII), README spin-up, ≤4-min unedited video showing Cloud Run console + Vertex AI logs + live `.run` calls. Email `testing@devpost.com` / `cloudhackathons@google.com` access.
 
@@ -323,15 +341,16 @@ URL pass.
 - Inspo sources — ideas only, NOT code:
   - `github.com/MadsLorentzen/ai-job-search` — fits the query-by-function search, gates-before-scoring, seen-job adoption; **their runtime is local (Claude Code) — we are Cloud Run**.
   - `github.com/strelov1/freehire` — freehire.me is MIT open-source backend (Go+Postgres+Meilisearch); `FREEHIRE_API_URL` env-swap is our one-line failover.
-- **Job-source references (verified live 2026-08-22, but re-verify):**
-  - Greenhouse: `GET https://boards-api.greenhouse.io/v1/boards/{board}/jobs`
-  - Ashby: `GET https://api.ashbyhq.com/posting-api/job-board/{board}`
-  - Lever: `GET https://api.lever.co/v0/postings/{board}?mode=json`
-  - Workable: `GET https://apply.workable.com/api/v1/widget/accounts/{account}`
+- **Job-source references (verified live 2026-08-23, but re-verify):**
+  - Greenhouse: `GET https://boards-api.greenhouse.io/v1/boards/gitlab/jobs?content=true` (204 jobs)
+  - Ashby: `GET https://api.ashbyhq.com/posting-api/job-board/notion` (128 jobs)
+  - LinkedIn guest: `GET https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=engineer&location=Tokyo` (200, cards parse)
+  - JSON-LD: `GET https://www.greenhouse.io/careers` → ld+json `JobPosting` (1 posting)
+  - Lever: `GET https://api.lever.co/v0/postings/{board}?mode=json` — **404 on all boards tested; retired/unreliable, not enabled**
+  - Workable: `GET https://apply.workable.com/api/v1/widget/accounts/{account}` — **200 but 0 jobs on all accounts tested; not enabled**
   - freehire: `GET https://freehire.me/api/v1/agent/jobs/search` + facets `/api/v1/jobs/facets`
   - Remotive: `GET https://remotive.com/api/remote-jobs`
   - RemoteOK: `GET https://remoteok.com/api`
-  - LinkedIn stem: `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search`
 
 ---
 
@@ -339,7 +358,7 @@ URL pass.
 
 1. Re-deploy to Cloud Run (`docs/DEPLOY.md`) → curl `/health`, then the live curl e2e with a real `.pdf` (`docs/CURL_E2E.md`): upload → run → jobs → approve. **This proves the phase — not the offline green.**
 2. Scaffold + wire the **Vite + React app** (`frontend/`) to the deployed API via fetch (dashboard + approve).
-3. Global registry column §10 (CSE key from Zach, JSON-LD, Layer II Playwright).
+3. Global registry column §10: **CSE key from Zach** (not done) + **Layer II Playwright/Chromium wiring in the Dockerfile** (scaffolded/opt-in).
 4. Demo & docs: clean diagram image, ≤4-min video with Cloud Run console + Vertex logs, grant repo access to `testing@devpost.com` / `cloudhackathons@google.com`.
 5. Optional: Cloud Scheduler → POST `/pipeline/run` hourly.
 

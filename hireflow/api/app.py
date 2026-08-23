@@ -11,11 +11,14 @@ from fastapi.responses import StreamingResponse
 
 from hireflow.agents.router import RouterAgent
 from hireflow.agents.runlog import RunLog
-from hireflow.config import SETTINGS
+from hireflow.config import JSONLD_COMPANY_URLS, SETTINGS
 from hireflow.domain import Application, ApplicationStatus, JobPosting, Profile
 from hireflow.storage.factory import StorageFactory
+from hireflow.tools.ats import AtsBoardSource
 from hireflow.tools.freehire import FreehireSource
 from hireflow.tools.gemini import GeminiClient
+from hireflow.tools.jsonld import JsonLdSource
+from hireflow.tools.linkedin import LinkedInSource
 from hireflow.tools.remoteok import RemoteOKSource
 from hireflow.tools.remotive import RemotiveSource
 from hireflow.tools.resume_parser import ResumeParser
@@ -74,7 +77,14 @@ async def _sse_events(runlog: RunLog, run_id: str):
 
 def _build_default_agent() -> RouterAgent:
     gemini = GeminiClient()
-    sources = [FreehireSource(), RemoteOKSource(), RemotiveSource()]
+    sources = [
+        FreehireSource(),
+        RemoteOKSource(),
+        RemotiveSource(),
+        LinkedInSource(),
+        AtsBoardSource(),
+        JsonLdSource(urls=JSONLD_COMPANY_URLS),
+    ]
     return RouterAgent(sources=sources, gemini=gemini)
 
 
