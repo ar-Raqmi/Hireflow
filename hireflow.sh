@@ -109,7 +109,7 @@ echo "run_id: $RUN_ID"
 echo
 echo "Streaming live progress from ${BASE_URL}/pipeline/run/${RUN_ID}/events"
 echo "--------------------------------------------------------------------------------"
-python3 - "$BASE_URL" "$RUN_ID" "$PROFILE_ID" <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$BASE_URL" "$RUN_ID" "$PROFILE_ID" <<'PY'
 import json, subprocess, sys, time
 base, run_id, pid = sys.argv[1], sys.argv[2], sys.argv[3]
 started = time.monotonic()
@@ -205,4 +205,14 @@ for a in apps:
 print("\nneeds_human:", result.get("needs_human") or [])
 print("\nNext: POST /approve?application_id=<id> to act on a drafted app.")
 print("=" * 64)
+
+try:
+    from hireflow.export_html import HtmlExporter
+    exporter = HtmlExporter()
+    exporter.export(result, "result-demo.html")
+    exporter.save_json(result, "result-demo.json")
+    print("\n  saved: ./result-demo.html")
+    print("  saved: ./result-demo.json")
+except ImportError as exc:
+    print(f"\n  (could not export result-demo.html: {exc})")
 PY

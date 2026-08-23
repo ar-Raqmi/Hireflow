@@ -133,7 +133,7 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 
 ---
 
-## 7. File layout (repo — reality as of Aug 22)
+## 7. File layout (repo — reality as of Aug 23)
 
 ```
 .
@@ -141,6 +141,8 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 ├── README.md                # NEVER lie; update after every deploy with real URLs
 ├── hireflow-frontend.html   # clickable prototype/reference ONLY (mock → replaced by the React app)
 ├── hireflow.sh              # bash thin CLI driver — prompts + curls the LIVE Cloud Run URL (online-only)
+├── hireflow.bat             # Windows double-click client → runs hireflow_run.py (exports the HTML report too)
+├── hireflow_run.py          # cross-platform thin client shared by hireflow.sh/bat (pure stdlib + curl)
 ├── requirements.txt
 ├── Dockerfile
 ├── .dockerignore            # keeps .env/API.md/credential JSON out of the Cloud Build context
@@ -153,6 +155,8 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 │   ├── config.py            # Settings (project id, model, vertex/api-key flags, thresholds 80/60,
 │   │                        #   caps, RESUME_PARSE_MODE)
 │   ├── cli.py               # `python -m hireflow.cli` — thin client of the deployed API (streams SSE)
+│   ├── export_html.py       # HtmlExporter — full result → self-contained result-demo.html (+ .json)
+│   │                        #   inline CSS only, clickable links, no truncation (client-side, stdlib)
 │   ├── domain/__init__.py   # Profile, JobPosting, Application, ApplicationStatus, ResumeFinding,
 │   │                        #   WorkTypeClassifier (all present — import tree unblocked)
 │   ├── storage/             # Repository ABC + InMemory + StorageFactory (in-memory only, no DB)
@@ -209,6 +213,12 @@ imports (Vertex/API access is handled by `google-genai`).
 - `GET /jobs` / `GET /applications` — list repository contents (persisted from
   the background run's `jobs` / `application_records`).
 - `POST /approve?application_id=…` — flips an application to approved (human gate).
+- **Clients** — `hireflow/cli.py`, `hireflow.sh`, and `hireflow.bat` →
+  `hireflow_run.py` are thin clients of the deployed API. After a successful
+  run they export `result-demo.html` (single self-contained report with
+  clickable links, full titles/reasons/drafts — no truncation) plus
+  `result-demo.json` (raw result) into the working dir. **Client-side only —
+  no backend change, so NO redeploy is needed for the export feature.**
 
 **Live Cloud Run** (`https://hireflow-backend-296941301245.us-central1.run.app`)
 is alive (`/health` ok) but still predates the RouterAgent pipeline wiring AND
@@ -320,7 +330,7 @@ URL pass.
 3. ~~Fix `freehire.py`~~ — **DONE**: live endpoint (`/api/v1/agent/jobs/search`) + facets, `LocationMapper` geo codes, stable `source`/`title`/etc. core schema across all sources.
 4. ~~Offline tests removed~~ — **DONE**: `tests/` deleted (stub agent, `_StubGemini`, `TestClient`). There is no offline gate — the acceptance gate is the online curl e2e in steps 5 & 6 against the live Cloud Run URL (real `.pdf`, real Gemini via Vertex).
 5. **Re-deploy to Cloud Run** (docs/DEPLOY.md) → curl `/health`, then a **real** e2e: upload a real `.pdf` → `/pipeline/run` → `/jobs` live results → `/dashboard` reflects it → `/approve`. **Video-record the curl-to-cloud proof.**
-6. ~~Terminal CLI test~~ — **DONE**: `hireflow/cli.py` + `hireflow.sh` are thin clients hitting the live API (not a separate runtime).
+6. ~~Terminal CLI test~~ — **DONE**: `hireflow/cli.py` + `hireflow.sh` are thin clients hitting the live API (not a separate runtime). After a successful run each client exports `result-demo.html` + `result-demo.json` into the working dir (full, no truncation, clickable links) — client-side only, no redeploy.
 
 **Next (global + demo):**
 7. **Global job-source registry** — ✅ **IMPLEMENTED + curl-verified (2026-08-23)**: `LinkedInSource` (guest API), `JsonLdSource` (schema.org career pages), `AtsBoardSource` (Greenhouse+Ashby). Registered in `_build_default_agent()` after RemoteOK/Remotive/Freehire. Lever (404) and Workable (0 jobs) are coded but **disabled** — add rows only once curl-verified. **Still pending: redeploy + live curl e2e** against the `.run.app` URL to prove this on the live deploy.

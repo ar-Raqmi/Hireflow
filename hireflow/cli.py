@@ -11,6 +11,7 @@ import httpx
 
 from hireflow.config import SETTINGS
 from hireflow.domain import WorkTypeClassifier
+from hireflow.export_html import HtmlExporter
 
 
 class InputPrefs:
@@ -54,6 +55,7 @@ class HireflowCli:
             print(f"pipeline failed: {exc.__class__.__name__}: {exc}")
             return 1
         self._render(result)
+        self._export(result)
         return 0
 
     def _require_file(self) -> None:
@@ -279,6 +281,13 @@ class HireflowCli:
 
         print("\n  next step: go to the dashboard and approve an application.")
         print("=" * 64)
+
+    def _export(self, result: dict[str, Any]) -> None:
+        exporter = HtmlExporter()
+        exporter.export(result, Path("result-demo.html"))
+        exporter.save_json(result, Path("result-demo.json"))
+        print("\n  saved: ./result-demo.html")
+        print("  saved: ./result-demo.json")
 
 
 def _dedupe(values: list[str]) -> list[str]:
