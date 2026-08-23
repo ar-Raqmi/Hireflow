@@ -31,13 +31,6 @@ class Settings:
         default_factory=lambda: _env("GEMINI_USE_VERTEX", "").lower() in {"1", "true", "yes"}
     )
     base_url: str = field(default_factory=lambda: _env("HIREFLOW_BASE_URL", DEFAULT_BASE_URL))
-    storage_backend: str = field(
-        default_factory=lambda: _env("HIREFLOW_STORAGE", "").strip().lower()
-    )
-    firestore_collection_profiles: str = "profiles"
-    firestore_collection_jobs: str = "jobs"
-    firestore_collection_applications: str = "applications"
-    firestore_collection_events: str = "events"
     job_source_poll_hours: int = 6
     approve_threshold_auto: int = 80
     approve_threshold_draft: int = 60
@@ -49,6 +42,9 @@ class Settings:
     )
     freehire_posted_within_days: int = field(
         default_factory=lambda: _int_env("FREEHIRE_POSTED_WITHIN_DAYS", 14)
+    )
+    resume_parse_mode: str = field(
+        default_factory=lambda: _env("RESUME_PARSE_MODE", "hybrid").strip().lower()
     )
 
 

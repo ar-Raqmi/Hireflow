@@ -21,12 +21,7 @@ class ApplicationStatus(str, Enum):
     MATCHED = "matched"
     ROUTED = "routed"
     DRAFTED = "drafted"
-    AWAITING_APPROVAL = "awaiting_approval"
     APPROVED = "approved"
-    SUBMITTED = "submitted"
-    FOLLOWUP = "followup"
-    REPLIED = "replied"
-    DONE = "done"
 
 
 @dataclass
@@ -143,13 +138,6 @@ class JobPosting:
 
 
 @dataclass
-class JobMatch:
-    job: JobPosting
-    score: int = 0
-    reasons: list[str] = field(default_factory=list)
-
-
-@dataclass
 class Application:
     id: str = ""
     job: JobPosting | None = None
@@ -248,7 +236,6 @@ def _parse_int(value: Any) -> int:
 __all__ = [
     "Profile",
     "JobPosting",
-    "JobMatch",
     "Application",
     "ApplicationStatus",
     "ResumeFinding",

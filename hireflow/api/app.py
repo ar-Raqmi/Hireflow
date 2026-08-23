@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import uuid
 from collections import Counter
+from datetime import datetime
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 
-from hireflow.agents.adk_router import HireflowAgent, HireflowTools
+from hireflow.agents.router import RouterAgent
+from hireflow.agents.runlog import RunLog
+from hireflow.config import SETTINGS
 from hireflow.domain import Application, ApplicationStatus, JobPosting, Profile
 from hireflow.storage.factory import StorageFactory
 from hireflow.tools.freehire import FreehireSource
@@ -15,21 +21,72 @@ from hireflow.tools.remotive import RemotiveSource
 from hireflow.tools.resume_parser import ResumeParser
 
 
-def _build_default_agent() -> HireflowAgent:
+async def _execute_run(
+    runlog: RunLog,
+    agent: RouterAgent,
+    storage: StorageFactory,
+    run_id: str,
+    profile: Profile,
+) -> None:
+    async def progress(stage: str, detail: str) -> None:
+        await runlog.emit(run_id, stage, detail)
+
+    await runlog.start(run_id)
+    try:
+        result = await agent.run_pipeline(profile, progress=progress)
+        for job_map in result.get("jobs", []):
+            await storage.jobs().put(JobPosting.from_mapping(job_map))
+        for app_map in result.get("application_records", []):
+            await storage.applications().put(Application.from_mapping(app_map))
+        result["status"] = "completed"
+        result["run_id"] = run_id
+        await runlog.finish(run_id, result)
+    except Exception as exc:  # noqa: BLE001 - surface agent failure as a status, not a 500
+        await runlog.finish(
+            run_id,
+            {
+                "profile_id": profile.id,
+                "run_id": run_id,
+                "status": "error",
+                "detail": f"{type(exc).__name__}: {str(exc)[:400]}",
+                "errors": [f"{type(exc).__name__}: {str(exc)[:200]}"],
+            },
+        )
+
+
+async def _sse_events(runlog: RunLog, run_id: str):
+    yield f"event: started\ndata: {json.dumps({'run_id': run_id, 'status': 'started'})}\n\n"
+    for _ in range(20):
+        if await runlog.exists(run_id):
+            break
+        await asyncio.sleep(0.5)
+    last_seq = 0
+    while True:
+        for event in await runlog.events_since(run_id, last_seq):
+            yield f"data: {json.dumps(event)}\n\n"
+            last_seq = event["seq"]
+        if await runlog.is_done(run_id):
+            result = await runlog.result(run_id)
+            yield f"event: done\ndata: {json.dumps(result)}\n\n"
+            return
+        await asyncio.sleep(0.5)
+
+
+def _build_default_agent() -> RouterAgent:
     gemini = GeminiClient()
     sources = [FreehireSource(), RemoteOKSource(), RemotiveSource()]
-    tools = HireflowTools(sources=sources, gemini=gemini)
-    return HireflowAgent(tools=tools)
+    return RouterAgent(sources=sources, gemini=gemini)
 
 
 def create_app(
-    storage: StorageFactory | None = None, agent: HireflowAgent | None = None
+    storage: StorageFactory | None = None, agent: RouterAgent | None = None
 ) -> FastAPI:
-    """App factory — injectable storage/agent for tests; defaults to real ones."""
-    api = FastAPI(title="Hireflow API", version="0.2.0")
+    """App factory — injectable storage/agent; defaults to real ones."""
+    api = FastAPI(title="Hireflow API", version="0.3.0")
     api.state.storage = storage or StorageFactory()
     api.state.agent = agent or _build_default_agent()
     api.state.parser = ResumeParser()
+    api.state.runlog = RunLog()
 
     @api.get("/health")
     async def health() -> dict[str, str]:
@@ -68,6 +125,16 @@ def create_app(
             locations=_split_csv(locations),
             salary_floor=salary_parsed,
         )
+        parsed, parse_errors = await _enrich_profile(
+            api.state.agent.gemini, api.state.parser, profile, file.filename, content
+        )
+        if not profile.target_roles:
+            profile.target_roles = parsed.get("target_roles", [])
+        profile.skills = parsed.get("skills", [])
+        profile.years_experience = float(parsed.get("years_experience", 0.0) or 0.0)
+        profile.culture_keywords = parsed.get("culture_keywords", [])
+        profile.residence = str(parsed.get("residence", "") or "")
+        profile.parsed_at = datetime.now()
         await api.state.storage.profiles().put(profile)
         return {
             "id": profile.id,
@@ -78,6 +145,11 @@ def create_app(
             "locations": profile.locations,
             "target_roles": profile.target_roles,
             "salary_floor": profile.salary_floor,
+            "skills": profile.skills,
+            "years_experience": profile.years_experience,
+            "residence": profile.residence,
+            "culture_keywords": profile.culture_keywords,
+            "parse_errors": parse_errors,
         }
 
     @api.get("/dashboard")
@@ -115,38 +187,19 @@ def create_app(
         profile = await api.state.storage.profiles().get(profile_id)
         if profile is None:
             return {"profile_id": profile_id, "status": "profile_not_found"}
-        try:
-            result = await api.state.agent.run_pipeline(profile.to_mapping())
-        except Exception as exc:  # noqa: BLE001 - surface agent failure as a status, not a 500
-            return {
-                "profile_id": profile_id,
-                "status": "error",
-                "detail": f"{type(exc).__name__}: {str(exc)[:400]}",
-            }
+        run_id = str(uuid.uuid4())
+        asyncio.create_task(
+            _execute_run(api.state.runlog, api.state.agent, api.state.storage, run_id, profile)
+        )
+        return {"run_id": run_id, "profile_id": profile_id, "status": "started"}
 
-        job_count = 0
-        for job_map in result.get("jobs", []):
-            job = JobPosting.from_mapping(job_map)
-            await api.state.storage.jobs().put(job)
-            job_count += 1
-
-        app_count = 0
-        for app_map in result.get("applications", []):
-            application = Application.from_mapping(app_map)
-            await api.state.storage.applications().put(application)
-            app_count += 1
-
-        return {
-            "profile_id": profile_id,
-            "status": "completed",
-            "jobs_found": job_count,
-            "matches": result.get("matches", []),
-            "applications": result.get("applications", []),
-            "needs_human": result.get("needs_human", []),
-            "errors": result.get("errors", []),
-            "drafts_ready": result.get("drafts", {}),
-            "pipeline": "search -> score -> research -> prepare -> approve",
-        }
+    @api.get("/pipeline/run/{run_id}/events")
+    async def pipeline_events(run_id: str) -> StreamingResponse:
+        return StreamingResponse(
+            _sse_events(api.state.runlog, run_id),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     return api
 
@@ -155,8 +208,34 @@ def _split_csv(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
-def _approx_pages(text: str) -> int:
-    return max(1, (len(text) + 2999) // 3000)
+async def _enrich_profile(
+    gemini: GeminiClient,
+    parser: ResumeParser,
+    profile: Profile,
+    filename: str | None,
+    content: bytes,
+) -> tuple[dict, list[str]]:
+    mode = SETTINGS.resume_parse_mode
+    is_pdf = (filename or "").lower().endswith(".pdf")
+    thin = len("".join(profile.resume_text.split())) < 200
+    use_vision = mode == "vision" or (mode == "hybrid" and is_pdf and thin)
+    errors: list[str] = []
+    parsed: dict = {}
+    if profile.resume_text:
+        if use_vision:
+            try:
+                pages = parser.pdf_page_images(content)
+                parsed = await gemini.parse_resume_vision(pages, text_hint=profile.resume_text[:2000])
+            except Exception as exc:  # noqa: BLE001 - degrade to text-only, never a 500
+                errors.append(f"vision parse: {type(exc).__name__}: {str(exc)[:200]}")
+                parsed = {}
+        if not parsed:
+            try:
+                parsed = await gemini.parse_resume(profile.resume_text)
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"text parse: {type(exc).__name__}: {str(exc)[:200]}")
+                parsed = {}
+    return parsed, errors
 
 
 def _parse_salary_floor(value: str) -> int | None:

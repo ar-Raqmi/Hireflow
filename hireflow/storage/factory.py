@@ -1,40 +1,31 @@
 from __future__ import annotations
 
-from hireflow.config import SETTINGS
 from hireflow.domain import Application, JobPosting, Profile
-from hireflow.storage.firestore_repository import FirestoreRepository
 from hireflow.storage.memory_repository import InMemoryRepository
 from hireflow.storage.repository import Repository
 
 
 class StorageFactory:
-    """Builds repositories for each entity, choosing Firestore or in-memory.
+    """Builds in-memory repositories for each entity.
 
-    In-memory by default — the backend is stateless by design (AGENTS.md §5);
-    the online curl e2e is the acceptance gate, not offline tests. Firestore is
-    only used when ``HIREFLOW_STORAGE`` is set to ``firestore``. Repositories are
-    cached so repeated access returns the same instance.
+    The backend is stateless by design (AGENTS.md §5): nothing sensitive is
+    stored server-side. Repositories are cached so repeated access returns the
+    same instance.
     """
 
     def __init__(self) -> None:
-        self._use_firestore = SETTINGS.storage_backend == "firestore"
         self._cache: dict[str, Repository] = {}
 
     def profiles(self) -> Repository:
-        return self._get(SETTINGS.firestore_collection_profiles, Profile)
+        return self._get("profiles", Profile)
 
     def jobs(self) -> Repository:
-        return self._get(SETTINGS.firestore_collection_jobs, JobPosting)
+        return self._get("jobs", JobPosting)
 
     def applications(self) -> Repository:
-        return self._get(SETTINGS.firestore_collection_applications, Application)
+        return self._get("applications", Application)
 
     def _get(self, collection: str, entity_type: type) -> Repository:
         if collection not in self._cache:
-            self._cache[collection] = self._build(collection, entity_type)
+            self._cache[collection] = InMemoryRepository(entity_type)
         return self._cache[collection]
-
-    def _build(self, collection: str, entity_type: type) -> Repository:
-        if self._use_firestore:
-            return FirestoreRepository(collection, entity_type)
-        return InMemoryRepository(entity_type)

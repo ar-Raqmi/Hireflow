@@ -76,6 +76,18 @@ class ResumeParser:
         text = "\n".join(paragraph.text for paragraph in document.paragraphs)
         return text, _approx_pages(text)
 
+    def pdf_page_images(self, content: bytes, max_pages: int = 6) -> list[bytes]:
+        import fitz
+
+        pages: list[bytes] = []
+        document = fitz.open(stream=content, filetype="pdf")
+        for index, page in enumerate(document):
+            if index >= max_pages:
+                break
+            pixmap = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+            pages.append(pixmap.tobytes("png"))
+        return pages
+
 
 def _approx_pages(text: str) -> int:
     return max(1, (len(text) + 2999) // 3000)

@@ -37,7 +37,29 @@ class GeminiClient:
 # Todo: recheck the prompt engineering.
 
     async def parse_resume(self, text: str) -> dict[str, Any]:
-        prompt = (
+        prompt = self._profile_prompt(text[:24000])
+        return await self._generate_json(prompt)
+
+    async def parse_resume_vision(
+        self, pages_bytes: list[bytes], text_hint: str = ""
+    ) -> dict[str, Any]:
+        from google.genai import types
+
+        parts: list[types.Part] = []
+        for data in pages_bytes:
+            parts.append(types.Part.from_bytes(data=data, mime_type="image/png"))
+        if text_hint:
+            parts.append(types.Part.from_text(text=text_hint))
+        instruction = self._profile_prompt("")
+        contents = [types.Content(role="user", parts=[types.Part.from_text(text=instruction), *parts])]
+        response = await self._async_client.models.generate_content(
+            model=self._model, contents=contents
+        )
+        return self._extract_profile(response.text)
+
+    @staticmethod
+    def _profile_prompt(text: str) -> str:
+        return (
             "Parse this resume into a structured profile. "
             "Residence means where the person lives (city, state/country) — not where they want to work. "
             'Return ONLY JSON: {"name": str, "headline": str, "residence": str, "email": str, '
@@ -46,7 +68,13 @@ class GeminiClient:
             '"target_roles": [str], "years_experience": float, "culture_keywords": [str]}\n'
             f"RESUME:\n{text[:24000]}"
         )
-        return await self._generate_json(prompt)
+
+    @staticmethod
+    def _extract_profile(text: str) -> dict[str, Any]:
+        try:
+            return json.loads(text[text.find("{") : text.rfind("}") + 1])
+        except (ValueError, json.JSONDecodeError):
+            return {"raw": text}
 
     async def audit_resume(self, text: str, profile: Profile) -> dict[str, Any]:
         parsed = profile.to_mapping()

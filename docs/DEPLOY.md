@@ -28,15 +28,19 @@ grant the role to that SA instead.
 ```bash
 gcloud run deploy hireflow-backend --region us-central1 --source . \
   --allow-unauthenticated \
-  --set-env-vars GCP_PROJECT_ID=hireflow-506207,GEMINI_USE_VERTEX=true,VERTEX_LOCATION=global,GEMINI_MODEL=gemini-3.5-flash \
-  --memory 512Mi --timeout 600
+  --set-env-vars GCP_PROJECT_ID=hireflow-506207,GEMINI_USE_VERTEX=true,VERTEX_LOCATION=global,GEMINI_MODEL=gemini-3.5-flash,RESUME_PARSE_MODE=hybrid \
+  --memory 512Mi --timeout 900
 ```
 
 - `--source .` builds the `Dockerfile` via Cloud Build. `.dockerignore`
   excludes `.env`, `API.md`, `*-credential.json`, `.venv`, etc. from the build
   context.
-- `--timeout 600` gives the pipeline (search→score→research→prepare) room to
-  finish inside one request; Cloud Run max is 3600s.
+- `--timeout 900` — the pipeline now streams SSE progress from a background
+  task; the request must stay open while the client drains `/events`, so give it
+  room (Cloud Run max is 3600s).
+- `RESUME_PARSE_MODE` — `hybrid` (default): Gemini text parse, upgraded to
+  Gemini **vision** page-images when the PDF's extracted text is thin;
+  `vision`: always render PDF pages + Gemini vision; `text`: text-only parse.
 - Optional tuning (defaults are fine for the demo):
   `PIPELINE_MAX_JOBS=25`, `PIPELINE_MAX_SCORE=10`, `PIPELINE_MAX_PREP=5`,
   `PIPELINE_MAX_RESEARCH=8`, `FREEHIRE_POSTED_WITHIN_DAYS=14`.

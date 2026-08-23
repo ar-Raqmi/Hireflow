@@ -56,7 +56,7 @@ The agent is **not a chatbot**. The user uploads a resume + preferences once; th
 
 | Role | Owner | Scope |
 |------|-------|-------|
-| Coding + backend | **You** (with your AI) | ADK agent, FastAPI, job-source clients, single-file HTML UI, demo video |
+| Coding + backend | **You** (with your AI) | ADK agent, FastAPI, job-source clients, Vite+React frontend, demo video |
 | Cloud (all Google things) | **Zach** | GCP project, $150 credits, enable APIs, service-account key, Vertex AI, Cloud Run deploy, IAM, GCloud console proof for demo |
 
 **Handoffs:** Zach gives → project id + service-account credentials JSON + enabled APIs. You give → Dockerfile + code. Zach returns → Cloud Run `.run.app` URL. No DB setup needed.
@@ -71,7 +71,7 @@ The agent is **not a chatbot**. The user uploads a resume + preferences once; th
 | Agent framework | **Google ADK (Python)** |
 | Model | **Gemini 3.5 Flash** via **Vertex AI** (Flash-first; Pro only if a review step demands it) |
 | Backend | **FastAPI** (Python) |
-| Frontend | Single-file HTML (`hireflow-frontend.html`) — mock UI today, **wired to the deployed FastAPI via fetch** once the CLI e2e passes |
+| Frontend | **Vite + React** (the real app, wired to the deployed FastAPI via fetch). `hireflow-frontend.html` is the clickable prototype/reference only — the React app replaces it. |
 | Database/state | **No SQL**. Browser `localStorage` owns prefs + history; backend is stateless, in-memory only for a run |
 | Hosting | **Cloud Run** (scale-to-zero) |
 | Scheduling | **Cloud Scheduler** → `POST /pipeline/run` (job polling) — optional |
@@ -88,26 +88,26 @@ The agent is **not a chatbot**. The user uploads a resume + preferences once; th
 
 ---
 
-## 5. Architecture (multi-agent)
+## 5. Architecture (multi-agent — the 5 agents are the LIVE pipeline)
 
 ```
-[User] → [hireflow-frontend.html → fetch to FastAPI] → [ROUTER (ADK orchestrator)]
-                                                        │
-                  ┌─────────────────────────────────────┼────────────────────────────┐
-                  ▼                                     ▼                            ▼
-         SearchAgent                         MatchAgent(CV Analysis)      ResearchAgent
-         search_jobs(global registry)       parse_resume()/audit()/      company_research()
-                                            score_fit()
-                  └─────────────────────────────────────┼────────────────────────────┘
-                                                        ▼
-                                       PrepareAgent: DRAFTER → REVIEWER → REVISE
-                                                        ▼
-                                              [ HUMAN APPROVAL GATE ]
-                                                        ▼
+[User] → [Vite + React app → fetch to FastAPI] → [RouterAgent (orchestrator)]
+                                                         │  SSE progress: parse→audit→search→match→research→prepare→approve
+                   ┌─────────────────────────────────────┼────────────────────────────┐
+                   ▼                                     ▼                            ▼
+          SearchAgent                         MatchAgent(CV Analysis)      ResearchAgent
+          search_jobs(global registry)       score_fit() 5-dim scoring     company_research()
+                                            + audit_resume (ATS)
+                   └─────────────────────────────────────┼────────────────────────────┘
+                                                         ▼
+                                        PrepareAgent: DRAFTER → REVIEWER → REVISE
+                                                         ▼
+                                               [ HUMAN APPROVAL GATE ]
+                                                         ▼
                                         Browser localStorage (history + tracking)
 ```
 
-MVP agents: **Search, Match/Analyze, Research, Prepare (drafter→reviewer→revise)**. Tracking = passive localStorage/dashboard. No DB.
+MVP agents: **Search, Match/Analyze, Research, Prepare (drafter→reviewer→revise)**, orchestrated by **RouterAgent**. Every agent runs server-side through `GeminiClient` (the only LLM entry point) and tags its stage on the SSE stream. Tracking = passive localStorage/dashboard. No DB.
 
 State story (judge-grade): **client-side persistence, stateless backend.** Nothing sensitive is ever stored server-side.
 
@@ -118,18 +118,18 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 - **All backend code object-oriented.** No free functions doing work; logic lives in classes.
 - Abstract base classes define contracts:
   - `hireflow/storage/` → `Repository` (ABC): `InMemoryRepository` (default)
-  - `hireflow/agents/` → `BaseAgent` (ABC): `SearchAgent`, `MatchAgent`, `ResearchAgent`, `PrepareAgent`, `RouterAgent`
+  - `hireflow/agents/` → `BaseAgent` (ABC): `SearchAgent`, `MatchAgent`, `ResearchAgent`, `PrepareAgent`, `RouterAgent` — **these are the LIVE pipeline** (RouterAgent orchestrates them; every one uses `GeminiClient`)
   - `hireflow/tools/` → `JobSource` (ABC): `RemoteOKSource`, `RemotiveSource`, `FreehireSource` (+ any new global sources)
   - `hireflow/tools/` → `GeminiClient` — THE only LLM entry point. No alternative/fallback LLM path, no stub.
 - Domain models in `hireflow/domain/` — plain typed classes, no framework imports:
   - `Profile` (incl. `residence`, `work_type`, preferred `locations`, `salary_floor`)
-  - `JobPosting`, `JobMatch`, `Application` (+ `ApplicationStatus`)
+  - `JobPosting`, `Application` (+ `ApplicationStatus` — only `MATCHED`/`ROUTED`/`DRAFTED`/`APPROVED` are used at runtime)
   - **`ResumeFinding`** — one ATS-health finding produced by `GeminiClient.audit_resume` (now present; `from hireflow.domain import JobPosting, Profile, ResumeFinding` resolves).
-  - **`WorkTypeClassifier`** — deterministic `remote|hybrid|onsite|any` gate (now present; used by `ResumeParser.infer_work_type` and `HireflowTools._infer_work_type`).
+  - **`WorkTypeClassifier`** — deterministic `remote|hybrid|onsite|any` gate (now present; used by `ResumeParser.infer_work_type` and `SearchAgent._infer_work_type`).
 - **Naming:** classes `PascalCase`, methods/vars `snake_case`, constants `UPPER_SNAKE`, private helpers `_underscore`.
 - **No code comments unless asked.**
 - Type hints everywhere (Python 3.11+).
-- Frontend OOP rules don't apply; no build tool.
+- Frontend OOP rules don't apply (Vite + React — build tool allowed).
 
 ---
 
@@ -139,7 +139,7 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 .
 ├── AGENTS.md                # this file — the memory
 ├── README.md                # NEVER lie; update after every deploy with real URLs
-├── hireflow-frontend.html   # single-file UI (mock today → real fetch wiring)
+├── hireflow-frontend.html   # clickable prototype/reference ONLY (mock → replaced by the React app)
 ├── hireflow.sh              # bash thin CLI driver — prompts + curls the LIVE Cloud Run URL (online-only)
 ├── requirements.txt
 ├── Dockerfile
@@ -150,18 +150,26 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 │   ├── CURL_E2E.md          # exact online curl playbook (upload → run → approve) against live URL
 │   └── DEPLOY.md            # Zach's one-command Cloud Run redeploy + Vertex IAM grant
 ├── hireflow/
-│   ├── config.py            # Settings (project id, model, vertex/api-key flags, thresholds 80/60, caps)
-│   ├── cli.py               # `python -m hireflow.cli` — thin client of the deployed API (reports only)
-│   ├── domain/__init__.py   # Profile, JobPosting, JobMatch, Application, ApplicationStatus,
-│   │                        #   ResumeFinding, WorkTypeClassifier (all present — import tree unblocked)
-│   ├── storage/             # Repository ABC + InMemory + Firestore(optional) + StorageFactory
-│   ├── agents/              # BaseAgent ABC, router.py (Search/Match/Research/Prepare/Router),
-│   │                        #   adk_router.py (HireflowAgent + HireflowTools, Google ADK)
+│   ├── config.py            # Settings (project id, model, vertex/api-key flags, thresholds 80/60,
+│   │                        #   caps, RESUME_PARSE_MODE)
+│   ├── cli.py               # `python -m hireflow.cli` — thin client of the deployed API (streams SSE)
+│   ├── domain/__init__.py   # Profile, JobPosting, Application, ApplicationStatus, ResumeFinding,
+│   │                        #   WorkTypeClassifier (all present — import tree unblocked)
+│   ├── storage/             # Repository ABC + InMemory + StorageFactory (in-memory only, no DB)
+│   ├── agents/              # BaseAgent ABC, router.py (Search/Match/Research/Prepare/Router — the LIVE
+│   │                        #   pipeline), adk_router.py (HireflowAgent ADK graph + HireflowTools),
+│   │                        #   runlog.py (RunLog — in-memory per-run SSE event log)
 │   ├── tools/               # JobSource ABC, RemoteOK, Remotive, Freehire, geo (LocationMapper),
-│   │                        #   resume_parser, gemini.py (REAL GeminiClient)
-│   └── api/app.py           # FastAPI: health, upload, dashboard, jobs, applications, approve, pipeline/run
-└── web/                     # unused — frontend lives in hireflow-frontend.html
+│   │                        #   resume_parser, gemini.py (REAL GeminiClient, incl. vision parse)
+│   └── api/app.py           # FastAPI: health, upload (text+vision parse), dashboard, jobs,
+│                            #   applications, approve, pipeline/run (async), pipeline/run/{id}/events (SSE)
+└── frontend/                # Vite + React app (future — the real frontend; replaces hireflow-frontend.html)
 ```
+
+**Deps (requirements.txt):** adds `PyMuPDF` (renders PDF pages → PNG for the
+Gemini vision path; pure-pip, no system libs). `google-cloud-firestore`,
+`google-cloud-aiplatform`, and `google-generativeai` were removed as dead
+imports (Vertex/API access is handled by `google-genai`).
 
 **No `tests/` directory — by design.** Offline tests (stub agent, `_StubGemini`,
 `TestClient`) were deleted. The acceptance gate is the online curl e2e in
@@ -179,21 +187,30 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 - `POST /upload` — real parse: `ResumeParser` extracts text from `.txt/.pdf/.docx`
   (`pypdf`/`python-docx`), validates `work_type ∈ remote|hybrid|onsite|any`,
   builds a `Profile` (work_type gate, locations, target roles, salary floor),
-  stores it in the in-memory repo. Returns `status: "parsed_and_stored"` + `pages`.
-- `POST /pipeline/run?profile_id=…` — **wired to the real agent**: `create_app`
-  builds `GeminiClient` (Vertex first, API-key fallback) + `HireflowTools`
-  (Freehire/RemoteOK/Remotive) + `HireflowAgent` by default. Runs
-  search → score → research → prepare server-side, persists discovered jobs +
-  applications, returns `status:"completed"` + matches/applications/needs_human.
-  Caps: ≤25 jobs, ≤10 scored, ≤5 prepared (env-tunable). A down board degrades to
-  `[]` and is recorded in `errors`, never a 500.
+  then **runs a real Gemini parse** (text-only, or Gemini vision page-images via
+  PyMuPDF when the PDF text is thin / `RESUME_PARSE_MODE=vision`) to populate
+  `skills`, `years_experience`, `culture_keywords`, `residence` and inferred
+  `target_roles`. Parse failure degrades to text-only + `parse_errors`, never a
+  500. Returns `status: "parsed_and_stored"` + pages + enriched fields.
+- `POST /pipeline/run?profile_id=…` — **async + SSE**: creates a `run_id`,
+  runs the real **RouterAgent pipeline** (`SearchAgent → MatchAgent →
+  ResearchAgent → PrepareAgent`, orchestrated by `RouterAgent`, every agent
+  through `GeminiClient` Vertex-first + `JobSource` Freehire/RemoteOK/Remotive)
+  in a background asyncio task, and returns `{"run_id":…,"status":"started"}`
+  immediately. Caps: ≤25 jobs, ≤10 scored, ≤5 prepared (env-tunable).
+- `GET /pipeline/run/{run_id}/events` — **Server-Sent Events** (`text/event-stream`):
+  streams `parse → audit → search → match → research → prepare → approve`
+  agent-tagged stage events with counts/names as `data: {…}`, then a final
+  `event: done` with the full result JSON. A down board degrades to `[]` and is
+  recorded in `errors`, never a 500.
 - `GET /dashboard` — live counts + by-status breakdown.
-- `GET /jobs` / `GET /applications` — list repository contents.
+- `GET /jobs` / `GET /applications` — list repository contents (persisted from
+  the background run's `jobs` / `application_records`).
 - `POST /approve?application_id=…` — flips an application to approved (human gate).
 
 **Live Cloud Run** (`https://hireflow-backend-296941301245.us-central1.run.app`)
-still predates the pipeline wiring (its `/pipeline/run` answers
-`agent_not_configured`); the NEW build is the acceptance target — see
+is alive (`/health` ok) but still predates the RouterAgent pipeline wiring AND
+the SSE streaming — the NEW build is the acceptance target — see
 `docs/DEPLOY.md` for the redeploy and `docs/CURL_E2E.md` for the curl proof.
 
 ---
@@ -205,18 +222,26 @@ still predates the pipeline wiring (its `/pipeline/run` answers
   **No offline tests exist** — `tests/` was deleted; the acceptance gate is the
   online curl e2e (`docs/CURL_E2E.md`). `python -m hireflow.cli` and `hireflow.sh`
   are thin clients of the deployed API.
-- **`create_app` now wires the real agent** — `GeminiClient` (Vertex first,
-  API-key fallback) + `HireflowTools` + `HireflowAgent`; `POST /pipeline/run`
-  runs search → score → research → prepare server-side. The deployed build still
-  predates this: the live `/pipeline/run` answers `agent_not_configured` until
-  the redeploy in `docs/DEPLOY.md` lands.
+- **`/pipeline/run` is now async + SSE** — it returns `{"run_id":…,"status":"started"}`,
+  runs the real **RouterAgent pipeline** (`SearchAgent → MatchAgent →
+  ResearchAgent → PrepareAgent`, every agent through `GeminiClient`
+  Vertex-first + `JobSource` Freehire/RemoteOK/Remotive, orchestrated by
+  `RouterAgent`) in a background asyncio task writing to an in-memory `RunLog`
+  (`hireflow/agents/runlog.py`), and `GET /pipeline/run/{run_id}/events` streams
+  `parse → audit → search → match → research → prepare → approve` events then a
+  final `done` payload. `/upload` now runs a real Gemini parse (text, or vision
+  via PyMuPDF page-images when the PDF text is thin) so `skills` /
+  `years_experience` are populated. The deployed build still predates this: the
+  live `/pipeline/run` answers `agent_not_configured` until the redeploy in
+  `docs/DEPLOY.md` lands.
 - **Live Cloud Run** (`https://hireflow-backend-296941301245.us-central1.run.app`)
   is ALIVE and returns `{"status":"ok"}` (verified Aug 22) — it predates the
-  pipeline wiring.
+  pipeline wiring AND the SSE streaming.
 - **Not yet done (must be proven live, AGENTS.md §16):** the new build is not
-  deployed; the online curl e2e (upload → run → jobs → approve) against the live
-  URL has not run with this code; `hireflow-frontend.html` is still a mock; CSE /
-  JSON-LD / Layer II (Playwright) are designed but not implemented.
+  deployed; the online curl e2e (upload → run → stream events → jobs → approve)
+  against the live URL has not run with this code; `hireflow-frontend.html` is
+  still a mock; CSE / JSON-LD / Layer II (Playwright) are designed but not
+  implemented.
 
 **The old AGENTS.md claimed Phases "1 & 1.5 done": that was FALSE at the time**
 (import was broken, no live pipeline). Today the code paths exist and are green
@@ -259,11 +284,12 @@ URL pass.
 
 ## 11. Backend API surface (target, FastAPI)
 
-- `POST /upload` — resume (txt/pdf/docx) + preferences → store → **trigger parse/audit** (real Gemini)
+- `POST /upload` — resume (txt/pdf/docx) + preferences → store → **parse/audit** (real Gemini, text+vision)
 - `GET /dashboard` — live pipeline status
 - `GET /jobs` / `GET /applications` — read
 - `POST /approve` — human approval gate
-- `POST /pipeline/run` — run Search→Match→Research→Prepare end-to-end (needs the non-`None` agent)
+- `POST /pipeline/run` — start the **RouterAgent** Search→Match→Research→Prepare pipeline end-to-end async → returns `run_id` (`started`)
+- `GET /pipeline/run/{run_id}/events` — SSE stream of per-stage progress + final `done` payload
 - healthcheck (`/health`) for Cloud Run
 
 ---
@@ -272,7 +298,7 @@ URL pass.
 
 **Now (the base, mandatory — stops the "partial runtime" myth):**
 1. ~~Unblock the import tree~~ — **DONE**: `ResumeFinding` + `WorkTypeClassifier` are in `hireflow/domain/__init__.py` and `hireflow.tools.gemini` imports cleanly.
-2. ~~Wire real agent into API~~ — **DONE**: `create_app` builds real `GeminiClient` (Vertex FIRST, API-key fallback) + `HireflowTools` + `HireflowAgent`; `POST /pipeline/run` runs server-side.
+2. ~~Wire the 5 named agents into the server pipeline~~ — **DONE (code; live proof pending redeploy)**: `RouterAgent` now orchestrates `SearchAgent → MatchAgent → ResearchAgent → PrepareAgent` as the ACTUAL `/pipeline/run` executor. Each agent carries its prompt-engineering and calls the same `GeminiClient` methods (`score_fit`, `research_company`, `draft/review/revise_application`, `audit_resume`). Stages are tagged in SSE as `search`/`match`/`research`/`prepare`. `HireflowTools` is reduced to the ADK `FunctionTool` layer; `HireflowAgent` keeps the mandated ADK `LlmAgent` graph and delegates to `RouterAgent` when wired.
 3. ~~Fix `freehire.py`~~ — **DONE**: live endpoint (`/api/v1/agent/jobs/search`) + facets, `LocationMapper` geo codes, stable `source`/`title`/etc. core schema across all sources.
 4. ~~Offline tests removed~~ — **DONE**: `tests/` deleted (stub agent, `_StubGemini`, `TestClient`). There is no offline gate — the acceptance gate is the online curl e2e in steps 5 & 6 against the live Cloud Run URL (real `.pdf`, real Gemini via Vertex).
 5. **Re-deploy to Cloud Run** (docs/DEPLOY.md) → curl `/health`, then a **real** e2e: upload a real `.pdf` → `/pipeline/run` → `/jobs` live results → `/dashboard` reflects it → `/approve`. **Video-record the curl-to-cloud proof.**
@@ -281,7 +307,7 @@ URL pass.
 **Next (global + demo):**
 7. Complete the **global job-source registry** §10 with live-verified rows + the ATS-brand detector (Greenhouse/Lever/Ashby/Workable per company).
 8. Add **Google CSE** + **JSON-LD** as catch-alls (needs CSE API key from Zach) + **Layer II** Playwright/Chromium (Chromium in the Dockerfile, ADK `FunctionTool`) for SPA-only career pages.
-9. Wire `hireflow-frontend.html` to the live backend (fetch) — the dashboard calls the same endpoints the CLI calls.
+9. Build the **Vite + React app** (`frontend/`, to be scaffolded) wired to the live backend (fetch) — the dashboard calls the same endpoints the CLI calls; `hireflow-frontend.html` is retired as the reference prototype.
 10. **Demo & docs**: clean architecture diagram image (README currently has ASCII), README spin-up, ≤4-min unedited video showing Cloud Run console + Vertex AI logs + live `.run` calls. Email `testing@devpost.com` / `cloudhackathons@google.com` access.
 
 ---
@@ -312,7 +338,7 @@ URL pass.
 ## 14. Next session: where to pick up
 
 1. Re-deploy to Cloud Run (`docs/DEPLOY.md`) → curl `/health`, then the live curl e2e with a real `.pdf` (`docs/CURL_E2E.md`): upload → run → jobs → approve. **This proves the phase — not the offline green.**
-2. Wire `hireflow-frontend.html` to the deployed API via fetch (dashboard + approve).
+2. Scaffold + wire the **Vite + React app** (`frontend/`) to the deployed API via fetch (dashboard + approve).
 3. Global registry column §10 (CSE key from Zach, JSON-LD, Layer II Playwright).
 4. Demo & docs: clean diagram image, ≤4-min video with Cloud Run console + Vertex logs, grant repo access to `testing@devpost.com` / `cloudhackathons@google.com`.
 5. Optional: Cloud Scheduler → POST `/pipeline/run` hourly.

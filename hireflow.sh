@@ -97,50 +97,75 @@ PROFILE_ID="$(python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''
 [[ -n "$PROFILE_ID" ]] || { echo "no profile id in response" >&2; exit 1; }
 
 echo
-echo "Running pipeline for profile $PROFILE_ID …"
-RESULT="$(curl -s -X POST "${BASE_URL}/pipeline/run?profile_id=${PROFILE_ID}")"
+echo "Starting pipeline for profile $PROFILE_ID (SSE live progress) …"
+RUN_ID="$(curl -sf -X POST "${BASE_URL}/pipeline/run?profile_id=${PROFILE_ID}" \
+  | python3 -c "import json,sys; print(json.load(sys.stdin).get('run_id',''))")" || {
+  echo "pipeline start failed" >&2
+  exit 1
+}
+[[ -n "$RUN_ID" ]] || { echo "no run_id in pipeline response" >&2; exit 1; }
+echo "run_id: $RUN_ID"
 
-TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
-printf '%s' "$RESULT" > "$TMP"
+echo
+echo "Streaming live progress from ${BASE_URL}/pipeline/run/${RUN_ID}/events"
+echo "----------------------------------------------------------------------"
+curl -sN "${BASE_URL}/pipeline/run/${RUN_ID}/events" | python3 - "$PROFILE_ID" <<'PY'
+import json, sys, time
+pid = sys.argv[1]
+started = time.monotonic()
+result = None
+event = ""
+for line in sys.stdin:
+    line = line.rstrip("\n")
+    if not line:
+        continue
+    if line.startswith("event:"):
+        event = line[6:].strip()
+        continue
+    if not line.startswith("data:"):
+        continue
+    raw = line[5:].strip()
+    if not raw:
+        continue
+    try:
+        payload = json.loads(raw)
+    except Exception:
+        continue
+    if event == "done":
+        result = payload
+        continue
+    event = ""
+    if "stage" in payload:
+        elapsed = int(time.monotonic() - started)
+        print(f"  [+{elapsed:>4}s] >> {payload['stage']:<9} {payload.get('detail','')}")
 
-python3 - "$TMP" "$BASE_URL" "$PROFILE_ID" <<'PY'
-import json, sys
-path, base, pid = sys.argv[1], sys.argv[2], sys.argv[3]
-with open(path) as f:
-    data = f.read()
-try:
-    r = json.loads(data)
-except Exception:
-    print("RAW RESPONSE (not JSON):")
-    print(data[:3000])
+if result is None:
+    print("pipeline finished without a done event", file=sys.stderr)
     sys.exit(1)
 
+print("\n" + "=" * 64)
+print("HIREFLOW REPORT · profile", pid, "· run", (result.get("run_id") or "")[:8])
 print("=" * 64)
-print("HIREFLOW REPORT · profile", pid)
-print("=" * 64)
-print("status:     ", r.get("status"))
-print("jobs_found: ", r.get("jobs_found", 0))
+print("status:     ", result.get("status"))
+print("jobs_found: ", result.get("jobs_found", 0))
 
-matches = r.get("matches") or []
+matches = result.get("matches") or []
 print(f"\nTOP MATCHES ({len(matches)})")
 for m in matches[:10]:
-    job = m.get("job", {})
-    print(f'  {m.get("score",0):>3}  {str(job.get("title",""))[:46]:<46} @ {str(job.get("company",""))[:28]:<28}')
-    print(f'      loc:{str(job.get("location",""))[:40]:<40} url:{str(job.get("post_url",""))[:70]}')
+    print(f'  {m.get("score",0):>3}  {str(m.get("title",""))[:46]:<46} @ {str(m.get("company",""))[:28]:<28}')
+    print(f'      loc:{str(m.get("location",""))[:40]:<40} url:{str(m.get("post_url",""))[:70]}')
     reasons = m.get("reasons") or []
     if reasons:
         print(f'      why: {str(reasons[0])[:110]}')
 
-apps = r.get("applications") or []
+apps = result.get("applications") or []
 print(f"\nAPPLICATIONS ({len(apps)})")
 for a in apps:
-    job = a.get("job") or {}
-    jt = str(job.get("title", ""))[:44]
+    drafted = "  [draft ready]" if a.get("drafted") else ""
     print(f'  {str(a.get("id",""))[:12]}  status={a.get("status","")}  score={a.get("score","")}'
-          f'{"  needs_human" if a.get("human_handoff") else ""}  {jt}')
+          f'{"  needs_human" if a.get("human_handoff") else ""}  {str(a.get("title",""))[:44]}{drafted}')
 
-print("\nneeds_human:", r.get("needs_human") or [])
+print("\nneeds_human:", result.get("needs_human") or [])
 print("\nNext: POST /approve?application_id=<id> to act on a drafted app.")
 print("=" * 64)
 PY

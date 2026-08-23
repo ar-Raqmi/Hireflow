@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -142,12 +144,53 @@ class HireflowCli:
         return payload["id"]
 
     def _run_pipeline(self, profile_id: str) -> dict[str, Any]:
-        with httpx.Client(timeout=600) as client:
+        with httpx.Client(timeout=60) as client:
             response = client.post(
                 f"{self._base_url}/pipeline/run", params={"profile_id": profile_id}
             )
             response.raise_for_status()
-        return response.json()
+        payload = response.json()
+        if payload.get("status") != "started" or not payload.get("run_id"):
+            raise SystemExit(f"pipeline did not start: {payload}")
+        run_id = payload["run_id"]
+        print(f"\n[run] started {run_id[:8]} · streaming live progress\n")
+        return self._stream_events(run_id)
+
+    def _stream_events(self, run_id: str) -> dict[str, Any]:
+        started = time.monotonic()
+        result: dict[str, Any] | None = None
+        event_name = ""
+        with httpx.Client(timeout=None) as client:
+            with client.stream(
+                "GET", f"{self._base_url}/pipeline/run/{run_id}/events"
+            ) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if not line:
+                        continue
+                    if line.startswith("event:"):
+                        event_name = line[len("event:") :].strip()
+                        continue
+                    if not line.startswith("data:"):
+                        continue
+                    raw = line[len("data:") :].strip()
+                    if not raw:
+                        continue
+                    try:
+                        payload = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+                    if event_name == "done":
+                        result = payload
+                        continue
+                    event_name = ""
+                    if "stage" in payload:
+                        elapsed = time.monotonic() - started
+                        print(f"  [+{elapsed:>4.0f}s] ▶ {payload['stage']:<9} {payload.get('detail', '')}")
+                        sys.stdout.flush()
+        if result is None:
+            raise SystemExit("pipeline finished without a done event")
+        return result
 
     def _render(self, result: dict[str, Any]) -> None:
         print("=" * 64)

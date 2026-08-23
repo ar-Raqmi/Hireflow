@@ -4,7 +4,6 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
-.pytest_cache/
 .coverage
 
 # Env / secrets
@@ -19,10 +18,7 @@ API.md
 # CLI session logs (audit artifacts)
 hireflow_session_*.json
 
-# Local persistent storage (JSON repo)
-hireflow_data/
-
-# Node (frontend later)
+# Node (Vite + React frontend)
 node_modules/
 dist/
 .vite/
