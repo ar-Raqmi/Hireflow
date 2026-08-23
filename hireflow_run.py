@@ -101,10 +101,19 @@ def _upload(base: str, resume: str, work: str, locs: list[str], target: str) -> 
 
 def _start_run(base: str, profile_id: str) -> str:
     url = f"{base}/pipeline/run?profile_id={urllib.parse.quote(profile_id)}"
-    with urllib.request.urlopen(url, timeout=60) as resp:
+
+    req = urllib.request.Request(
+        url,
+        data=b"",
+        method="POST",
+    )
+
+    with urllib.request.urlopen(req, timeout=60) as resp:
         payload = json.loads(resp.read().decode())
+
     if payload.get("status") != "started" or not payload.get("run_id"):
         raise SystemExit(f"pipeline did not start: {payload}")
+
     return payload["run_id"]
 
 
