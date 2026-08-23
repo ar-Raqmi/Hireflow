@@ -108,36 +108,73 @@ echo "run_id: $RUN_ID"
 
 echo
 echo "Streaming live progress from ${BASE_URL}/pipeline/run/${RUN_ID}/events"
-echo "----------------------------------------------------------------------"
-curl -sN "${BASE_URL}/pipeline/run/${RUN_ID}/events" | python3 - "$PROFILE_ID" <<'PY'
-import json, sys, time
-pid = sys.argv[1]
+echo "--------------------------------------------------------------------------------"
+python3 - "$BASE_URL" "$RUN_ID" "$PROFILE_ID" <<'PY'
+import json, subprocess, sys, time
+base, run_id, pid = sys.argv[1], sys.argv[2], sys.argv[3]
 started = time.monotonic()
 result = None
-event = ""
-for line in sys.stdin:
-    line = line.rstrip("\n")
-    if not line:
-        continue
-    if line.startswith("event:"):
-        event = line[6:].strip()
-        continue
-    if not line.startswith("data:"):
-        continue
-    raw = line[5:].strip()
-    if not raw:
-        continue
-    try:
-        payload = json.loads(raw)
-    except Exception:
-        continue
-    if event == "done":
-        result = payload
-        continue
+resume_seq = 0
+attempts = 0
+max_attempts = 12
+
+EMOJI = {
+    "parse": "Reading resume",
+    "audit": "Auditing ATS health",
+    "search": "Searching job boards",
+    "match": "Scoring matches",
+    "research": "Researching companies",
+    "prepare": "Drafting CV + cover letter",
+    "approve": "Finalizing applications",
+}
+
+while result is None and attempts <= max_attempts:
+    url = f"{base}/pipeline/run/{run_id}/events"
+    headers = ["-H", f"Last-Event-ID: {resume_seq}"] if resume_seq else []
+    proc = subprocess.Popen(
+        ["curl", "-sN", "--max-time", "600"] + headers + [url],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
     event = ""
-    if "stage" in payload:
-        elapsed = int(time.monotonic() - started)
-        print(f"  [+{elapsed:>4}s] >> {payload['stage']:<9} {payload.get('detail','')}")
+    for line in proc.stdout:
+        line = line.rstrip("\n")
+        if not line:
+            continue
+        if line.startswith("event:"):
+            event = line[6:].strip()
+            continue
+        if line.startswith("id:"):
+            seq = line[3:].strip()
+            if seq.isdigit():
+                resume_seq = max(resume_seq, int(seq))
+            continue
+        if not line.startswith("data:"):
+            continue
+        raw = line[5:].strip()
+        if not raw:
+            continue
+        try:
+            payload = json.loads(raw)
+        except Exception:
+            continue
+        if event == "done":
+            result = payload
+            break
+        event = ""
+        if "stage" in payload:
+            stage = payload.get("stage", "")
+            detail = payload.get("detail", "") or ""
+            emoji = EMOJI.get(stage, stage)
+            elapsed = int(time.monotonic() - started)
+            print(f"  [+{elapsed:>5}s] {emoji}  {detail}")
+            sys.stdout.flush()
+    proc.wait()
+    if result is not None:
+        break
+    attempts += 1
+    if attempts <= max_attempts:
+        time.sleep(2)
 
 if result is None:
     print("pipeline finished without a done event", file=sys.stderr)

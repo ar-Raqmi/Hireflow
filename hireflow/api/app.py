@@ -6,7 +6,7 @@ import uuid
 from collections import Counter
 from datetime import datetime
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from hireflow.agents.router import RouterAgent
@@ -57,20 +57,19 @@ async def _execute_run(
         )
 
 
-async def _sse_events(runlog: RunLog, run_id: str):
-    yield f"event: started\ndata: {json.dumps({'run_id': run_id, 'status': 'started'})}\n\n"
+async def _sse_events(runlog: RunLog, run_id: str, last_seq: int = 0):
+    yield f"event: started\nid: 0\ndata: {json.dumps({'run_id': run_id, 'status': 'started'})}\n\n"
     for _ in range(20):
         if await runlog.exists(run_id):
             break
         await asyncio.sleep(0.5)
-    last_seq = 0
     while True:
         for event in await runlog.events_since(run_id, last_seq):
-            yield f"data: {json.dumps(event)}\n\n"
             last_seq = event["seq"]
+            yield f"id: {last_seq}\ndata: {json.dumps(event)}\n\n"
         if await runlog.is_done(run_id):
             result = await runlog.result(run_id)
-            yield f"event: done\ndata: {json.dumps(result)}\n\n"
+            yield f"event: done\nid: {last_seq}\ndata: {json.dumps(result)}\n\n"
             return
         await asyncio.sleep(0.5)
 
@@ -204,9 +203,18 @@ def create_app(
         return {"run_id": run_id, "profile_id": profile_id, "status": "started"}
 
     @api.get("/pipeline/run/{run_id}/events")
-    async def pipeline_events(run_id: str) -> StreamingResponse:
+    async def pipeline_events(
+        run_id: str,
+        request: Request,
+        last_event_id: int = 0,
+    ) -> StreamingResponse:
+        resume = last_event_id
+        if resume <= 0:
+            last = request.headers.get("Last-Event-ID")
+            if last and last.isdigit():
+                resume = int(last)
         return StreamingResponse(
-            _sse_events(api.state.runlog, run_id),
+            _sse_events(api.state.runlog, run_id, last_seq=resume),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )

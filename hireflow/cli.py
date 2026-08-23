@@ -160,37 +160,76 @@ class HireflowCli:
         started = time.monotonic()
         result: dict[str, Any] | None = None
         event_name = ""
+        resume_seq = 0
+        reconnect_attempts = 0
+        max_attempts = 12
         with httpx.Client(timeout=None) as client:
-            with client.stream(
-                "GET", f"{self._base_url}/pipeline/run/{run_id}/events"
-            ) as response:
-                response.raise_for_status()
-                for line in response.iter_lines():
-                    if not line:
-                        continue
-                    if line.startswith("event:"):
-                        event_name = line[len("event:") :].strip()
-                        continue
-                    if not line.startswith("data:"):
-                        continue
-                    raw = line[len("data:") :].strip()
-                    if not raw:
-                        continue
-                    try:
-                        payload = json.loads(raw)
-                    except json.JSONDecodeError:
-                        continue
-                    if event_name == "done":
-                        result = payload
-                        continue
-                    event_name = ""
-                    if "stage" in payload:
-                        elapsed = time.monotonic() - started
-                        print(f"  [+{elapsed:>4.0f}s] ▶ {payload['stage']:<9} {payload.get('detail', '')}")
-                        sys.stdout.flush()
+            while result is None and reconnect_attempts <= max_attempts:
+                headers = {"Last-Event-ID": str(resume_seq)} if resume_seq else {}
+                try:
+                    with client.stream(
+                        "GET",
+                        f"{self._base_url}/pipeline/run/{run_id}/events",
+                        headers=headers,
+                    ) as response:
+                        response.raise_for_status()
+                        for line in response.iter_lines():
+                            if not line:
+                                continue
+                            if line.startswith("event:"):
+                                event_name = line[len("event:") :].strip()
+                                continue
+                            if line.startswith("id:"):
+                                seq = line[len("id:") :].strip()
+                                if seq.isdigit():
+                                    resume_seq = max(resume_seq, int(seq))
+                                continue
+                            if not line.startswith("data:"):
+                                continue
+                            raw = line[len("data:") :].strip()
+                            if not raw:
+                                continue
+                            try:
+                                payload = json.loads(raw)
+                            except json.JSONDecodeError:
+                                continue
+                            if event_name == "done":
+                                result = payload
+                                break
+                            event_name = ""
+                            if "stage" in payload:
+                                self._print_stage(payload, time.monotonic() - started)
+                                sys.stdout.flush()
+                except httpx.HTTPError as exc:
+                    reconnect_attempts += 1
+                    if reconnect_attempts > max_attempts:
+                        raise SystemExit(f"stream dropped after {max_attempts} retries: {exc}")
+                    time.sleep(2)
+                    continue
+                if result is None:
+                    reconnect_attempts += 1
+                    if reconnect_attempts > max_attempts:
+                        raise SystemExit("pipeline finished without a done event")
+                    time.sleep(2)
         if result is None:
             raise SystemExit("pipeline finished without a done event")
         return result
+
+    @staticmethod
+    def _print_stage(payload: dict[str, Any], elapsed: float) -> None:
+        stage = payload.get("stage", "")
+        detail = payload.get("detail", "") or ""
+        emoji = {
+            "parse": "▶ Reading resume",
+            "audit": "▶ Auditing ATS health",
+            "search": "▶ Searching job boards",
+            "match": "▶ Scoring matches",
+            "research": "▶ Researching companies",
+            "prepare": "▶ Drafting CV + cover letter",
+            "approve": "▶ Finalizing applications",
+        }.get(stage, f"▶ {stage}")
+        print(f"  [+{elapsed:>5.0f}s] {emoji}  {detail}")
+        sys.stdout.flush()
 
     def _render(self, result: dict[str, Any]) -> None:
         print("=" * 64)
