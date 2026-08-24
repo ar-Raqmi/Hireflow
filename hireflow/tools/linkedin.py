@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from urllib.parse import quote_plus
 
@@ -100,6 +101,7 @@ class LinkedInSource(JobSource):
         return params
 
     async def _fetch_html(self, url: str, params: dict[str, str]) -> str:
+        await asyncio.sleep(1.5)  # gentle throttle — LinkedIn rate-limits bursts (429)
         async with httpx.AsyncClient(timeout=15.0, headers={"User-Agent": _USER_AGENT}) as client:
             response = await client.get(url, params=params)
             response.raise_for_status()

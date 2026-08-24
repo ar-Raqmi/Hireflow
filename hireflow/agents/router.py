@@ -16,7 +16,7 @@ from hireflow.tools.job_source import JobSource
 
 _WORK_MODE_VALUES = {"remote", "hybrid", "onsite"}
 _REMOTEISH_MARKERS = ("remote", "worldwide", "anywhere", "distributed")
-_GEO_CAPABLE = {"freehire", "freehire:seek", "freehire:mycareersfuture", "linkedin"}
+_GEO_CAPABLE = {"freehire", "freehire:seek", "freehire:mycareersfuture"}
 
 
 def _default_caps() -> dict[str, int]:
