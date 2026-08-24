@@ -141,34 +141,28 @@ class JobStreetSource(JobSource):
         url = self._build_url(query, location, locations)
         self._page_url = url
         try:
-            return await self._scrape(url, limit)
+            return await self._scrape(url, limit, locations)
         except Exception as exc:  # noqa: BLE001 - a dead page never sinks a run
             self._last_error = f"{url}: {type(exc).__name__}: {str(exc)[:300]}"
             return []
 
-    async def _scrape(self, url: str, limit: int) -> list[JobPosting]:
+    async def _scrape(self, url: str, limit: int, locations: list[str] | None = None) -> list[JobPosting]:
         from playwright.async_api import async_playwright
+
+        from hireflow.tools.browser_launcher import (
+            apply_stealth,
+            stealth_context_kwargs,
+            stealth_launch_kwargs,
+        )
 
         browser = None
         try:
             async with async_playwright() as p:
-                browser = await p.chromium.launch(
-                    headless=True,
-                    chromium_sandbox=False,
-                    args=[
-                        "--no-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-gpu",
-                        "--disable-setuid-sandbox",
-                    ],
-                )
+                browser = await p.chromium.launch(**stealth_launch_kwargs())
                 try:
-                    context = await browser.new_context(
-                        user_agent=_USER_AGENT,
-                        locale="en-US",
-                        viewport={"width": 1366, "height": 900},
-                    )
+                    context = await browser.new_context(**stealth_context_kwargs(locations))
                     page = await context.new_page()
+                    apply_stealth(page)
                     try:
                         return await self._extract(page, url, limit)
                     finally:
