@@ -181,7 +181,7 @@ def _build_default_agent() -> RouterAgent:
         *[FreehireRegionalSource(source) for source in SETTINGS.freehire_sources],
         RemoteOKSource(),
         RemotiveSource(),
-        LinkedInSource(),
+        LinkedInSource(detail=False),
         JsonLdSource(urls=JSONLD_COMPANY_URLS),
         AtsBoardSource(),
     ]

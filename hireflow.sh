@@ -20,6 +20,13 @@ for t in curl python3; do
   command -v "$t" >/dev/null 2>&1 || { echo "missing required tool: $t"; exit 1; }
 done
 
+# Prefer the project venv python (has dotenv + hireflow deps) so the HTML/JSON
+# export works; fall back to system python3 if no venv exists.
+PY="python3"
+if [[ -x "$HERE/.venv/bin/python3" ]]; then
+  PY="$HERE/.venv/bin/python3"
+fi
+
 echo
 echo "  hireflow-cli · online · $BASE_URL"
 echo "  (the pipeline runs on Cloud Run — nothing is computed locally)"
@@ -93,13 +100,13 @@ RESP="$(curl -sf -X POST "${BASE_URL}/upload" "${FIELDS[@]}")" || {
   exit 1
 }
 echo "$RESP"
-PROFILE_ID="$(python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))" <<< "$RESP")"
+PROFILE_ID="$("$PY" -c "import json,sys;print(json.load(sys.stdin).get('id',''))" <<< "$RESP")"
 [[ -n "$PROFILE_ID" ]] || { echo "no profile id in response" >&2; exit 1; }
 
 echo
 echo "Starting pipeline for profile $PROFILE_ID (SSE live progress) …"
 RUN_ID="$(curl -sf -X POST "${BASE_URL}/pipeline/run?profile_id=${PROFILE_ID}" \
-  | python3 -c "import json,sys; print(json.load(sys.stdin).get('run_id',''))")" || {
+  | "$PY" -c "import json,sys; print(json.load(sys.stdin).get('run_id',''))")" || {
   echo "pipeline start failed" >&2
   exit 1
 }
@@ -109,7 +116,7 @@ echo "run_id: $RUN_ID"
 echo
 echo "Streaming live progress from ${BASE_URL}/pipeline/run/${RUN_ID}/events"
 echo "--------------------------------------------------------------------------------"
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" python3 - "$BASE_URL" "$RUN_ID" "$PROFILE_ID" <<'PY'
+PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" "$PY" - "$BASE_URL" "$RUN_ID" "$PROFILE_ID" <<'PY'
 import json, subprocess, sys, time
 base, run_id, pid = sys.argv[1], sys.argv[2], sys.argv[3]
 started = time.monotonic()
