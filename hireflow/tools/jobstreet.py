@@ -149,35 +149,54 @@ class JobStreetSource(JobSource):
     async def _scrape(self, url: str, limit: int) -> list[JobPosting]:
         from playwright.async_api import async_playwright
 
+        browser = None
         try:
             async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True)
-        except Exception as exc:  # noqa: BLE001 - Chromium missing in the image is non-fatal
-            self._last_error = f"chromium launch failed: {type(exc).__name__}: {str(exc)[:200]}"
-            return []
-        try:
-            context = await browser.new_context(
-                user_agent=_USER_AGENT,
-                locale="en-US",
-                viewport={"width": 1366, "height": 900},
-            )
-            page = await context.new_page()
-            try:
-                response = await page.goto(url, wait_until="domcontentloaded", timeout=25000)
-                if response is not None and response.status >= 400:
-                    self._last_error = f"{url}: HTTP {response.status} (Cloudflare block?)"
-                    return []
+                browser = await p.chromium.launch(
+                    headless=True,
+                    chromium_sandbox=False,
+                    args=[
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-gpu",
+                        "--disable-setuid-sandbox",
+                    ],
+                )
                 try:
-                    await page.wait_for_selector("article", timeout=10000)
-                except Exception as exc:  # noqa: BLE001 - hydrated cards never arriving
-                    self._last_error = f"{url}: no job cards ({type(exc).__name__})"
-                    return []
-                await page.wait_for_timeout(1500)
-                rows = await page.eval_on_selector_all("article", _EXTRACT_JS)
-            finally:
-                await context.close()
-        finally:
-            await browser.close()
+                    context = await browser.new_context(
+                        user_agent=_USER_AGENT,
+                        locale="en-US",
+                        viewport={"width": 1366, "height": 900},
+                    )
+                    page = await context.new_page()
+                    try:
+                        return await self._extract(page, url, limit)
+                    finally:
+                        await context.close()
+                finally:
+                    await browser.close()
+        except Exception as exc:  # noqa: BLE001 - Chromium missing/boot fail is non-fatal
+            self._last_error = f"chromium failed: {type(exc).__name__}: {str(exc)[:200]}"
+            return []
+
+    async def _extract(
+        self, page, url: str, limit: int
+    ) -> list[JobPosting]:
+        try:
+            response = await page.goto(url, wait_until="domcontentloaded", timeout=25000)
+            if response is not None and response.status >= 400:
+                self._last_error = f"{url}: HTTP {response.status} (Cloudflare block?)"
+                return []
+            try:
+                await page.wait_for_selector("article", timeout=10000)
+            except Exception as exc:  # noqa: BLE001 - hydrated cards never arriving
+                self._last_error = f"{url}: no job cards ({type(exc).__name__})"
+                return []
+            await page.wait_for_timeout(1500)
+            rows = await page.eval_on_selector_all("article", _EXTRACT_JS)
+        except Exception as exc:  # noqa: BLE001 - a dead page never sinks a run
+            self._last_error = f"{url}: {type(exc).__name__}: {str(exc)[:200]}"
+            return []
         return self._rows_to_jobs(rows or [], url, limit)
 
     def _build_url(self, query: str, location: str, locations: list[str] | None) -> str:
