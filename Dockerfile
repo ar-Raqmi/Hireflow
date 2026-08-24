@@ -1,17 +1,13 @@
-FROM python:3.11-slim
+# Playwright base image — Chromium + system deps pre-installed, so
+# HIREFLOW_PLAYWRIGHT=1 sources (JobStreet, SPA career pages) work out of the
+# box. Heavier than slim; deploy with --memory 2Gi (docs/GCP_SETUP.md §5).
+# requirements.txt pins playwright>=1.44, matching the v1.44.0 browsers below.
+FROM mcr.microsoft.com/playwright/python:v1.44.0-jammy
 
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Layer II (Playwright + headless Chromium) — the opt-in last-resort job source.
-# Official build-your-own-image path (playwright.dev/python/docs/docker): this
-# installs the apt system deps AND bundles Chromium, so a deploy can flip
-# HIREFLOW_PLAYWRIGHT=1 at runtime without a new build. Soft-fail: if Chromium
-# cannot be fetched, the image still builds and PlaywrightSource stays a
-# documented no-op instead of bricking the deploy.
-RUN python -m playwright install --with-deps chromium || echo "WARN: playwright chromium install failed - PlaywrightSource stays disabled"
 
 COPY hireflow ./hireflow
 
@@ -22,6 +18,7 @@ ENV GEMINI_USE_VERTEX="true"
 ENV SEMANTIC_SEARCH="1"
 ENV EMBEDDING_MODEL="gemini-embedding-001"
 ENV HIREFLOW_PLAYWRIGHT="1"
+ENV JOBSTREET_ENABLED="true"
 ENV USE_UNVERIFIED_SOURCES="1"
 ENV SANDBOX_ATS_FILE="sandbox_ats.json"
 

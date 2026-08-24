@@ -21,6 +21,7 @@ from hireflow.tools.freehire import FreehireSource
 from hireflow.tools.gemini import GeminiClient
 from hireflow.tools.japan_dev import JapanDevSource
 from hireflow.tools.jsonld import JsonLdSource
+from hireflow.tools.jobstreet import JobStreetSource
 from hireflow.tools.linkedin import LinkedInSource
 from hireflow.tools.remoteok import RemoteOKSource
 from hireflow.tools.remotive import RemotiveSource
@@ -198,6 +199,8 @@ def _build_default_agent() -> RouterAgent:
         sources.append(JapanDevSource())
     if SETTINGS.playwright_enabled:
         sources.append(PlaywrightSource())
+        if SETTINGS.jobstreet_enabled:
+            sources.append(JobStreetSource())
     return RouterAgent(sources=sources, gemini=gemini)
 
 

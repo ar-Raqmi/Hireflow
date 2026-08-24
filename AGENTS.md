@@ -126,7 +126,12 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
   - `hireflow/tools/` → **search intelligence** — **PRESENT (code; live proof pending redeploy)**,
     all grep-verified this pass: `QueryExpander` (`expander.py` — Gemini expansion + deterministic
     fallback), `WantedlySource` (`wantedly.py`, JP, flag-gated), `JapanDevSource` (`japan_dev.py`,
-    JP, flag-gated), `LocationMapper` (`geo.py` — incl. `Johor → my`; the location gate lives in
+    JP, flag-gated), **`JobStreetSource` (`jobstreet.py`, PLAYWRIGHT — the "PC-quality" source:
+    real Chromium renders `{cc}.jobstreet.com/{role}-jobs/in-{place}` (my/sg/id/ph/th/vn),
+    extracts per-card title/company/location/salary("RM 9,000 – RM 13,000 per month")/
+    work-type/listed-date from the DOM exactly as a real browser sees. Cloudflare 403s plain
+    httpx (live-verified), so this source is Playwright-only, gated `HIREFLOW_PLAYWRIGHT=1` +
+    `JOBSTREET_ENABLED=true`; cap ≤20 cards/run, ToS low-volume; soft-fail → `[]`)**. `LocationMapper` (`geo.py` — incl. `Johor → my`; the location gate lives in
     `SearchAgent._passes_location`).
   - `hireflow/tools/` → **PRESENT (code; live proof pending redeploy)**:
     `WebFetchSource` (`webfetch.py`), `WebDiscoverySource` (`discovery.py`), `EmbeddingRanker`

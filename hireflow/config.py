@@ -116,6 +116,10 @@ class Settings:
             if part.strip()
         ]
     )
+    jobstreet_enabled: bool = field(
+        default_factory=lambda: _env("JOBSTREET_ENABLED", "true").lower()
+        in {"1", "true", "yes"}
+    )
     sandbox_ats_file: str = field(
         default_factory=lambda: _env("SANDBOX_ATS_FILE", "sandbox_ats.json")
     )

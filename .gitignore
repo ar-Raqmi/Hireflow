@@ -28,3 +28,7 @@ dist/
 .idea/
 .vscode/
 *.swp
+# local browser-capture artifacts + exported reports
+.playwright-mcp/
+result-demo.html
+result-demo.json
