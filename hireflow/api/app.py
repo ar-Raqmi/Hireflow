@@ -178,11 +178,11 @@ async def _sse_events(runlog: RunLog, run_id: str, last_seq: int = 0):
 def _build_default_agent() -> RouterAgent:
     gemini = GeminiClient()
     sources = [
+        LinkedInSource(detail=False),
         FreehireSource(),
         *[FreehireRegionalSource(source) for source in SETTINGS.freehire_sources],
         RemoteOKSource(),
         RemotiveSource(),
-        LinkedInSource(detail=False),
         JsonLdSource(urls=JSONLD_COMPANY_URLS),
         AtsBoardSource(),
     ]
