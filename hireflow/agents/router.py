@@ -71,7 +71,7 @@ class SearchAgent(BaseAgent):
 
         per_source = self._per_source_cap()
         gathered: list[JobPosting] = []
-        sources = self._rotate(self._sources, seed)
+        sources = self._sources
         for source in sources:
             variants = queries if source.name in _GEO_CAPABLE else queries[:1]
             raw: list[JobPosting] = []
