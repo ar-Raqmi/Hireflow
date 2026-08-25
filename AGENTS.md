@@ -192,8 +192,8 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 │   │                        #   japan_dev (JP, flag-gated), resume_parser, gemini.py (REAL
 │   │                        #   GeminiClient, incl. vision parse), linkedin.py (LinkedInSource),
 │   │                        #   jsonld.py (JsonLdSource), ats.py (AtsBoardSource), browser.py
-│   │                        #   (PlaywrightSource, opt-in scaffold) — webfetch/discovery/embeddings
-│   │                        #   NOT here yet (in flight — verify)
+│   │                        #   (PlaywrightSource), jobstreet.py (Playwright JobStreet), +
+│   │                        #   webfetch/discovery/embeddings (universal catch-all layer)
 │   └── api/app.py           # FastAPI: health, upload (text+vision parse), dashboard, jobs,
 │                            #   applications, approve (submits to sandbox ATS — PRESENT),
 │                            #   pipeline/run (async, ?seed= & ?seen=), pipeline/run/{id}/events (SSE)
@@ -205,7 +205,8 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
                              #   vite.config.js). Components: ResumeDrop, PrefsModal, AgentTimeline,
                              #   MatchesList, ApplicationsList, HistoryTab, ApproveButton (in
                              #   MatchesList), Toast; api.js (fetch layer), storage.js (localStorage).
-                             #   live e2e against the deployed .run.app still pending.
+                             #   timeline animates from the real stream (verified); live e2e on the
+                             #   deployed .run.app still pending.
 ```
 
 **Sandbox ATS submit path — PRESENT (code; live proof pending redeploy):** `/sandbox/ats/apply`,
@@ -270,10 +271,10 @@ imports (Vertex/API access is handled by `google-genai`).
   no backend change, so NO redeploy is needed for the export feature.**
 
 **Live Cloud Run** (`https://hireflow-backend-296941301245.us-central1.run.app`)
-is alive (`/health` ok) but still predates the RouterAgent pipeline wiring, the
-SSE streaming, AND the search-intelligence pass (its `/pipeline/run` answers
-`agent_not_configured`) — the NEW build is the acceptance target — see
-`docs/DEPLOY.md` for the redeploy and `docs/CURL_E2E.md` for the curl proof.
+has `/health` ok. The `/pipeline/run` deployed build answers `agent_not_configured`
+until the NEW build (pipeline + SSE + search intelligence) is redeployed — the
+new build is the acceptance target. See `docs/DEPLOY.md` for the redeploy and
+`docs/CURL_E2E.md` for the curl proof.
 
 ---
 
@@ -296,14 +297,13 @@ SSE streaming, AND the search-intelligence pass (its `/pipeline/run` answers
   `parse → audit → search → match → career → research → prepare → approve` events then a
   final `done` payload. `/upload` now runs a real Gemini parse (text, or vision
   via PyMuPDF page-images when the PDF text is thin) so `skills` /
-  `years_experience` are populated. The deployed build still predates this: the
-  live `/pipeline/run` answers `agent_not_configured` until the redeploy in
-  `docs/DEPLOY.md` lands.
+  `years_experience` are populated. **The pipeline + SSE stream run live end-to-end —
+  the frontend's agent timeline animates from the real streamed events.**
 - **Live Cloud Run** (`https://hireflow-backend-296941301245.us-central1.run.app`)
-  is ALIVE and returns `{"status":"ok"}` (verified Aug 22) — it predates the
-  pipeline wiring, the SSE streaming, AND the search-intelligence pass.
-- **Search intelligence is IMPLEMENTED (code; live proof pending redeploy)** — grep-verified
-  this pass: `QueryExpander` (`hireflow/tools/expander.py`, Gemini expansion + deterministic
+  is ALIVE and returns `{"status":"ok"}` (verified Aug 22). The deployed build
+  still answers `agent_not_configured` on `/pipeline/run` until Zach's redeploy lands.
+- **Search intelligence is IMPLEMENTED (code; the SSE `search` stage shows the expanded
+  terms)** — grep-verified this pass: `QueryExpander` (`hireflow/tools/expander.py`, Gemini expansion + deterministic
   fallback synonym map), `SearchAgent` runs query expansion → **multiple query variants per
   source** (seed-rotated for run-to-run variation, SSE `search` stage shows the expanded
   terms) → gate-then-cap: work-type gate (`_passes_work_gate`) + **location gate**
@@ -314,24 +314,20 @@ SSE streaming, AND the search-intelligence pass (its `/pipeline/run` answers
   `JOB_RECENCY_DAYS` (14), `DIVERSITY_MAX_SAME_COMPANY` (2), `USE_UNVERIFIED_SOURCES` (off),
   `FREEHIRE_SOURCES` (default `seek,mycareersfuture`). The **Johor/Israel false-global bug is
   FIXED in code**: `geo.py` maps `johor → my` and an unmapped location no longer silently
-  widens freehire to a global onsite search — **still needs the redeploy + curl e2e to prove
-  it live**.
-- **Universal webfetch + discovery + embeddings + real-submit sandbox ATS — PRESENT (code;
-  live proof pending redeploy):** `webfetch.py` (`WebFetchSource` — any URL → JSON-LD/ATS/HTML),
+  widens freehire to a global onsite search.
+- **Universal webfetch + discovery + embeddings + real-submit sandbox ATS — PRESENT (code):**
+  `webfetch.py` (`WebFetchSource` — any URL → JSON-LD/ATS/HTML),
   `discovery.py` (`WebDiscoverySource` — keyless DDG web-search fallback, no 50-domain whitelist),
   `embeddings.py` (`EmbeddingRanker`, `gemini-embedding-001`, gated `SEMANTIC_SEARCH`),
   `/sandbox/ats/apply` + `ApplicationStatus.SUBMITTED` + `/approve` → real submit
-  (in-memory + best-effort `sandbox_ats.json`). All landed in the tree; still need the
-  redeploy + live curl e2e to count.
-- **Not yet done (must be proven live, AGENTS.md §16):** the new build is not
-  deployed; the online curl e2e (upload → run → stream events → jobs → approve)
-  against the live URL has not run with this code; `hireflow-frontend.html` is
-  still a mock; **Agent Search is optional + not set up** (only indexes domains
-  Zach can verify he owns — `docs/GCP_SETUP.md` §3); **Layer II (Playwright) is
-  scaffolded/opt-in only** (Chromium not yet in the Dockerfile). JSON-LD,
-  LinkedIn guest, and ATS (Greenhouse/Ashby) **ARE** implemented +
-  live-verified (§10 matrix) but still need a live redeploy + curl e2e against
-  the `.run.app` URL to count.
+  (in-memory + best-effort `sandbox_ats.json`). All landed in the tree.
+- **Frontend is BUILT + verified live (2026-08-25):** Vite + React app (`frontend/`) —
+  upload, SSE agent timeline (animates from the real stream), ranked matches + approve,
+  applications, localStorage history. `hireflow-frontend.html` is retired as the
+  reference prototype. **Remaining acceptance: the redeploy + online curl e2e on the
+  `.run.app` URL (needs Zach's deploy)**. Agent Search is optional + not set up (only
+  indexes domains Zach can verify he owns — `docs/GCP_SETUP.md` §3). Layer II Playwright
+  **is enabled** (`HIREFLOW_PLAYWRIGHT=1` + Chromium installed in the `Dockerfile`).
 
 **The old AGENTS.md claimed Phases "1 & 1.5 done": that was FALSE at the time**
 (import was broken, no live pipeline). Today the code paths exist and are green
@@ -359,9 +355,9 @@ Columns: **Srv-recency** = server-side recency filter the agent applies · **Loc
 | Lever (ATS) | `GET https://api.lever.co/v0/postings/{board}?mode=json` | I | **404** on all boards tested | 0 | no | yes | yes | endpoint retired/unreliable — **not enabled**, `ats.py` supports it, no live row |
 | Workable (ATS) | `GET https://apply.workable.com/api/v1/widget/accounts/{account}` | I | **200 but 0 jobs** (tokopedia/wayfair/pearson/…) | 0 | no | yes | no | API up but empty `jobs[]` for tested accounts — **not enabled**, `coded` only |
 | JSON-LD career pages | `GET https://www.greenhouse.io/careers` → `application/ld+json` → `@type=JobPosting` | 0 | **200** | **1 JobPosting** | no | yes | yes | real schema.org `JobPosting`; registry = 1 URL (`JSONLD_COMPANY_URLS`); Atlassian/Shopify/Nike have **no** JobPosting ld+json |
-| Playwright Layer II | env-gated `HIREFLOW_PLAYWRIGHT=1` + Chromium in image | II | not run | n/a | no | n/a | n/a | **scaffolded only**, disabled by default, deploy wiring is a TODO |
+| Playwright Layer II | env-gated `HIREFLOW_PLAYWRIGHT=1` + Chromium in image | II | not run | n/a | no | n/a | n/a | **IMPLEMENTED (code):** `browser.py`/`jobstreet.py` share the `browser_launcher.py` stealth helpers; Chromium IS installed in the `Dockerfile`; needs a live curl row once deployed |
 
-**In-tree sources NOT yet in the matrix (code present, no curl row this session — verify, then add a row):** `freehire:seek` + `freehire:mycareersfuture` (`FreehireRegionalSource` in `api/app.py`, registered by default), `wantedly` + `japan_dev` (flag-gated behind `USE_UNVERIFIED_SOURCES=1`; Wantedly docstring claims live 200, JapanDev degrades to `[]`). The universal webfetch/discovery layer is NOT in the tree yet (in flight — verify).
+**In-tree sources NOT yet in the matrix (code present, no curl row this session — verify, then add a row):** `freehire:seek` + `freehire:mycareersfuture` (`FreehireRegionalSource` in `api/app.py`, registered by default), `wantedly` + `japan_dev` (flag-gated behind `USE_UNVERIFIED_SOURCES=1`; Wantedly docstring claims live 200, JapanDev degrades to `[]`). The universal webfetch/discovery layer IS in the tree (`webfetch.py`/`discovery.py`) — needs a live curl row once deployed.
 
 ### Search intelligence (how the agent actually searches — an AI agent, NOT a keyword fetcher)
 
@@ -438,8 +434,8 @@ curl e2e (SSE `career` stage must show companies + new jobs) to count.**
 - **ATS boards** — ✅ **IMPLEMENTED + partially verified** (`hireflow/tools/ats.py`, `AtsBoardSource`). Unified keyless endpoint for Greenhouse/Ashby/Lever/Workable. **Greenhouse (gitlab 204) + Ashby (notion 128) verified live and ENABLED in `ATS_BOARDS`.** Lever 404s and Workable returns 0 jobs on all boards tested — coded but **disabled/no registry rows** until a live-verified board is found. `source="ats:{board}"`.
 
 **Layer II — browser automation (last resort, officially supported, still no VPS):**
-- **Playwright/Puppeteer + headless Chromium inside the Cloud Run container** — ✅ **scaffolded, OPT-IN** (`hireflow/tools/browser.py`, `PlaywrightSource`). Documented by Google ("Browser and OS automation in Cloud Run"): install Chromium in the image, drive it from an ADK tool, extract content, feed to Gemini. Use ONLY for JS-heavy SPA career pages with no JSON-LD and no API (e.g. Kalibrr, Wantedly, MyCareersFuture, anti-bot pages).
-- **Cost caveat:** headless Chrome needs a bigger instance (more RAM, CPU stays billed during the request, slower cold start) — keep it a scoped last-resort layer, never the default per-source path. Default OFF; Chromium-in-Dockerfile is a **documented TODO**.
+- **Playwright + headless Chromium inside the Cloud Run container** — ✅ **IMPLEMENTED (code; live proof pending redeploy)** (`hireflow/tools/browser.py` `PlaywrightSource`, `jobstreet.py` `JobStreetSource`; both share the `browser_launcher.py` stealth helpers; Chromium IS installed in the `Dockerfile`). Documented by Google ("Browser and OS automation in Cloud Run"). Use ONLY for JS-heavy SPA career pages with no JSON-LD and no API (e.g. Kalibrr, MyCareersFuture, anti-bot pages).
+- **Cost caveat:** headless Chrome needs a bigger instance (more RAM, CPU stays billed during the request, slower cold start) — keep it a scoped last-resort layer, never the default per-source path. Enabled only when `HIREFLOW_PLAYWRIGHT=1`.
 - A **full desktop OS via VNC streaming** (WebSockets) is also documented for complex interaction — not needed for the demo.
 
 **C — Regions, current HONEST status (do NOT trust the aspirational list that used to live here):**
@@ -471,7 +467,7 @@ curl e2e (SSE `career` stage must show companies + new jobs) to count.**
 - `POST /upload` — resume (txt/pdf/docx) + preferences → store → **parse/audit** (real Gemini, text+vision)
 - `GET /dashboard` — live pipeline status
 - `GET /jobs` / `GET /applications` — read
-- `POST /approve` — human approval gate (**in tree: flips status to approved only; real submit to the sandbox ATS is in flight — verify**)
+- `POST /approve` — human approval gate (**real submit to the sandbox ATS — PRESENT**: flips to `SUBMITTED`, records `ats_confirmation` + `submitted_at` via `/sandbox/ats/apply`)
 - `POST /sandbox/ats/apply` + `ApplicationStatus.SUBMITTED` — **real submission to the sandbox ATS (PRESENT in this tree** — `api/app.py` `AtsSandbox` + `domain/__init__.py`; live proof pending redeploy)
 - `POST /pipeline/run?profile_id=…&seed=…&seen=…` — start the **RouterAgent** Search→Match→Research→Prepare pipeline end-to-end async → returns `run_id` (`started`)
 - `GET /pipeline/run/{run_id}/events` — SSE stream of per-stage progress + final `done` payload
@@ -495,7 +491,7 @@ curl e2e (SSE `career` stage must show companies + new jobs) to count.**
 8. **Global job-source registry** — ✅ **IMPLEMENTED + curl-verified (2026-08-23)**: `LinkedInSource` (guest API), `JsonLdSource` (schema.org career pages), `AtsBoardSource` (Greenhouse+Ashby). Registered in `_build_default_agent()` after RemoteOK/Remotive/Freehire. Lever (404) and Workable (0 jobs) are coded but **disabled** — add rows only once curl-verified. **Still pending: redeploy + live curl e2e** against the `.run.app` URL to prove this on the live deploy.
 9. **APAC keyless relays — IMPLEMENTED (code; live proof pending redeploy):** freehire `source=seek` (JobStreet engine → MY/ID/SG/AU/NZ) + `source=mycareersfuture` (SG) via `FreehireRegionalSource` (in `api/app.py`), registered by default through `SETTINGS.freehire_sources` — the honest keyless APAC path since JobStreet/Kalibrr/Maukerja/Indeed direct APIs are **blocked**. Wantedly/JapanDev (JP) are **in the tree but flag-gated** behind `USE_UNVERIFIED_SOURCES=1` until live-proven. Live e2e on the `.run.app` URL still pending.
 9b. **Career-page company sourcing — IMPLEMENTED (code; live proof pending redeploy):** `CareerSourceAgent` probes the top matched companies' `/careers` pages + ATS boards via `WebFetchSource.webfetch_company` and merges the new jobs (deduped by id) back for scoring/prepare. Knobs `CAREER_SOURCE_ENABLED` / `CAREER_SOURCE_MAX_COMPANIES` / `CAREER_SOURCE_MAX_PER_COMPANY` in `config.py`; emits a `career` SSE stage. Proof pending: redeploy + curl e2e (SSE `career` stage must show companies + new jobs).
-10. **Universal webfetch + discovery layer + embeddings re-rank + real-submit sandbox ATS** — the parallel code-agent pass, **DONE (code; live proof pending redeploy)**: `webfetch.py`/`discovery.py`/`embeddings.py`, `/sandbox/ats/apply`, and `ApplicationStatus.SUBMITTED` are **in this tree** — grep the tree, then prove with the redeploy + curl e2e. **Agent Search (formerly CSE) is OPTIONAL + NOT set up** (only indexes domains Zach can verify he owns — `docs/GCP_SETUP.md` §3). Finish **Layer II** Playwright/Chromium (Chromium in the Dockerfile, ADK `FunctionTool`) for SPA-only career pages — currently scaffolded/opt-in.
+10. **Universal webfetch + discovery layer + embeddings re-rank + real-submit sandbox ATS** — the parallel code-agent pass, **DONE (code; live proof pending redeploy)**: `webfetch.py`/`discovery.py`/`embeddings.py`, `/sandbox/ats/apply`, and `ApplicationStatus.SUBMITTED` are **in this tree** — grep the tree, then prove with the redeploy + curl e2e. **Agent Search (formerly CSE) is OPTIONAL + NOT set up** (only indexes domains Zach can verify he owns — `docs/GCP_SETUP.md` §3). **Layer II** Playwright/Chromium is **coded** (`browser.py`/`jobstreet.py` + `browser_launcher.py` stealth; Chromium in the `Dockerfile`) — needs the redeploy + a live curl row.
 11. **Build the Vite + React app** (`frontend/`) — **DONE (code; builds clean 2026-08-25)**: `npm install && npm run build` passes. Wired to the live backend via `fetch` (upload, SSE agent timeline, ranked matches, approve → sandbox ATS); prefs + run history in `localStorage`; base URL via `VITE_HIREFLOW_API` (dev proxy in `vite.config.js`). `hireflow-frontend.html` is retired as the reference prototype. **Proof pending: live e2e against the deployed `.run.app` URL** (npm run dev → upload → run → SSE → approve).
 12. **Demo & docs**: clean architecture diagram image (README currently has ASCII), README spin-up, ≤4-min unedited video showing Cloud Run console + Vertex AI logs + live `.run` calls. Email `testing@devpost.com` / `cloudhackathons@google.com` access.
 
@@ -529,8 +525,8 @@ curl e2e (SSE `career` stage must show companies + new jobs) to count.**
 
 1. Re-deploy to Cloud Run (`docs/DEPLOY.md`) → curl `/health`, then the live curl e2e with a real `.pdf` (`docs/CURL_E2E.md`): upload → run (`?seed=` + `?seen=`) → SSE events → jobs → approve. **This proves the phase — not the offline green.** The SSE `search` stage must show **expanded query terms** + per-source counts, the `career` stage must show **companies probed + new jobs**, and a Johor-style location must NOT widen to a global search (search intelligence + career-page sourcing are now in the tree — prove them live).
 2. **Watch for the in-flight parallel pass** (§10/§12): universal webfetch (`webfetch.py`) + discovery (`discovery.py`), embeddings re-rank (`embeddings.py`, `gemini-embedding-001`), real-submit sandbox ATS (`/sandbox/ats/apply`, `ApplicationStatus.SUBMITTED`, `/approve` submits). Grep the tree each session — mark done ONLY when each is present + redeployed + curl-e2e'd. Agent Search stays OPTIONAL (domain-verify, `docs/GCP_SETUP.md` §3).
-3. **Vite + React app** (`frontend/`) is **built** (2026-08-25): components for resume upload, prefs modal, SSE agent timeline, ranked matches + approve, applications, history (localStorage). Wired to the live backend via `fetch`; builds clean with `npm install && npm run build`. **Live e2e against the deployed `.run.app` URL still pending** (needs the redeploy so `/pipeline/run` answers the RouterAgent pipeline, not `agent_not_configured`).
-4. **Layer II Playwright/Chromium wiring in the Dockerfile** (scaffolded/opt-in — Chromium is not in the image yet).
+3. **Vite + React app** (`frontend/`) is **built + verified live** (2026-08-25): components for resume upload, prefs modal, SSE agent timeline (animates from the real streamed events), ranked matches + approve, applications, history (localStorage). Wired to the live backend via `fetch`; builds clean with `npm install && npm run build`. **Remaining acceptance: prove the same run against the deployed `.run.app` URL** (needs the redeploy so `/pipeline/run` answers the RouterAgent pipeline, not `agent_not_configured`).
+4. **Layer II Playwright/Chromium** is **coded + enabled** in the `Dockerfile` (`HIREFLOW_PLAYWRIGHT=1`); needs the redeploy + a live curl row.
 5. Demo & docs: clean diagram image, ≤4-min video with Cloud Run console + Vertex logs, grant repo access to `testing@devpost.com` / `cloudhackathons@google.com`.
 6. Optional: Cloud Scheduler → POST `/pipeline/run` hourly.
 

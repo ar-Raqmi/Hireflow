@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from typing import Any
 
 
@@ -110,3 +111,32 @@ def stealth_context_kwargs(locations: list[str] | None = None) -> dict[str, Any]
 def apply_stealth(page: Any) -> None:
     """Inject the anti-detection script into a freshly created page."""
     page.add_init_script(STEALTH_INIT_SCRIPT)
+
+
+@asynccontextmanager
+async def stealth_browser():
+    """Launch headless stealth Chromium; close it on exit.
+
+    Shared by every Playwright source so the launch/sandbox flags live in one
+    place. The caller catches a missing Chromium as non-fatal.
+    """
+    from playwright.async_api import async_playwright
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(**stealth_launch_kwargs())
+        try:
+            yield browser
+        finally:
+            await browser.close()
+
+
+@asynccontextmanager
+async def stealth_page(browser: Any, locations: list[str] | None = None):
+    """A new stealth context+page (location-fingerprinted), closed on exit."""
+    context = await browser.new_context(**stealth_context_kwargs(locations))
+    page = await context.new_page()
+    apply_stealth(page)
+    try:
+        yield page
+    finally:
+        await context.close()

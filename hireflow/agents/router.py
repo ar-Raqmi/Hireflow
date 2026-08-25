@@ -85,7 +85,7 @@ class SearchAgent(BaseAgent):
                         work_type=profile.work_type,
                         locations=profile.locations,
                     )
-                except Exception as exc:  # noqa: BLE001 - a down source is non-fatal
+                except Exception as exc:
                     errors.append(f"{source.name}: {type(exc).__name__}: {str(exc)[:200]}")
                     found = []
                 if source.last_error:
@@ -248,7 +248,7 @@ class MatchAgent(BaseAgent):
             job = JobPosting.from_mapping(job_map)
             try:
                 score, reasons = await self._gemini.score_fit(job=job, profile=profile)
-            except Exception as exc:  # noqa: BLE001 - keep scoring going past a bad call
+            except Exception as exc:
                 errors.append(f"match {job.id}: {type(exc).__name__}: {str(exc)[:200]}")
                 continue
             scored.append({"job": job_map, "score": score, "reasons": reasons})
@@ -272,7 +272,7 @@ class MatchAgent(BaseAgent):
         try:
             ranker = EmbeddingRanker(self._gemini)
             ranked = await ranker.rank(jobs, self._rerank_query(profile))
-        except Exception as exc:  # noqa: BLE001 - never let embeddings sink scoring
+        except Exception as exc:
             errors.append(f"semantic re-rank: {type(exc).__name__}: {str(exc)[:200]}")
             ranked = None
         if ranked is None:
@@ -337,7 +337,7 @@ class ResearchAgent(BaseAgent):
                 done += 1
                 try:
                     researched[company] = await self._gemini.research_company(company)
-                except Exception as exc:  # noqa: BLE001 - non-fatal
+                except Exception as exc:
                     errors.append(f"research {company}: {type(exc).__name__}: {str(exc)[:200]}")
                     researched[company] = {"company": company, "summary": "", "error": str(exc)[:200]}
                 await self._emit(
@@ -377,7 +377,7 @@ class PrepareAgent(BaseAgent):
                 draft = await self._gemini.draft_application(profile=profile, job=job)
                 review = await self._gemini.review_application(draft=draft)
                 revised = await self._gemini.revise_application(draft=draft, review=review)
-            except Exception as exc:  # noqa: BLE001 - non-fatal
+            except Exception as exc:
                 errors.append(f"prepare {job.id}: {type(exc).__name__}: {str(exc)[:200]}")
                 continue
             drafts[job.id] = {"draft": draft, "review": review, "revised": revised}
@@ -499,7 +499,7 @@ class RouterAgent(BaseAgent):
             health = int(audit.get("health", 0) or 0)
             findings = audit.get("findings", [])
             await self._emit("audit", f"ATS health {health}/100 · {len(findings)} findings")
-        except Exception as exc:  # noqa: BLE001 - non-fatal
+        except Exception as exc:
             errors.append(f"audit: {type(exc).__name__}: {str(exc)[:200]}")
 
     def _build_applications(

@@ -38,7 +38,7 @@ class FreehireSource(JobSource):
         try:
             params = self._params(query, location, work_type=work_type, locations=locations)
             data = await self._fetch_json(self._url, params)
-        except Exception as exc:  # noqa: BLE001 - a board being down must never sink a run
+        except Exception as exc:
             self._last_error = f"{type(exc).__name__}: {str(exc)[:300]}"
             return []
         jobs = [self._parse_row(row) for row in self._extract_rows(data)]

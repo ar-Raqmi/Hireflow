@@ -62,7 +62,7 @@ class HireflowTools:
         for source in self._sources:
             try:
                 jobs.extend(await source.search(query=query))
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self._errors.append(f"{source.name}: {type(exc).__name__}: {str(exc)[:200]}")
         mappings = [job.to_mapping() for job in jobs]
         self._state["jobs"] = mappings

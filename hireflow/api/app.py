@@ -145,7 +145,7 @@ async def _execute_run(
         result["status"] = "completed"
         result["run_id"] = run_id
         await runlog.finish(run_id, result)
-    except Exception as exc:  # noqa: BLE001 - surface agent failure as a status, not a 500
+    except Exception as exc:
         await runlog.finish(
             run_id,
             {
@@ -406,13 +406,13 @@ async def _enrich_profile(
             try:
                 pages = parser.pdf_page_images(content)
                 parsed = await gemini.parse_resume_vision(pages, text_hint=profile.resume_text[:2000])
-            except Exception as exc:  # noqa: BLE001 - degrade to text-only, never a 500
+            except Exception as exc:
                 errors.append(f"vision parse: {type(exc).__name__}: {str(exc)[:200]}")
                 parsed = {}
         if not parsed:
             try:
                 parsed = await gemini.parse_resume(profile.resume_text)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 errors.append(f"text parse: {type(exc).__name__}: {str(exc)[:200]}")
                 parsed = {}
     return parsed, errors

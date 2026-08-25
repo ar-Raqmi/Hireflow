@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-import json
-import re
-from typing import Any, Iterable
-
 import httpx
 
 from hireflow.domain import JobPosting
 from hireflow.tools.job_source import JobSource
+from hireflow.tools.jsonld import JsonLdSource
 
-_LD_SCRIPT_RE = re.compile(r'<script\s+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', re.S)
 _USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -55,10 +51,12 @@ class JapanDevSource(JobSource):
             self._last_error = f"{type(exc).__name__}: {str(exc)[:300]}"
             return []
         jobs: list[JobPosting] = []
-        for posting in self._extract_postings(html):
-            job = self._parse_posting(posting)
-            if job and job.title and self._matches(job, query, ""):
-                jobs.append(job)
+        for posting in JsonLdSource._extract_postings(html):
+            job = JsonLdSource._parse_posting(posting)
+            if not job or not job.title or not self._matches(job, query, ""):
+                continue
+            job.source = self.name
+            jobs.append(job)
         return jobs[:limit]
 
     async def _fetch_html(self, url: str, params: dict[str, str]) -> str:
@@ -66,74 +64,3 @@ class JapanDevSource(JobSource):
             response = await client.get(url, params=params)
             response.raise_for_status()
         return response.text
-
-    @classmethod
-    def _extract_postings(cls, html: str) -> Iterable[dict[str, Any]]:
-        for block in _LD_SCRIPT_RE.findall(html):
-            try:
-                data = json.loads(block)
-            except (json.JSONDecodeError, ValueError):
-                continue
-            yield from cls._walk(data)
-
-    @classmethod
-    def _walk(cls, node: Any) -> Iterable[dict[str, Any]]:
-        if isinstance(node, dict):
-            if cls._is_posting(node):
-                yield node
-                return
-            for value in node.values():
-                yield from cls._walk(value)
-        elif isinstance(node, list):
-            for item in node:
-                yield from cls._walk(item)
-
-    @staticmethod
-    def _is_posting(node: dict[str, Any]) -> bool:
-        type_ = node.get("@type")
-        if isinstance(type_, str):
-            return type_ == "JobPosting"
-        if isinstance(type_, list):
-            return "JobPosting" in type_
-        return False
-
-    @staticmethod
-    def _string(value: Any) -> str:
-        return str(value or "").strip()
-
-    @staticmethod
-    def _posting_url(posting: dict[str, Any]) -> str:
-        for key in ("sameAs", "url", "id"):
-            value = posting.get(key)
-            if isinstance(value, str) and value.startswith("http"):
-                return value
-        return ""
-
-    def _parse_posting(self, posting: dict[str, Any]) -> JobPosting | None:
-        title = self._string(posting.get("title"))
-        if not title:
-            return None
-        org = posting.get("hiringOrganization") or {}
-        company = self._string(org.get("name")) if isinstance(org, dict) else self._string(org)
-        address = posting.get("jobLocation") or {}
-        if isinstance(address, dict):
-            address = address.get("address") or address
-        if isinstance(address, dict):
-            parts = [
-                self._string(address.get("addressLocality")),
-                self._string(address.get("addressRegion")),
-                self._string(address.get("addressCountry")),
-            ]
-            location = ", ".join(part for part in parts if part)
-        else:
-            location = self._string(address)
-        return JobPosting(
-            id=self._posting_url(posting) or title,
-            source=self.name,
-            title=title,
-            company=company,
-            location=location,
-            post_url=self._posting_url(posting),
-            posted_at=self._parse_iso(posting.get("datePosted")),
-            raw_data={"description": self._string(posting.get("description"))},
-        )

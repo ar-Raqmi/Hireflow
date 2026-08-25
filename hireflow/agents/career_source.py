@@ -53,7 +53,7 @@ class CareerSourceAgent(BaseAgent):
                 found = await self._fetcher.webfetch_company(
                     company, profile.locations, role_query
                 )
-            except Exception as exc:  # noqa: BLE001 - a blocked careers page is non-fatal
+            except Exception as exc:
                 errors.append(f"career {company}: {type(exc).__name__}: {str(exc)[:200]}")
                 found = []
             if not found:

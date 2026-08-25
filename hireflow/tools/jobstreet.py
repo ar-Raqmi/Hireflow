@@ -134,7 +134,7 @@ class JobStreetSource(JobSource):
             self._last_error = _DISABLED_ERROR
             return []
         try:
-            from playwright.async_api import async_playwright  # local import
+            import playwright
         except ImportError as exc:
             self._last_error = f"playwright not installed: {type(exc).__name__}: {str(exc)[:200]}"
             return []
@@ -142,34 +142,18 @@ class JobStreetSource(JobSource):
         self._page_url = url
         try:
             return await self._scrape(url, limit, locations)
-        except Exception as exc:  # noqa: BLE001 - a dead page never sinks a run
+        except Exception as exc:
             self._last_error = f"{url}: {type(exc).__name__}: {str(exc)[:300]}"
             return []
 
     async def _scrape(self, url: str, limit: int, locations: list[str] | None = None) -> list[JobPosting]:
-        from playwright.async_api import async_playwright
+        from hireflow.tools.browser_launcher import stealth_browser, stealth_page
 
-        from hireflow.tools.browser_launcher import (
-            apply_stealth,
-            stealth_context_kwargs,
-            stealth_launch_kwargs,
-        )
-
-        browser = None
         try:
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(**stealth_launch_kwargs())
-                try:
-                    context = await browser.new_context(**stealth_context_kwargs(locations))
-                    page = await context.new_page()
-                    apply_stealth(page)
-                    try:
-                        return await self._extract(page, url, limit)
-                    finally:
-                        await context.close()
-                finally:
-                    await browser.close()
-        except Exception as exc:  # noqa: BLE001 - Chromium missing/boot fail is non-fatal
+            async with stealth_browser() as browser:
+                async with stealth_page(browser, locations) as page:
+                    return await self._extract(page, url, limit)
+        except Exception as exc:
             self._last_error = f"chromium failed: {type(exc).__name__}: {str(exc)[:200]}"
             return []
 
@@ -183,12 +167,12 @@ class JobStreetSource(JobSource):
                 return []
             try:
                 await page.wait_for_selector("article", timeout=10000)
-            except Exception as exc:  # noqa: BLE001 - hydrated cards never arriving
+            except Exception as exc:
                 self._last_error = f"{url}: no job cards ({type(exc).__name__})"
                 return []
             await page.wait_for_timeout(1500)
             rows = await page.eval_on_selector_all("article", _EXTRACT_JS)
-        except Exception as exc:  # noqa: BLE001 - a dead page never sinks a run
+        except Exception as exc:
             self._last_error = f"{url}: {type(exc).__name__}: {str(exc)[:200]}"
             return []
         return self._rows_to_jobs(rows or [], url, limit)

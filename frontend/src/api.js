@@ -1,12 +1,8 @@
 // api.js — the single place the frontend talks to the REAL Hireflow backend.
-// Base URL is configurable via VITE_HIREFLOW_API. When unset and the app is
-// served by the Vite dev server, `/api/...` is proxied to the backend by
-// vite.config.js. When built (npm run build), set VITE_HIREFLOW_API to the
-// deployed Cloud Run URL at build time.
-//
-// The deployed backend is Cloud Run, so VITE_HIREFLOW_API should be the
-// `.run.app` URL (no trailing slash). Every function here returns real data
-// from the API — nothing is mocked or hardcoded.
+// Base URL: VITE_HIREFLOW_API (the deployed `.run.app` URL, no trailing slash).
+// When unset and served by the Vite dev server, `/api/...` is proxied to the
+// backend by vite.config.js. Every function returns real API data — nothing is
+// mocked or hardcoded.
 
 function resolveBase() {
   if (import.meta.env.VITE_HIREFLOW_API) {

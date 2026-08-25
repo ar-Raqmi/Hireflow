@@ -45,7 +45,7 @@ class PlaywrightSource(JobSource):
             self._last_error = _DISABLED_ERROR
             return []
         try:
-            from playwright.async_api import async_playwright  # local import
+            import playwright
         except ImportError as exc:
             self._last_error = f"playwright not installed: {type(exc).__name__}: {str(exc)[:200]}"
             return []
@@ -54,43 +54,29 @@ class PlaywrightSource(JobSource):
     async def _render_and_parse(
         self, query: str, limit: int, locations: list[str] | None = None
     ) -> list[JobPosting]:
+        from hireflow.tools.browser_launcher import stealth_browser, stealth_page
+
         jobs: list[JobPosting] = []
-        from playwright.async_api import async_playwright
-
-        from hireflow.tools.browser_launcher import (
-            apply_stealth,
-            stealth_context_kwargs,
-            stealth_launch_kwargs,
-        )
-
         try:
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(**stealth_launch_kwargs())
-        except Exception as exc:  # noqa: BLE001 - Chromium missing in the image is non-fatal
+            async with stealth_browser() as browser:
+                for url in self._urls:
+                    try:
+                        async with stealth_page(browser, locations) as page:
+                            await page.goto(url, timeout=30000)
+                            await page.wait_for_timeout(4000)
+                            rows = await self._page_rows(page, url)
+                    except Exception as exc:
+                        self._last_error = f"{url}: {type(exc).__name__}: {str(exc)[:200]}"
+                        continue
+                    for row in rows:
+                        job = self._parse_row(row)
+                        if job.id and self._matches(job, query, ""):
+                            jobs.append(job)
+                    if len(jobs) >= limit:
+                        break
+        except Exception as exc:
             self._last_error = f"chromium launch failed: {type(exc).__name__}: {str(exc)[:200]}"
             return []
-        try:
-            for url in self._urls:
-                context = await browser.new_context(**stealth_context_kwargs(locations))
-                page = await context.new_page()
-                apply_stealth(page)
-                try:
-                    await page.goto(url, timeout=30000)
-                    await page.wait_for_timeout(4000)
-                    rows = await self._page_rows(page, url)
-                except Exception as exc:  # noqa: BLE001 - a page failing is non-fatal
-                    self._last_error = f"{url}: {type(exc).__name__}: {str(exc)[:200]}"
-                    await context.close()
-                    continue
-                for row in rows:
-                    job = self._parse_row(row)
-                    if job.id and self._matches(job, query, ""):
-                        jobs.append(job)
-                await context.close()
-                if len(jobs) >= limit:
-                    break
-        finally:
-            await browser.close()
         return jobs[:limit]
 
     async def _page_rows(self, page: Any, url: str) -> list[dict[str, Any]]:

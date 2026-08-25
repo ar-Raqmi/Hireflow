@@ -93,7 +93,7 @@ class WebFetchSource:
         self._last_error = None
         try:
             html = await self._fetch_html(url)
-        except Exception as exc:  # noqa: BLE001 - a blocked page must never raise
+        except Exception as exc:
             self._last_error = f"{url}: {type(exc).__name__}: {str(exc)[:200]}"
             self._last_via = "none"
             return []

@@ -34,8 +34,6 @@ class GeminiClient:
         response = await self._async_client.models.generate_content(model=self._model, contents=prompt)
         return response.text
 
-# Todo: recheck the prompt engineering.
-
     async def parse_resume(self, text: str) -> dict[str, Any]:
         prompt = self._profile_prompt(text[:24000])
         return await self._generate_json(prompt)

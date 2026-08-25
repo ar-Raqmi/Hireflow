@@ -29,24 +29,6 @@ EMOJI = {
 }
 
 
-def ask_work_type() -> str:
-    print("\nWork type:")
-    options = ["(1) Remote", "(2) Onsite", "(3) Hybrid", "(4) Anywhere (skip)"]
-    for line in options:
-        print(f"  {line}")
-    while True:
-        raw = input("Pick 1-4 [4]: ").strip()
-        if not raw or raw == "4":
-            return "any"
-        if raw == "1":
-            return "remote"
-        if raw == "2":
-            return "onsite"
-        if raw == "3":
-            return "hybrid"
-        print("  -> pick 1-4")
-
-
 def _prompt_work_type() -> str:
     print("remote | hybrid | onsite | any  [any]:")
     while True:
@@ -231,8 +213,6 @@ def _render(result: dict) -> None:
 
 
 def main() -> int:
-    import uuid  # noqa: F401 - used in _upload
-
     if len(sys.argv) < 2:
         print("usage: python hireflow_run.py <base_url> <resume> [work_type] [locations_csv] [target] [seed] [seen_csv] [approve]")
         return 2

@@ -108,7 +108,7 @@ class WebDiscoverySource:
         for url in urls:
             try:
                 found = await self._fetcher.fetch_url(url, query_hint=role)
-            except Exception as exc:  # noqa: BLE001 - a failing page is non-fatal
+            except Exception as exc:
                 self._last_error = f"fetch {url}: {type(exc).__name__}: {str(exc)[:200]}"
                 found = []
             for job in found:
@@ -120,7 +120,7 @@ class WebDiscoverySource:
         for company in company_names or []:
             try:
                 found = await self._fetcher.webfetch_company(company, preferred, role)
-            except Exception as exc:  # noqa: BLE001 - non-fatal
+            except Exception as exc:
                 self._last_error = f"company {company}: {type(exc).__name__}: {str(exc)[:200]}"
                 found = []
             for job in found:
