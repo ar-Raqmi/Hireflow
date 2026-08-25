@@ -200,13 +200,33 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 └── frontend/                # Vite + React app (BUILT 2026-08-25) — the real frontend, wired to
                              #   the live backend via fetch (dashboard, SSE agent timeline, ranked
                              #   matches, approve → sandbox ATS). Replaces hireflow-frontend.html
-                             #   (now retired as the reference prototype). `npm install && npm run
-                             #   build` builds clean; base URL via VITE_HIREFLOW_API (dev proxy in
-                             #   vite.config.js). Components: ResumeDrop, PrefsModal, AgentTimeline,
-                             #   MatchesList, ApplicationsList, HistoryTab, ApproveButton (in
-                             #   MatchesList), Toast; api.js (fetch layer), storage.js (localStorage).
-                             #   timeline animates from the real stream (verified); live e2e on the
-                             #   deployed .run.app still pending.
+                             #   (now retired as the reference prototype). **M3E (Material 3
+                             #   Expressive) UI (`@m3e/react`, 2026-08-25):** app wrapped in
+                             #   `<M3eTheme color="#8F4100" scheme="light" motion="expressive">`
+                             #   (ember brand primary → full M3 palette); components swapped to M3E —
+                             #   buttons (`M3eButton`), prefs dialog (`M3eDialog`), tabs (`M3eTabs`/
+                             #   `M3eTab`), icons (`M3eIcon` replaces `Icon.jsx` via `M3eIcon.jsx`),
+                             #   chips (`M3eChip`/`M3eInputChipSet`), snackbar (`M3eSnackbar.open`),
+                             #   progress (`M3eLinearProgressIndicator`/`M3eCircularProgressIndicator`),
+                             #   work-type (`M3eSegmentedButton`), sort (`M3eSelect`/`M3eOption`),
+                             #   filters (`M3eFilterChip`/`M3eFilterChipSet`). Custom dropzone (no M3E
+                             #   dropzone), SSE timeline kept as custom markup themed via
+                             #   `var(--md-sys-color-primary)`. `npm install && npm run build` builds
+                             #   clean; headless-Chromium render verified (all M3E components upgrade,
+                             #   no console errors, tabs/dialog/segmented interactions work). Base URL
+                             #   via VITE_HIREFLOW_API (dev proxy in vite.config.js). **Views: Agent
+                             #   run / Results / History (no separate Applications tab).** Results
+                             #   shows the ranked matches + inline app status + per-match drafts,
+                             #   with client-side filters (sort by score/company/date, source chips,
+                             #   "has draft"). Match cards: M3E circular progress score (number only,
+                             #   no /100), rank label, Open Link, View Draft (CV + cover letter
+                             #   from the done payload `drafts[job_id]`), expandable reasons +
+                             #   research (markdown rendered via `marked`). `ApplicationsList` +
+                             #   `ScoreDial` are DELETED (dead after the merge). Components:
+                             #   M3eIcon, ResumeDrop, PrefsModal, AgentTimeline, MatchesList,
+                             #   HistoryTab, Toast; lib/md.js (marked), api.js (fetch layer),
+                             #   storage.js (localStorage). timeline animates from the real stream
+                             #   (verified); live e2e on the deployed .run.app still pending.
 ```
 
 **Sandbox ATS submit path — PRESENT (code; live proof pending redeploy):** `/sandbox/ats/apply`,
@@ -321,10 +341,16 @@ new build is the acceptance target. See `docs/DEPLOY.md` for the redeploy and
   `embeddings.py` (`EmbeddingRanker`, `gemini-embedding-001`, gated `SEMANTIC_SEARCH`),
   `/sandbox/ats/apply` + `ApplicationStatus.SUBMITTED` + `/approve` → real submit
   (in-memory + best-effort `sandbox_ats.json`). All landed in the tree.
-- **Frontend is BUILT + verified live (2026-08-25):** Vite + React app (`frontend/`) —
-  upload, SSE agent timeline (animates from the real stream), ranked matches + approve,
-  applications, localStorage history. `hireflow-frontend.html` is retired as the
-  reference prototype. **Remaining acceptance: the redeploy + online curl e2e on the
+- **Frontend is BUILT + verified live (2026-08-25):** Vite + React app (`frontend/`), **rebuilt on the
+  M3E (Material 3 Expressive) component library** (`@m3e/react`) — `<M3eTheme color="#8F4100"
+  scheme="light" motion="expressive">` at the root (ember brand primary → full M3 palette), with
+  `M3eButton`/`M3eDialog`/`M3eTabs`/`M3eIcon`/`M3eChip`/`M3eSnackbar`/`M3eProgressIndicator`/
+  `M3eSegmentedButton` replacing the hand-rolled CSS/icons; custom dropzone + SSE timeline + score
+  dials stay custom markup themed via `var(--md-sys-color-primary)`. Upload, SSE agent timeline
+  (animates from the real stream), ranked matches + approve, applications, localStorage history all
+  behave as before. Headless-Chromium render verified (2026-08-25): all M3E components upgrade, no
+  console errors, tabs/dialog/segmented-select interactions work. `hireflow-frontend.html` is
+  retired as the reference prototype. **Remaining acceptance: the redeploy + online curl e2e on the
   `.run.app` URL (needs Zach's deploy)**. Agent Search is optional + not set up (only
   indexes domains Zach can verify he owns — `docs/GCP_SETUP.md` §3). Layer II Playwright
   **is enabled** (`HIREFLOW_PLAYWRIGHT=1` + Chromium installed in the `Dockerfile`).

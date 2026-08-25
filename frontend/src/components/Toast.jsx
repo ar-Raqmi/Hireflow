@@ -1,24 +1,15 @@
-import { useEffect, useState } from 'react';
-import Icon from './Icon.jsx';
+import { useEffect } from 'react';
+import { M3eSnackbar } from '@m3e/react/snackbar';
 
 // Toast — bottom notification. Auto-dismisses after `ms`; message comes from
-// app state (errors from the API or success confirmations).
+// app state (errors from the API or success confirmations). Presented via the
+// M3E snackbar (imperative M3eSnackbar.open).
 export default function Toast({ toast }) {
-  const [visible, setVisible] = useState(false);
-
   useEffect(() => {
     if (!toast) return;
-    setVisible(true);
-    const t = setTimeout(() => setVisible(false), toast.ms || 3500);
-    return () => clearTimeout(t);
+    M3eSnackbar.open(toast.message, { duration: toast.ms || 3500 });
+    return () => M3eSnackbar.dismiss();
   }, [toast]);
 
-  if (!toast) return null;
-  return (
-    <div className={`toast ${visible ? 'show' : ''}`} role="status">
-      <Icon name={toast.icon || (toast.kind === 'error' ? 'error' : 'auto_awesome')} size={22} />
-      <span>{toast.message}</span>
-      <i className="toastbar" />
-    </div>
-  );
+  return null;
 }
