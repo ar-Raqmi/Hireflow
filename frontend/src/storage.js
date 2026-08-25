@@ -59,3 +59,22 @@ export function markSeen(jobs) {
   safeSet(SEEN_KEY, merged.slice(-500));
   return merged;
 }
+
+// --- active run (resume-after-refresh) ---
+const ACTIVE_RUN_KEY = 'hireflow.active_run.v1';
+
+export function saveActiveRun(info) {
+  safeSet(ACTIVE_RUN_KEY, info);
+}
+
+export function loadActiveRun() {
+  return safeGet(ACTIVE_RUN_KEY, null);
+}
+
+export function clearActiveRun() {
+  try {
+    localStorage.removeItem(ACTIVE_RUN_KEY);
+  } catch {
+    /* blocked — best effort */
+  }
+}

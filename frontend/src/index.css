@@ -130,6 +130,7 @@ m3e-icon { vertical-align: middle; }
   border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; color: var(--ink-soft);
 }
 .phase-chip.live { border-color: var(--ember); color: var(--ember); }
+.tl-cancel { margin-left: auto; }
 .con-progress { width: 100%; display: block; padding: 0 24px; margin-bottom: 4px; --m3e-progress-indicator-color: var(--md-sys-color-primary); --m3e-progress-indicator-track-color: var(--track); }
 .filechip {
   display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line);

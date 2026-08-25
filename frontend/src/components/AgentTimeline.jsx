@@ -1,4 +1,5 @@
 import { M3eLinearProgressIndicator } from '@m3e/react/progress-indicator';
+import { M3eButton } from '@m3e/react/button';
 import M3eIcon from './M3eIcon.jsx';
 
 const STAGE_META = {
@@ -15,7 +16,7 @@ const STAGE_META = {
 // AgentTimeline — renders the SSE live stages as a vertical timeline.
 // `events` is the ordered list of {seq, stage, detail} frames streamed from
 // the backend; `running` drives the "active/paused" ring states.
-export default function AgentTimeline({ events = [], running = false }) {
+export default function AgentTimeline({ events = [], running = false, onCancel }) {
   const stages = Object.keys(STAGE_META);
   const seenSet = new Set(events.filter((e) => e && e.stage).map((e) => e.stage));
 
@@ -38,6 +39,11 @@ export default function AgentTimeline({ events = [], running = false }) {
           <M3eIcon name="monitoring" />Agent timeline
         </div>
         <span className={`phase-chip ${running ? 'live' : ''}`}>{running ? 'running' : 'idle'}</span>
+        {running && onCancel && (
+          <M3eButton className="tl-cancel" variant="tonal" size="small" onClick={onCancel}>
+            <M3eIcon name="close" size={16} />Cancel
+          </M3eButton>
+        )}
       </div>
 
       <div className="segbar">

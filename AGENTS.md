@@ -277,6 +277,16 @@ imports (Vertex/API access is handled by `google-genai`).
   `event: done` with the full result JSON. The `search` stage shows the
   expanded query terms + per-source counts. A down board degrades to `[]` and is
   recorded in `errors`, never a 500.
+- `GET /pipeline/run/{run_id}` — **resume-after-refresh status (PRESENT; live proof
+  pending redeploy)**: `{run_id, exists, done, status, result}` — the frontend calls
+  this on mount when an active run id is saved in `localStorage` (key
+  `hireflow.active_run.v1`), then either re-attaches the SSE stream (`Last-Event-ID`
+  resume) or renders the already-stored result.
+- `POST /pipeline/run/{run_id}/cancel` — **cancel a run (PRESENT; live proof pending
+  redeploy)**: cancels the background asyncio task (stops paid Vertex/Gemini work via
+  `task.cancel()`); `_execute_run` catches `CancelledError` and finishes the runlog as
+  `status:"cancelled"` so the SSE stream closes cleanly. In-memory `run_tasks` registry
+  on `api.state` (`create_app`) is popped by a done callback.
 - `GET /dashboard` — live counts + by-status breakdown.
 - `GET /jobs` / `GET /applications` — list repository contents (persisted from
   the background run's `jobs` / `application_records`).
@@ -497,6 +507,8 @@ curl e2e (SSE `career` stage must show companies + new jobs) to count.**
 - `POST /sandbox/ats/apply` + `ApplicationStatus.SUBMITTED` — **real submission to the sandbox ATS (PRESENT in this tree** — `api/app.py` `AtsSandbox` + `domain/__init__.py`; live proof pending redeploy)
 - `POST /pipeline/run?profile_id=…&seed=…&seen=…` — start the **RouterAgent** Search→Match→Research→Prepare pipeline end-to-end async → returns `run_id` (`started`)
 - `GET /pipeline/run/{run_id}/events` — SSE stream of per-stage progress + final `done` payload
+- `GET /pipeline/run/{run_id}` — run status `{exists, done, status, result}` (resume-after-refresh)
+- `POST /pipeline/run/{run_id}/cancel` — cancel the background task (stops paid Gemini work)
 - healthcheck (`/health`) for Cloud Run
 - Optional in-flight knobs: **embeddings re-rank** (`gemini-embedding-001`, `EMBEDDING_MODEL` fallback `text-embedding-005` — code present, gated `SEMANTIC_SEARCH`) and **Agent Search** (`AGENT_SEARCH_DATASTORE`) per `docs/GCP_SETUP.md` §3–4
 
@@ -551,7 +563,7 @@ curl e2e (SSE `career` stage must show companies + new jobs) to count.**
 
 1. Re-deploy to Cloud Run (`docs/DEPLOY.md`) → curl `/health`, then the live curl e2e with a real `.pdf` (`docs/CURL_E2E.md`): upload → run (`?seed=` + `?seen=`) → SSE events → jobs → approve. **This proves the phase — not the offline green.** The SSE `search` stage must show **expanded query terms** + per-source counts, the `career` stage must show **companies probed + new jobs**, and a Johor-style location must NOT widen to a global search (search intelligence + career-page sourcing are now in the tree — prove them live).
 2. **Watch for the in-flight parallel pass** (§10/§12): universal webfetch (`webfetch.py`) + discovery (`discovery.py`), embeddings re-rank (`embeddings.py`, `gemini-embedding-001`), real-submit sandbox ATS (`/sandbox/ats/apply`, `ApplicationStatus.SUBMITTED`, `/approve` submits). Grep the tree each session — mark done ONLY when each is present + redeployed + curl-e2e'd. Agent Search stays OPTIONAL (domain-verify, `docs/GCP_SETUP.md` §3).
-3. **Vite + React app** (`frontend/`) is **built + verified live** (2026-08-25): components for resume upload, prefs modal, SSE agent timeline (animates from the real streamed events), ranked matches + approve, applications, history (localStorage). Wired to the live backend via `fetch`; builds clean with `npm install && npm run build`. **Remaining acceptance: prove the same run against the deployed `.run.app` URL** (needs the redeploy so `/pipeline/run` answers the RouterAgent pipeline, not `agent_not_configured`).
+3. **Vite + React app** (`frontend/`) is **built + verified live** (2026-08-25): components for resume upload, prefs modal, SSE agent timeline (animates from the real streamed events), ranked matches + approve, applications, history (localStorage). Wired to the live backend via `fetch`; builds clean with `npm install && npm run build`. **Remaining acceptance: prove the same run against the deployed `.run.app` URL** (needs the redeploy so `/pipeline/run` answers the RouterAgent pipeline, not `agent_not_configured`). **Resume-after-refresh + Cancel are IMPLEMENTED (2026-08-26, code; live proof pending redeploy):** run start persists `{run_id, profile}` to `localStorage` (`hireflow.active_run.v1`); on mount the app calls `GET /pipeline/run/{run_id}` and either re-attaches the live SSE stream (`Last-Event-ID` resume) or renders the finished result; a Cancel button in the timeline header calls `POST /pipeline/run/{run_id}/cancel` to stop the background task. A refreshed run only continues while the same in-memory instance lives; a missing run clears the marker gracefully.
 4. **Layer II Playwright/Chromium** is **coded + enabled** in the `Dockerfile` (`HIREFLOW_PLAYWRIGHT=1`); needs the redeploy + a live curl row.
 5. Demo & docs: clean diagram image, ≤4-min video with Cloud Run console + Vertex logs, grant repo access to `testing@devpost.com` / `cloudhackathons@google.com`.
 6. Optional: Cloud Scheduler → POST `/pipeline/run` hourly.

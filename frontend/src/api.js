@@ -57,6 +57,20 @@ export async function startPipeline(profileId, { seed = 0, seen = [] } = {}) {
   return jsonRequest(res, 'start pipeline');
 }
 
+// fetchRunStatus — GET /pipeline/run/{runId} → {exists, done, status, result}.
+// Used on app mount to resume a run after a refresh.
+export async function fetchRunStatus(runId) {
+  const res = await fetch(`${BASE}/pipeline/run/${encodeURIComponent(runId)}`);
+  return jsonRequest(res, 'pipeline status');
+}
+
+// cancelPipeline — POST /pipeline/run/{runId}/cancel → stops the background
+// task so the backend stops doing work for an abandoned run.
+export async function cancelPipeline(runId) {
+  const res = await fetch(`${BASE}/pipeline/run/${encodeURIComponent(runId)}/cancel`, { method: 'POST' });
+  return jsonRequest(res, 'cancel pipeline');
+}
+
 // streamEvents — consume the SSE stream for a run. Calls onEvent(data) for
 // each `data:` line and onDone(result) on the final `event: done`. Handles
 // `id:` lines for resume via Last-Event-ID. Uses fetch + ReadableStream so it
@@ -153,5 +167,3 @@ export async function approveApplication(applicationId) {
   });
   return jsonRequest(res, 'approve application');
 }
-
-export { BASE };

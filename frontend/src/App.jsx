@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { M3eButton } from '@m3e/react/button';
 import { M3eTabs, M3eTab } from '@m3e/react/tabs';
-import { health, startPipeline, streamEvents } from './api.js';
-import { loadPrefs, savePrefs, loadHistory, pushHistory, clearHistory, loadSeen, markSeen } from './storage.js';
+import { health, startPipeline, streamEvents, fetchRunStatus, cancelPipeline } from './api.js';
+import {
+  loadPrefs, savePrefs, loadHistory, pushHistory, clearHistory, loadSeen, markSeen,
+  saveActiveRun, loadActiveRun, clearActiveRun,
+} from './storage.js';
 import ResumeDrop from './components/ResumeDrop.jsx';
 import PrefsModal from './components/PrefsModal.jsx';
 import AgentTimeline from './components/AgentTimeline.jsx';
@@ -35,11 +38,107 @@ export default function App() {
     health().catch((e) => {
       showToast(`Backend unreachable: ${e.message}`, 'error');
     });
+    const active = loadActiveRun();
+    if (active && active.runId) resumeRun(active);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function showToast(message, kind = 'info', ms) {
     setToast({ message, kind, ms, ts: Date.now() });
+  }
+
+  function resetRunState() {
+    setRunning(true);
+    setEvents([]);
+    setResult(null);
+    setMatches([]);
+    setApplications([]);
+    setView('agent');
+  }
+
+  // applyResult — turns a run's done payload into app state + history, then
+  // clears the stored active run (no more resume needed).
+  function applyResult(res, p) {
+    setResult(res);
+    const m = res.matches || [];
+    const a = res.applications || res.application_records || [];
+    setMatches(m);
+    setApplications(a);
+    clearActiveRun();
+    if (res.status === 'cancelled') {
+      setRunning(false);
+      showToast('Run cancelled — agent stopped');
+      return;
+    }
+    markSeen(m);
+    const historyEntry = {
+      ts: Date.now(),
+      filename: (p && p.filename) || 'resume',
+      prefs,
+      status: res.status || 'completed',
+      result: res,
+    };
+    pushHistory(historyEntry);
+    setHistory(loadHistory());
+    if (res.status === 'error' || (res.errors && res.errors.length > 0)) {
+      showToast((res.detail || (res.errors && res.errors[0])) || 'Run finished with errors', 'error', 6000);
+    } else {
+      showToast(`Run complete — ${m.length} matches, ${a.length} applications`);
+    }
+    setRunning(false);
+  }
+
+  // streamRun — attach to an existing run's SSE stream; picks up mid-run events
+  // via Last-Event-ID resume and finishes with applyResult. Every callback
+  // ignores the stream if a newer run has since taken over runRef.
+  async function streamRun(runId, p) {
+    runRef.current = runId;
+    await streamEvents(runId, {
+      onEvent: (ev) => {
+        if (runRef.current === runId) setEvents((prev) => [...prev, ev]);
+      },
+      onDone: (res) => {
+        if (runRef.current !== runId) return;
+        applyResult(res, p);
+      },
+      onError: (err) => {
+        if (runRef.current !== runId) return;
+        showToast(`Stream error: ${err.message}`, 'error', 6000);
+        setRunning(false);
+      },
+    });
+  }
+
+  // resumeRun — app mount path for a run that was started in a previous page
+  // load (saved to localStorage). If the backend still has the run it reattaches
+  // to the live stream; if it already finished it renders the full result; if
+  // the run is gone (instance restart/scale-to-zero) it just clears the marker.
+  async function resumeRun(active) {
+    let info = null;
+    try {
+      info = await fetchRunStatus(active.runId);
+    } catch {
+      // Backend unreachable — keep the marker so a later refresh can re-attach;
+      // the backend task keeps running whether or not we are connected to it.
+      setRunning(false);
+      showToast('Backend unreachable — run will resume when it is back', 'error', 6000);
+      return;
+    }
+    if (!info || !info.exists) {
+      clearActiveRun();
+      setRunning(false);
+      showToast('Previous run is no longer available', 'info');
+      return;
+    }
+    const p = active.profile || null;
+    if (p) setProfile(p);
+    if (info.done) {
+      applyResult(info.result || { status: 'completed', run_id: active.runId }, p);
+      return;
+    }
+    resetRunState();
+    showToast('Resuming previous agent run');
+    await streamRun(active.runId, p);
   }
 
   function handleUploaded(parsed) {
@@ -71,17 +170,16 @@ export default function App() {
   }
 
   async function handleRun(override) {
+    if (running) {
+      showToast('A run is already in progress', 'error');
+      return;
+    }
     const p = override || profile;
     if (!p) {
       showToast('Upload a résumé first', 'error');
       return;
     }
-    setRunning(true);
-    setEvents([]);
-    setResult(null);
-    setMatches([]);
-    setApplications([]);
-    setView('agent');
+    resetRunState();
 
     let runId = null;
     try {
@@ -90,42 +188,30 @@ export default function App() {
       runId = started.run_id;
       if (!runId) throw new Error('Pipeline did not return a run_id');
       runRef.current = runId;
-      showToast('Agent run started');
-
-      await streamEvents(runId, {
-        onEvent: (ev) => setEvents((prev) => [...prev, ev]),
-        onDone: (res) => {
-          setResult(res);
-          const m = res.matches || [];
-          const a = res.applications || res.application_records || [];
-          setMatches(m);
-          setApplications(a);
-          markSeen(m);
-          const historyEntry = {
-            ts: Date.now(),
-            filename: p.filename || 'resume',
-            prefs,
-            status: res.status || 'completed',
-            result: res,
-          };
-          pushHistory(historyEntry);
-          setHistory(loadHistory());
-          if (res.status === 'error' || (res.errors && res.errors.length > 0)) {
-            showToast((res.detail || (res.errors && res.errors[0])) || 'Run finished with errors', 'error', 6000);
-          } else {
-            showToast(`Run complete — ${m.length} matches, ${a.length} applications`);
-          }
-          setRunning(false);
-        },
-        onError: (err) => {
-          showToast(`Stream error: ${err.message}`, 'error', 6000);
-          setRunning(false);
-        },
+      saveActiveRun({
+        runId,
+        profile: { id: p.id, filename: p.filename, target_roles: p.target_roles },
       });
+      showToast('Agent run started');
+      await streamRun(runId, p);
     } catch (err) {
       showToast(`Failed to start run: ${err.message}`, 'error', 6000);
       setRunning(false);
     }
+  }
+
+  async function handleCancel() {
+    const runId = runRef.current;
+    if (!runId) return;
+    try {
+      await cancelPipeline(runId);
+    } catch (err) {
+      showToast(`Cancel failed: ${err.message}`, 'error', 6000);
+      return;
+    }
+    clearActiveRun();
+    setRunning(false);
+    showToast('Cancelling…');
   }
 
   function handleClearHistory() {
@@ -140,7 +226,7 @@ export default function App() {
     <div className="app">
       <header className="topbar wrap">
         <div className="logo">
-          hireflow<b>.</b>
+          Hireflow<b>.</b>
         </div>
       </header>
 
@@ -209,7 +295,7 @@ export default function App() {
                 )}
               </div>
             )}
-            <AgentTimeline events={events} running={running} />
+            <AgentTimeline events={events} running={running} onCancel={running ? handleCancel : undefined} />
             {result && (result.errors && result.errors.length > 0) && (
               <div className="riskbanner high">
                 <M3eIcon name="warning" size={28} />

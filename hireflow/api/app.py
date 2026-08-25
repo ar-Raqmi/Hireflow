@@ -145,6 +145,9 @@ async def _execute_run(
         result["status"] = "completed"
         result["run_id"] = run_id
         await runlog.finish(run_id, result)
+    except asyncio.CancelledError:
+        await runlog.finish(run_id, {"run_id": run_id, "status": "cancelled", "errors": []})
+        raise
     except Exception as exc:
         await runlog.finish(
             run_id,
@@ -213,6 +216,7 @@ def create_app(
     api.state.agent = agent or _build_default_agent()
     api.state.parser = ResumeParser()
     api.state.runlog = RunLog()
+    api.state.run_tasks: dict[str, asyncio.Task] = {}
     api.state.ats = AtsSandbox()
 
     @api.get("/health")
@@ -351,7 +355,7 @@ def create_app(
             return {"profile_id": profile_id, "status": "profile_not_found"}
         run_id = str(uuid.uuid4())
         seen_jobs = _split_csv(seen)
-        asyncio.create_task(
+        task = asyncio.create_task(
             _execute_run(
                 api.state.runlog,
                 api.state.agent,
@@ -362,7 +366,33 @@ def create_app(
                 seen_jobs=seen_jobs,
             )
         )
+        api.state.run_tasks[run_id] = task
+        task.add_done_callback(lambda t: api.state.run_tasks.pop(run_id, None))
         return {"run_id": run_id, "profile_id": profile_id, "status": "started"}
+
+    @api.get("/pipeline/run/{run_id}")
+    async def pipeline_status(run_id: str) -> dict:
+        if not await api.state.runlog.exists(run_id):
+            return {"run_id": run_id, "exists": False, "done": False}
+        result = await api.state.runlog.result(run_id)
+        done = result is not None
+        return {
+            "run_id": run_id,
+            "exists": True,
+            "done": done,
+            "status": (result or {}).get("status", "running"),
+            "result": result,
+        }
+
+    @api.post("/pipeline/run/{run_id}/cancel")
+    async def cancel_pipeline(run_id: str) -> dict:
+        task = api.state.run_tasks.get(run_id)
+        if task is None:
+            return {"run_id": run_id, "status": "not_found"}
+        if task.done():
+            return {"run_id": run_id, "status": "already_finished"}
+        task.cancel()
+        return {"run_id": run_id, "status": "cancelling"}
 
     @api.get("/pipeline/run/{run_id}/events")
     async def pipeline_events(
