@@ -49,6 +49,7 @@ export default function App() {
   function handleUploaded(parsed) {
     setProfile(parsed);
     showToast(`Résumé parsed — ${parsed.skills ? parsed.skills.length : 0} skills extracted`);
+    handleRun(parsed);
   }
 
   function handlePrefsSave(p) {
@@ -56,15 +57,18 @@ export default function App() {
     savePrefs(p);
     setPrefsOpen(false);
     showToast('Preferences saved');
+    if (profile) handleRun();
   }
 
   function handlePrefsSkip() {
     setPrefsOpen(false);
     showToast('Using résumé defaults');
+    if (profile) handleRun();
   }
 
-  async function handleRun() {
-    if (!profile) {
+  async function handleRun(override) {
+    const p = override || profile;
+    if (!p) {
       showToast('Upload a résumé first', 'error');
       return;
     }
@@ -78,7 +82,7 @@ export default function App() {
     let runId = null;
     try {
       const seen = loadSeen();
-      const started = await startPipeline(profile.id, { seed: Math.floor(Math.random() * 1000), seen });
+      const started = await startPipeline(p.id, { seed: Math.floor(Math.random() * 1000), seen });
       runId = started.run_id;
       if (!runId) throw new Error('Pipeline did not return a run_id');
       runRef.current = runId;
@@ -95,7 +99,7 @@ export default function App() {
           markSeen(m);
           const historyEntry = {
             ts: Date.now(),
-            filename: profile.filename || 'resume',
+            filename: p.filename || 'resume',
             prefs,
             status: res.status || 'completed',
             result: res,
@@ -185,7 +189,7 @@ export default function App() {
                     Drop in a résumé and Hireflow takes it from there — parsing, auditing, searching,
                     ranking and tailoring. You only approve.
                   </p>
-                  <button type="button" className="filled runbtn" onClick={handleRun} disabled={!profile || running}>
+                  <button type="button" className="filled runbtn" onClick={() => handleRun()} disabled={!profile || running}>
                     <Icon name={running ? 'progress_activity' : 'play_arrow'} size={18} />
                     {running ? 'Running…' : profile ? 'Run the agent' : 'Upload a résumé to start'}
                   </button>

@@ -67,44 +67,8 @@ export async function startPipeline(profileId, { seed = 0, seen = [] } = {}) {
 export async function streamEvents(runId, { onEvent, onDone, onError } = {}) {
   let lastId = 0;
   let done = false;
-  while (!done) {
-    const headers = {};
-    if (lastId > 0) headers['Last-Event-ID'] = String(lastId);
-    let res;
-    try {
-      res = await fetch(`${BASE}/pipeline/run/${runId}/events`, { headers });
-    } catch (err) {
-      onError?.(err);
-      return;
-    }
-    if (!res.ok || !res.body) {
-      onError?.(new Error(`SSE stream failed (${res.status} ${res.statusText})`));
-      return;
-    }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    try {
-      while (true) {
-        const { value, done: streamDone } = await reader.read();
-        if (streamDone) break;
-        buffer += decoder.decode(value, { stream: true });
-        let idx;
-        // SSE frames are separated by a blank line.
-        while ((idx = buffer.indexOf('\n\n')) !== -1) {
-          const raw = buffer.slice(0, idx);
-          buffer = buffer.slice(idx + 2);
-          parseFrame(raw);
-        }
-      }
-    } catch (err) {
-      onError?.(err);
-      return;
-    }
-  }
-
   let dataLines = '';
-  function parseFrame(raw) {
+  const parseFrame = (raw) => {
     let event = 'message';
     dataLines = '';
     for (const line of raw.split('\n')) {
@@ -129,6 +93,42 @@ export async function streamEvents(runId, { onEvent, onDone, onError } = {}) {
       onDone?.(payload);
     } else {
       onEvent?.(payload);
+    }
+  };
+  while (!done) {
+    const headers = {};
+    if (lastId > 0) headers['Last-Event-ID'] = String(lastId);
+    let res;
+    try {
+      res = await fetch(`${BASE}/pipeline/run/${runId}/events`, { headers });
+    } catch (err) {
+      onError?.(err);
+      return;
+    }
+    if (!res.ok || !res.body) {
+      onError?.(new Error(`SSE stream failed (${res.status} ${res.statusText})`));
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    try {
+      while (!done) {
+        const { value, done: streamDone } = await reader.read();
+        if (streamDone) break;
+        buffer += decoder.decode(value, { stream: true });
+        let idx;
+        // SSE frames are separated by a blank line.
+        while ((idx = buffer.indexOf('\n\n')) !== -1) {
+          const raw = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+          parseFrame(raw);
+        }
+      }
+      if (done) await reader.cancel().catch(() => {});
+    } catch (err) {
+      onError?.(err);
+      return;
     }
   }
 }

@@ -16,10 +16,19 @@ const STAGE_META = {
 // the backend; `running` drives the "active/paused" ring states.
 export default function AgentTimeline({ events = [], running = false }) {
   const stages = Object.keys(STAGE_META);
-  const seen = events.filter((e) => e && e.stage).map((e) => e.stage);
+  const seenSet = new Set(events.filter((e) => e && e.stage).map((e) => e.stage));
 
-  // Determine the latest stage the agent reached.
-  const lastIdx = stages.reduce((acc, s, i) => (seen.includes(s) ? i : acc), -1);
+  // For each stage, "reached" = this stage OR any later stage has been seen.
+  // The pipeline is sequential (parse→audit→search→match→…→approve), so seeing a
+  // later stage implies the earlier ones passed — even if the backend emits them
+  // slightly out of order.
+  const reachedIdx = stages.reduce(
+    (acc, s, i) => (seenSet.has(s) ? i : acc),
+    -1,
+  );
+  // Furthest index reached = the max index of any seen stage.
+  let furthest = -1;
+  stages.forEach((s, i) => { if (seenSet.has(s) && i > furthest) furthest = i; });
 
   return (
     <section className="console" aria-label="Agent timeline">
@@ -34,7 +43,7 @@ export default function AgentTimeline({ events = [], running = false }) {
         {stages.map((s, i) => (
           <div
             key={s}
-            className={`seg ${i <= lastIdx ? 'done' : ''} ${i === lastIdx + 1 && running ? 'active' : ''}`}
+            className={`seg ${i <= furthest ? 'done' : ''} ${i === furthest + 1 && running ? 'active' : ''}`}
           />
         ))}
       </div>
@@ -42,15 +51,17 @@ export default function AgentTimeline({ events = [], running = false }) {
       <ol className="tl">
         {stages.map((s, i) => {
           const meta = STAGE_META[s];
-          const state = i < lastIdx ? 'done' : i === lastIdx ? (running ? 'active' : 'done') : 'pending';
+          const reached = i <= furthest;
+          const isActive = i === furthest && running;
+          const state = reached ? (isActive ? 'active' : 'done') : 'pending';
           const detail = events.filter((e) => e.stage === s).map((e) => e.detail).filter(Boolean);
-          const isFailed = state === 'done' && i === lastIdx && events.some((e) => e.stage === s && /error|fail/i.test(e.detail || ''));
+          const isFailed = state === 'done' && events.some((e) => e.stage === s && /error|fail/i.test(e.detail || ''));
           return (
             <li
               key={s}
               className="ck"
               data-state={isFailed ? 'failed' : state}
-              data-line={i < lastIdx ? '1' : '0'}
+              data-line={reachedIdx > i ? '1' : '0'}
               data-reach="0"
             >
               <div className="ck-rail">
