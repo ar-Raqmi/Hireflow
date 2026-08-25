@@ -21,7 +21,6 @@ class ApplicationStatus(str, Enum):
     MATCHED = "matched"
     ROUTED = "routed"
     DRAFTED = "drafted"
-    APPROVED = "approved"
     SUBMITTED = "submitted"
 
 
@@ -146,9 +145,7 @@ class Application:
     status: ApplicationStatus = ApplicationStatus.MATCHED
     score: int = 0
     submitted_at: datetime | None = None
-    followup_due: datetime | None = None
     human_handoff: bool = False
-    notes: list[str] = field(default_factory=list)
     drafts: dict[str, str] = field(default_factory=dict)
     ats_confirmation: str = ""
 
@@ -162,9 +159,7 @@ class Application:
             status=ApplicationStatus(data.get("status", ApplicationStatus.MATCHED.value)),
             score=int(data.get("score", 0)),
             submitted_at=_parse_datetime(data.get("submitted_at")),
-            followup_due=_parse_datetime(data.get("followup_due")),
             human_handoff=bool(data.get("human_handoff", False)),
-            notes=list(data.get("notes", [])),
             drafts=dict(data.get("drafts", {}) or {}),
             ats_confirmation=str(data.get("ats_confirmation", "") or ""),
         )
@@ -177,9 +172,7 @@ class Application:
             "status": self.status.value,
             "score": self.score,
             "submitted_at": self.submitted_at.isoformat() if self.submitted_at else None,
-            "followup_due": self.followup_due.isoformat() if self.followup_due else None,
             "human_handoff": self.human_handoff,
-            "notes": self.notes,
             "drafts": self.drafts,
             "ats_confirmation": self.ats_confirmation,
         }

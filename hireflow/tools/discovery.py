@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from typing import Any
 from urllib.parse import unquote, urlsplit
 
 import httpx
@@ -9,15 +8,11 @@ import httpx
 from hireflow.config import SETTINGS
 from hireflow.domain import JobPosting
 from hireflow.tools.webfetch import WebFetchSource
+from hireflow.tools.job_source import USER_AGENT
 
 _DDG_LINK_RE = re.compile(r'<a\b[^>]*rel="nofollow"[^>]*href="([^"]+)"', re.I)
 _UDDG_RE = re.compile(r"[?&]uddg=([^&\s'\"]+)")
 _DEFAULT_ENDPOINT = "https://lite.duckduckgo.com/lite/"
-_USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-)
-
 _LOCATION_HINTS: dict[str, tuple[str, ...]] = {
     "malaysia": ("jobstreet.com.my",),
     "my": ("jobstreet.com.my",),
@@ -138,7 +133,7 @@ class WebDiscoverySource:
             try:
                 async with httpx.AsyncClient(
                     timeout=15.0,
-                    headers={"User-Agent": _USER_AGENT},
+                    headers={"User-Agent": USER_AGENT},
                     follow_redirects=True,
                 ) as client:
                     response = await client.get(self._endpoint, params={"q": term})

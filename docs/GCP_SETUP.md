@@ -105,8 +105,8 @@ If you want to try it, the current flow:
 6. **Data store location:** choose **global (Global)** — the sites must be
    public and global gives the best availability.
 7. Name it `hireflow-jobs` → **Create**. Copy the auto-generated **Data store
-   ID** (looks like `hireflow-jobs-...`) — that's the value for
-   `AGENT_SEARCH_DATASTORE` in §5.
+   ID** (looks like `hireflow-jobs-...`) — the optional Agent Search ID. It is
+   **not read by the app code yet** (Agent Search stays optional/unwired).
 8. After create, **verify the domains** you listed (Data page → Website tab →
    **Verify**). Indexing only starts after verification, and large sites may
    exceed the default page quota (upgrade via quota request if so).
@@ -164,7 +164,7 @@ gcloud run deploy hireflow-backend \
   --service-account "$(gcloud projects describe hireflow-506207 --format='value(projectNumber)')-compute@developer.gserviceaccount.com" \
   --memory 1Gi --cpu 1 \
   --timeout 3600 \
-  --set-env-vars GCP_PROJECT_ID=hireflow-506207,GEMINI_USE_VERTEX=true,VERTEX_LOCATION=global,GEMINI_MODEL=gemini-3.5-flash,RESUME_PARSE_MODE=hybrid,QUERY_EXPANSION=true,JOB_RECENCY_DAYS=14,DIVERSITY_MAX_SAME_COMPANY=2,AGENT_SEARCH_DATASTORE=your-datastore-id
+  --set-env-vars GCP_PROJECT_ID=hireflow-506207,GEMINI_USE_VERTEX=true,VERTEX_LOCATION=global,GEMINI_MODEL=gemini-3.5-flash,RESUME_PARSE_MODE=hybrid,QUERY_EXPANSION=true,JOB_RECENCY_DAYS=14,DIVERSITY_MAX_SAME_COMPANY=2
 ```
 
 - `--memory 1Gi` + `--timeout 3600` → needed for Chromium (Playwright) + long

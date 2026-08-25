@@ -15,7 +15,7 @@ const STAGE_META = {
 
 // AgentTimeline — renders the SSE live stages as a vertical timeline.
 // `events` is the ordered list of {seq, stage, detail} frames streamed from
-// the backend; `running` drives the "active/paused" ring states.
+// the backend; `running` drives the translucent ring state.
 export default function AgentTimeline({ events = [], running = false, onCancel }) {
   const stages = Object.keys(STAGE_META);
   const seenSet = new Set(events.filter((e) => e && e.stage).map((e) => e.stage));

@@ -2,21 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import re
-from urllib.parse import quote_plus
 
 import httpx
 
 from hireflow.domain import JobPosting
-from hireflow.tools.job_source import JobSource
+from hireflow.tools.job_source import USER_AGENT, JobSource
 
 _LINKEDIN_SEARCH_URL = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
 _LINKEDIN_DETAIL_URL = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
 _WORKPLACE_FILTER = {"remote": "2", "hybrid": "3", "onsite": "1"}
-_USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-)
-
 _CARD_RE = re.compile(
     r'data-entity-urn="urn:li:jobPosting:(?P<id>\d+)"'
     r'.*?base-card__full-link[^>]+href="(?P<url>[^"]+)"'
@@ -101,8 +95,8 @@ class LinkedInSource(JobSource):
         return params
 
     async def _fetch_html(self, url: str, params: dict[str, str]) -> str:
-        await asyncio.sleep(1.5)  # gentle throttle — LinkedIn rate-limits bursts (429)
-        async with httpx.AsyncClient(timeout=15.0, headers={"User-Agent": _USER_AGENT}) as client:
+        await asyncio.sleep(1.5)
+        async with httpx.AsyncClient(timeout=15.0, headers={"User-Agent": USER_AGENT}) as client:
             response = await client.get(url, params=params)
             response.raise_for_status()
         return response.text

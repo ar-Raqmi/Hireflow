@@ -140,7 +140,6 @@ class GeminiClient:
             vectors.append([float(value) for value in values])
         return vectors or None
 
-
     async def expand_query(self, roles: list[str], skills: list[str] | None = None) -> list[str]:
         if not roles:
             return []

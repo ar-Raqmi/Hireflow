@@ -3,13 +3,8 @@ from __future__ import annotations
 import httpx
 
 from hireflow.domain import JobPosting
-from hireflow.tools.job_source import JobSource
+from hireflow.tools.job_source import USER_AGENT, JobSource
 from hireflow.tools.jsonld import JsonLdSource
-
-_USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-)
 
 
 class JapanDevSource(JobSource):
@@ -36,6 +31,10 @@ class JapanDevSource(JobSource):
     ) -> dict[str, str] | None:
         return {"q": query} if query else None
 
+    def _parse_row(self, row: dict) -> JobPosting:
+        posting = JsonLdSource._parse_posting(row)
+        return posting if posting else JobPosting()
+
     async def search(
         self,
         query: str = "",
@@ -60,7 +59,7 @@ class JapanDevSource(JobSource):
         return jobs[:limit]
 
     async def _fetch_html(self, url: str, params: dict[str, str]) -> str:
-        async with httpx.AsyncClient(timeout=15.0, headers={"User-Agent": _USER_AGENT}) as client:
+        async with httpx.AsyncClient(timeout=15.0, headers={"User-Agent": USER_AGENT}) as client:
             response = await client.get(url, params=params)
             response.raise_for_status()
         return response.text

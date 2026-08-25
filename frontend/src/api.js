@@ -143,27 +143,3 @@ export async function streamEvents(runId, { onEvent, onDone, onError } = {}) {
     }
   }
 }
-
-// listJobs / listApplications / dashboard / approve — the read + handoff APIs.
-export async function fetchJobs() {
-  const res = await fetch(`${BASE}/jobs`);
-  return jsonRequest(res, 'fetch jobs');
-}
-
-export async function fetchApplications() {
-  const res = await fetch(`${BASE}/applications`);
-  return jsonRequest(res, 'fetch applications');
-}
-
-export async function fetchDashboard() {
-  const res = await fetch(`${BASE}/dashboard`);
-  return jsonRequest(res, 'fetch dashboard');
-}
-
-// approve — POST /approve?application_id=... → { status: 'submitted', ats_confirmation }
-export async function approveApplication(applicationId) {
-  const res = await fetch(`${BASE}/approve?application_id=${encodeURIComponent(applicationId)}`, {
-    method: 'POST',
-  });
-  return jsonRequest(res, 'approve application');
-}

@@ -13,6 +13,7 @@ from hireflow.config import SETTINGS
 from hireflow.domain import JobPosting
 from hireflow.tools.ats import AtsBoardSource
 from hireflow.tools.jsonld import JsonLdSource
+from hireflow.tools.job_source import USER_AGENT
 
 _LD_SCRIPT_RE = re.compile(
     r'<script\s+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', re.S
@@ -32,11 +33,6 @@ _MONTH_DAY_RE = re.compile(
 _DAY_MONTH_RE = re.compile(
     r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})\b", re.I
 )
-_USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-)
-
 _ATS_API = {
     "greenhouse": "https://boards-api.greenhouse.io/v1/boards/{name}/jobs?content=true",
     "lever": "https://api.lever.co/v0/postings/{name}?mode=json",
@@ -66,8 +62,7 @@ class WebFetchSource:
     Ashby / Workable via their public unauthenticated APIs), then a tolerant
     generic HTML card parse (title / detail links / meta). Every step soft-fails
     to ``[]`` with ``last_error`` set — a page that yields nothing never raises
-    and never sinks a run. ``source`` is ``webfetch`` (plus ``raw_data
-    ["webfetch_via"]`` = ``jsonld`` | ``ats:<kind>`` | ``html`` | ``none``).
+    and never sinks a run. ``source`` is ``webfetch``.
     """
 
     name = "webfetch"
@@ -75,27 +70,20 @@ class WebFetchSource:
     def __init__(self, timeout: float | None = None) -> None:
         self._timeout = timeout if timeout is not None else SETTINGS.web_fetch_timeout
         self._last_error: str | None = None
-        self._last_via: str = "none"
 
     @property
     def last_error(self) -> str | None:
         return self._last_error
 
-    @property
-    def last_via(self) -> str:
-        return self._last_via
-
     async def fetch_url(self, url: str, query_hint: str = "") -> list[JobPosting]:
         if not SETTINGS.web_fetch_enabled:
             self._last_error = "webfetch disabled (set WEB_FETCH=1 to enable)"
-            self._last_via = "none"
             return []
         self._last_error = None
         try:
             html = await self._fetch_html(url)
         except Exception as exc:
             self._last_error = f"{url}: {type(exc).__name__}: {str(exc)[:200]}"
-            self._last_via = "none"
             return []
         return await self._extract(url, html, query_hint)
 
@@ -118,7 +106,7 @@ class WebFetchSource:
 
     async def _fetch_html(self, url: str) -> str:
         async with httpx.AsyncClient(
-            timeout=self._timeout, headers={"User-Agent": _USER_AGENT}
+            timeout=self._timeout, headers={"User-Agent": USER_AGENT}
         ) as client:
             response = await client.get(url, follow_redirects=True)
             response.raise_for_status()
@@ -144,18 +132,14 @@ class WebFetchSource:
             if job and job.title:
                 postings.append(self._normalize(job, "jsonld"))
         if postings:
-            self._last_via = "jsonld"
             return postings
         ats = self._detect_ats(url)
         if ats is not None:
             kind, name = ats
             postings = await self._fetch_ats(kind, name)
             if postings:
-                self._last_via = f"ats:{kind}"
                 return postings
-        postings = self._parse_html(url, html, query)
-        self._last_via = "html" if postings else "none"
-        return postings
+        return self._parse_html(url, html, query)
 
     def _normalize(self, job: JobPosting, via: str) -> JobPosting:
         job.source = "webfetch"
@@ -191,7 +175,7 @@ class WebFetchSource:
         try:
             url = _ATS_API[kind].format(name=name)
             async with httpx.AsyncClient(
-                timeout=self._timeout, headers={"User-Agent": _USER_AGENT}
+                timeout=self._timeout, headers={"User-Agent": USER_AGENT}
             ) as client:
                 response = await client.get(url)
                 response.raise_for_status()
