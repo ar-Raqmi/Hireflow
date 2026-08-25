@@ -48,7 +48,7 @@ export default function AgentTimeline({ events = [], running = false }) {
           />
         ))}
       </div>
-      {running && <M3eLinearProgressIndicator className="con-progress" indeterminate />}
+      {running && <M3eLinearProgressIndicator className="con-progress" mode="indeterminate" variant="wavy" />}
 
       <ol className="tl">
         {stages.map((s, i) => {

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { M3eButton } from '@m3e/react/button';
 import { M3eChip, M3eChipSet } from '@m3e/react/chips';
-import { M3eCircularProgressIndicator } from '@m3e/react/progress-indicator';
+import { M3eLoadingIndicator } from '@m3e/react/loading-indicator';
 import { uploadResume } from '../api.js';
 import M3eIcon from './M3eIcon.jsx';
 
@@ -10,6 +10,7 @@ import M3eIcon from './M3eIcon.jsx';
 // by the backend (skills, years, residence) once upload completes.
 export default function ResumeDrop({ onUploaded, onError, prefs }) {
   const inputRef = useRef(null);
+  const abortRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -19,20 +20,31 @@ export default function ResumeDrop({ onUploaded, onError, prefs }) {
     if (!f) return;
     setFile(f);
     setBusy(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const parsed = await uploadResume({
         file: f,
         work_type: (prefs && prefs.work_type) || 'any',
         locations: (prefs && prefs.locations) || [],
         target_roles: (prefs && prefs.target_roles) || [],
+        signal: controller.signal,
       });
       setProfile(parsed);
       onUploaded?.(parsed);
     } catch (err) {
-      onError?.(err);
+      if (err.name !== 'AbortError') onError?.(err);
     } finally {
       setBusy(false);
+      abortRef.current = null;
     }
+  }
+
+  function handleStop() {
+    if (abortRef.current) abortRef.current.abort();
+    setFile(null);
+    setProfile(null);
+    setBusy(false);
   }
 
   return (
@@ -68,43 +80,54 @@ export default function ResumeDrop({ onUploaded, onError, prefs }) {
             <M3eButton variant="tonal" className="browse" onClick={(e) => { e.stopPropagation(); inputRef.current && inputRef.current.click(); }}>
               browse files
             </M3eButton>
-            <div className="dz-note">uploaded to the Hireflow backend</div>
           </div>
         )}
         {file && (
           <div className="dz-file">
-            <div className="file-row">
+            <div className="dz-center">
+              {busy ? (
+                <M3eLoadingIndicator className="upload-ind" role="progressbar" aria-label="Uploading résumé" />
+              ) : profile ? (
+                <div className="parsed-summary">
+                  {profile.skills && profile.skills.length > 0 && (
+                    <div className="skills">
+                      <M3eChipSet>
+                        {profile.skills.slice(0, 8).map((s, i) => (
+                          <M3eChip key={i} className="sk">{s}</M3eChip>
+                        ))}
+                      </M3eChipSet>
+                    </div>
+                  )}
+                  <div className="parsed-meta">
+                    {Number(profile.years_experience) > 0 && <span>{profile.years_experience} yrs exp</span>}
+                    {profile.residence && <span>📍 {profile.residence}</span>}
+                    {profile.work_type && <span>work: {profile.work_type}</span>}
+                  </div>
+                </div>
+              ) : (
+                <div className="dz-empty">
+                  <div className="dz-badge">
+                    <M3eIcon name="upload_file" size={36} />
+                  </div>
+                  <div className="dz-title">Drop your résumé here</div>
+                  <div className="dz-sub">PDF, DOCX or TXT — parsed &amp; audited by the live agent</div>
+                  <M3eButton variant="tonal" className="browse" onClick={(e) => { e.stopPropagation(); inputRef.current && inputRef.current.click(); }}>
+                    browse files
+                  </M3eButton>
+                </div>
+              )}
+            </div>
+            <div className="file-bottom">
               <div className="file-ic">
                 <M3eIcon name="description" size={22} />
               </div>
-              <div>
-                <div className="file-name">{file.name}</div>
-                <div className="file-sub">{busy ? <span className="busy-row"><M3eCircularProgressIndicator size={16} /> uploading…</span> : (profile ? 'parsed & stored' : '')}</div>
-              </div>
+              <div className="file-name">{file.name}</div>
               <div className="file-btns">
-                <M3eButton variant="text" onClick={(e) => { e.stopPropagation(); inputRef.current && inputRef.current.click(); }}>
-                  Replace
+                <M3eButton variant="text" onClick={handleStop}>
+                  <M3eIcon name="stop" size={16} /> Stop
                 </M3eButton>
               </div>
             </div>
-            {profile && (
-              <div className="parsed-summary">
-                {profile.skills && profile.skills.length > 0 && (
-                  <div className="skills">
-                    <M3eChipSet>
-                      {profile.skills.slice(0, 8).map((s, i) => (
-                        <M3eChip key={i} className="sk">{s}</M3eChip>
-                      ))}
-                    </M3eChipSet>
-                  </div>
-                )}
-                <div className="parsed-meta">
-                  {Number(profile.years_experience) > 0 && <span>{profile.years_experience} yrs exp</span>}
-                  {profile.residence && <span>📍 {profile.residence}</span>}
-                  {profile.work_type && <span>work: {profile.work_type}</span>}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>

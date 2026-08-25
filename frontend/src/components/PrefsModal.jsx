@@ -3,17 +3,18 @@ import { M3eButton } from '@m3e/react/button';
 import { M3eDialog } from '@m3e/react/dialog';
 import { M3eInputChip, M3eInputChipSet } from '@m3e/react/chips';
 import { M3eSegmentedButton, M3eButtonSegment } from '@m3e/react/segmented-button';
+import M3eIcon from './M3eIcon';
 
 const WORK_OPTIONS = [
-  { value: 'remote', label: 'Remote', sub: 'work from anywhere' },
-  { value: 'hybrid', label: 'Hybrid', sub: 'mix of office + remote' },
-  { value: 'onsite', label: 'Onsite', sub: 'at the office' },
-  { value: 'any', label: 'Any', sub: 'no preference' },
+  { value: 'remote', label: 'Remote', icon: 'home_work' },
+  { value: 'hybrid', label: 'Hybrid', icon: 'sync_alt' },
+  { value: 'onsite', label: 'Onsite', icon: 'business_center' },
+  { value: 'any', label: 'Any', icon: 'public' },
 ];
 
 // PrefsModal — work-type + locations + target roles. Skippable ("Any").
 // Saved to localStorage; used as the /upload + /pipeline/run prefs.
-export default function PrefsModal({ open, initial, onSave, onSkip }) {
+export default function PrefsModal({ open, initial, onSave, onSkip, onClose }) {
   const [workType, setWorkType] = useState((initial && initial.work_type) || 'any');
   const [locations, setLocations] = useState((initial && initial.locations) || []);
   const [locInput, setLocInput] = useState('');
@@ -34,7 +35,7 @@ export default function PrefsModal({ open, initial, onSave, onSkip }) {
   }
 
   return (
-    <M3eDialog ref={dlgRef} className="pfmodal" onCancel={onSkip}>
+    <M3eDialog ref={dlgRef} className="pfmodal" onClosed={onClose}>
       <div className="pf-eyebrow">Before the agent runs</div>
       <h3 id="pfTitle">Tell Hireflow how to work</h3>
       <p className="pf-sub">
@@ -51,8 +52,8 @@ export default function PrefsModal({ open, initial, onSave, onSkip }) {
       >
         {WORK_OPTIONS.map((opt) => (
           <M3eButtonSegment key={opt.value} value={opt.value} checked={workType === opt.value}>
+            <M3eIcon slot="icon" name={opt.icon} />
             {opt.label}
-            <span className="po-sub">{opt.sub}</span>
           </M3eButtonSegment>
         ))}
       </M3eSegmentedButton>

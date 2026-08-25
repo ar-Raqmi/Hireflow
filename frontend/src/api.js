@@ -37,14 +37,15 @@ export async function health() {
 }
 
 // upload — multipart resume file + preferences. Returns the parsed Profile.
-export async function uploadResume({ file, work_type, locations, target_roles, salary_floor }) {
+// Pass AbortSignal (via `signal`) to cancel the in-flight upload.
+export async function uploadResume({ file, work_type, locations, target_roles, salary_floor, signal }) {
   const form = new FormData();
   form.append('file', file);
   form.append('work_type', work_type || 'any');
   form.append('locations', (locations || []).join(','));
   form.append('target_roles', (target_roles || []).join(','));
   if (salary_floor) form.append('salary_floor', String(salary_floor));
-  const res = await fetch(`${BASE}/upload`, { method: 'POST', body: form });
+  const res = await fetch(`${BASE}/upload`, { method: 'POST', body: form, signal });
   return jsonRequest(res, 'resume upload');
 }
 

@@ -29,16 +29,12 @@ export default function App() {
   const [history, setHistory] = useState(() => loadHistory());
   const [toast, setToast] = useState(null);
   const [view, setView] = useState('agent');
-  const [apiUp, setApiUp] = useState(null);
   const runRef = useRef(null);
 
   useEffect(() => {
-    health()
-      .then((h) => setApiUp(h && h.status === 'ok'))
-      .catch((e) => {
-        setApiUp(false);
-        showToast(`Backend unreachable: ${e.message}`, 'error');
-      });
+    health().catch((e) => {
+      showToast(`Backend unreachable: ${e.message}`, 'error');
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -67,6 +63,10 @@ export default function App() {
   }
 
   function handleViewTab(key) {
+    if (key === 'settings') {
+      setPrefsOpen(true);
+      return;
+    }
     setView(key);
   }
 
@@ -142,17 +142,6 @@ export default function App() {
         <div className="logo">
           hireflow<b>.</b>
         </div>
-        <div className="top-actions">
-          <span className="pill">
-            <span className={`dot ${running ? 'running' : apiUp === false ? 'failed' : apiUp === true ? 'done' : ''}`} />
-            {running ? 'Agent running' : apiUp === false ? 'backend offline' : apiUp === true ? 'Agent idle' : 'connecting…'}
-          </span>
-          <button type="button" className="pill prefschip" onClick={() => setPrefsOpen(true)}>
-            <M3eIcon name="tune" size={16} />
-            {prefs.work_type}
-            {prefs.locations.length > 0 ? ` · ${prefs.locations.join(', ')}` : ''}
-          </button>
-        </div>
       </header>
 
       <M3eTabs variant="secondary" className="wrap viewtabs" onChange={(e) => handleViewTab(e.target?.selectedTab?.getAttribute('data-view') || view)}>
@@ -170,6 +159,14 @@ export default function App() {
             </M3eTab>
           );
         })}
+        <M3eTab
+          key="settings"
+          data-view="settings"
+          selected={false}
+        >
+          <M3eIcon slot="icon" name="tune" size={16} />
+          Settings
+        </M3eTab>
       </M3eTabs>
 
       {view === 'agent' && (
@@ -253,11 +250,10 @@ export default function App() {
       )}
 
       <footer>
-        <span>hireflow — Vite + React frontend wired to the live backend</span>
-        <span>every number from the API</span>
+        <span>Created by ar-Raqmi and Izaaz</span>
       </footer>
 
-      <PrefsModal open={prefsOpen} initial={prefs} onSave={handlePrefsSave} onSkip={handlePrefsSkip} />
+      <PrefsModal open={prefsOpen} initial={prefs} onSave={handlePrefsSave} onSkip={handlePrefsSkip} onClose={() => setPrefsOpen(false)} />
       <Toast toast={toast} />
     </div>
   );
