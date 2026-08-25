@@ -10,11 +10,12 @@ by ar-Raqmi and Izaaz
 
 ---
 
-## What is real now (2026-08-23)
+## What is real now (2026-08-25)
 
 ### Live
 - **Cloud Run backend** — `https://hireflow-backend-296941301245.us-central1.run.app` — `/health` returns `{"status":"ok"}` (verified Aug 22). Note: the **live build predates** the RouterAgent pipeline, SSE streaming, AND the search-intelligence pass (its `/pipeline/run` answers `agent_not_configured`). The new build below is the acceptance target — redeploy with `docs/DEPLOY.md`, then prove it with `docs/CURL_E2E.md`.
 - **Keyless job-source registry (curl-verified):** freehire (193 countries), RemoteOK, Remotive, LinkedIn guest search, JSON-LD career pages, ATS boards (Greenhouse GitLab 204 jobs, Ashby Notion 128 jobs). Lever (404) and Workable (0 jobs) are coded but disabled.
+- **Vite + React frontend (`frontend/`) built** (2026-08-25) — `npm install && npm run build` passes. Wired to the live backend via `fetch`: resume upload → `/upload`, SSE agent timeline (`/pipeline/run/{id}/events`), ranked matches + approve (`/approve` → sandbox ATS), applications, and localStorage run history. Base URL via `VITE_HIREFLOW_API` (dev proxy in `vite.config.js`). `hireflow-frontend.html` is retired as the reference prototype. **Live e2e against the deployed `.run.app` URL still pending** (needs the redeploy so `/pipeline/run` answers the RouterAgent pipeline).
 
 ### Implemented in code — live proof pending redeploy + curl e2e
 - **Agent pipeline** — Five agents (Search → Match → Research → Prepare, orchestrated by RouterAgent) run server-side through `GeminiClient` (Vertex AI, Gemini 3.5 Flash — the only LLM entry point, no stubs/mocks). `/pipeline/run` is async and streams per-stage progress over SSE; `/upload` does a real Gemini resume parse (text, or vision via PyMuPDF page images when text is thin).
@@ -36,12 +37,23 @@ by ar-Raqmi and Izaaz
 - `docs/DEPLOY.md` — one-command Cloud Run redeploy + Vertex IAM grant.
 - `docs/GCP_SETUP.md` — one-time GCP runbook: APIs, SA grant, embeddings check, optional Agent Search, big-instance deploy.
 
+## Frontend (Vite + React)
+
+```bash
+cd frontend
+npm install
+npm run build        # production build → frontend/dist
+npm run dev          # dev server; /api/* proxied to VITE_HIREFLOW_API (default: the live Cloud Run URL)
+```
+
+Set `VITE_HIREFLOW_API=https://hireflow-backend-296941301245.us-central1.run.app` at build time to point the production bundle at the deployed backend. The app calls the **real** API endpoints (`/upload`, `/pipeline/run`, SSE `/pipeline/run/{id}/events`, `/jobs`, `/applications`, `/approve`) — no mock or hardcoded job data. Prefs + run history live in browser `localStorage` (backend stays stateless). `hireflow-frontend.html` is the retired reference prototype only.
+
 ## Stack
 - **Gemini 3.5 Flash** via Vertex AI — `hireflow/config.py`
 - **Google ADK** (Python) — `hireflow/agents/adk_router.py` (LlmAgent graph + FunctionTools)
 - **FastAPI** backend — `hireflow/api/app.py` (stateless, in-memory per run; no DB)
 - **Cloud Run** (scale-to-zero) — `Dockerfile`
-- Frontend: **Vite + React** (planned — `hireflow-frontend.html` is the reference prototype only)
+- Frontend: **Vite + React** (`frontend/`) — wired to the live backend via fetch; `hireflow-frontend.html` is the retired reference prototype only
 
 ## Hackathon compliance (see RULES.md)
 Gemini 3.5+ via Vertex AI ✓ · Google ADK ✓ · Cloud Run ✓ · hosted public URL ✓ · open GitHub repo ✓ · README spin-up ✓ · architecture diagram in AGENTS.md (clean image pending) · ≤4-min demo video (pending) · repo access for `testing@devpost.com` + `cloudhackathons@google.com` (pending).

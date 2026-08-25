@@ -197,7 +197,15 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 │   └── api/app.py           # FastAPI: health, upload (text+vision parse), dashboard, jobs,
 │                            #   applications, approve (submits to sandbox ATS — PRESENT),
 │                            #   pipeline/run (async, ?seed= & ?seen=), pipeline/run/{id}/events (SSE)
-└── frontend/                # Vite + React app (future — the real frontend; replaces hireflow-frontend.html)
+└── frontend/                # Vite + React app (BUILT 2026-08-25) — the real frontend, wired to
+                             #   the live backend via fetch (dashboard, SSE agent timeline, ranked
+                             #   matches, approve → sandbox ATS). Replaces hireflow-frontend.html
+                             #   (now retired as the reference prototype). `npm install && npm run
+                             #   build` builds clean; base URL via VITE_HIREFLOW_API (dev proxy in
+                             #   vite.config.js). Components: ResumeDrop, PrefsModal, AgentTimeline,
+                             #   MatchesList, ApplicationsList, HistoryTab, ApproveButton (in
+                             #   MatchesList), Toast; api.js (fetch layer), storage.js (localStorage).
+                             #   live e2e against the deployed .run.app still pending.
 ```
 
 **Sandbox ATS submit path — PRESENT (code; live proof pending redeploy):** `/sandbox/ats/apply`,
@@ -488,7 +496,7 @@ curl e2e (SSE `career` stage must show companies + new jobs) to count.**
 9. **APAC keyless relays — IMPLEMENTED (code; live proof pending redeploy):** freehire `source=seek` (JobStreet engine → MY/ID/SG/AU/NZ) + `source=mycareersfuture` (SG) via `FreehireRegionalSource` (in `api/app.py`), registered by default through `SETTINGS.freehire_sources` — the honest keyless APAC path since JobStreet/Kalibrr/Maukerja/Indeed direct APIs are **blocked**. Wantedly/JapanDev (JP) are **in the tree but flag-gated** behind `USE_UNVERIFIED_SOURCES=1` until live-proven. Live e2e on the `.run.app` URL still pending.
 9b. **Career-page company sourcing — IMPLEMENTED (code; live proof pending redeploy):** `CareerSourceAgent` probes the top matched companies' `/careers` pages + ATS boards via `WebFetchSource.webfetch_company` and merges the new jobs (deduped by id) back for scoring/prepare. Knobs `CAREER_SOURCE_ENABLED` / `CAREER_SOURCE_MAX_COMPANIES` / `CAREER_SOURCE_MAX_PER_COMPANY` in `config.py`; emits a `career` SSE stage. Proof pending: redeploy + curl e2e (SSE `career` stage must show companies + new jobs).
 10. **Universal webfetch + discovery layer + embeddings re-rank + real-submit sandbox ATS** — the parallel code-agent pass, **DONE (code; live proof pending redeploy)**: `webfetch.py`/`discovery.py`/`embeddings.py`, `/sandbox/ats/apply`, and `ApplicationStatus.SUBMITTED` are **in this tree** — grep the tree, then prove with the redeploy + curl e2e. **Agent Search (formerly CSE) is OPTIONAL + NOT set up** (only indexes domains Zach can verify he owns — `docs/GCP_SETUP.md` §3). Finish **Layer II** Playwright/Chromium (Chromium in the Dockerfile, ADK `FunctionTool`) for SPA-only career pages — currently scaffolded/opt-in.
-11. Build the **Vite + React app** (`frontend/`, to be scaffolded) wired to the live backend (fetch) — the dashboard calls the same endpoints the CLI calls; `hireflow-frontend.html` is retired as the reference prototype.
+11. **Build the Vite + React app** (`frontend/`) — **DONE (code; builds clean 2026-08-25)**: `npm install && npm run build` passes. Wired to the live backend via `fetch` (upload, SSE agent timeline, ranked matches, approve → sandbox ATS); prefs + run history in `localStorage`; base URL via `VITE_HIREFLOW_API` (dev proxy in `vite.config.js`). `hireflow-frontend.html` is retired as the reference prototype. **Proof pending: live e2e against the deployed `.run.app` URL** (npm run dev → upload → run → SSE → approve).
 12. **Demo & docs**: clean architecture diagram image (README currently has ASCII), README spin-up, ≤4-min unedited video showing Cloud Run console + Vertex AI logs + live `.run` calls. Email `testing@devpost.com` / `cloudhackathons@google.com` access.
 
 ---
@@ -521,7 +529,7 @@ curl e2e (SSE `career` stage must show companies + new jobs) to count.**
 
 1. Re-deploy to Cloud Run (`docs/DEPLOY.md`) → curl `/health`, then the live curl e2e with a real `.pdf` (`docs/CURL_E2E.md`): upload → run (`?seed=` + `?seen=`) → SSE events → jobs → approve. **This proves the phase — not the offline green.** The SSE `search` stage must show **expanded query terms** + per-source counts, the `career` stage must show **companies probed + new jobs**, and a Johor-style location must NOT widen to a global search (search intelligence + career-page sourcing are now in the tree — prove them live).
 2. **Watch for the in-flight parallel pass** (§10/§12): universal webfetch (`webfetch.py`) + discovery (`discovery.py`), embeddings re-rank (`embeddings.py`, `gemini-embedding-001`), real-submit sandbox ATS (`/sandbox/ats/apply`, `ApplicationStatus.SUBMITTED`, `/approve` submits). Grep the tree each session — mark done ONLY when each is present + redeployed + curl-e2e'd. Agent Search stays OPTIONAL (domain-verify, `docs/GCP_SETUP.md` §3).
-3. Scaffold + wire the **Vite + React app** (`frontend/`) to the deployed API via fetch (dashboard + approve).
+3. **Vite + React app** (`frontend/`) is **built** (2026-08-25): components for resume upload, prefs modal, SSE agent timeline, ranked matches + approve, applications, history (localStorage). Wired to the live backend via `fetch`; builds clean with `npm install && npm run build`. **Live e2e against the deployed `.run.app` URL still pending** (needs the redeploy so `/pipeline/run` answers the RouterAgent pipeline, not `agent_not_configured`).
 4. **Layer II Playwright/Chromium wiring in the Dockerfile** (scaffolded/opt-in — Chromium is not in the image yet).
 5. Demo & docs: clean diagram image, ≤4-min video with Cloud Run console + Vertex logs, grant repo access to `testing@devpost.com` / `cloudhackathons@google.com`.
 6. Optional: Cloud Scheduler → POST `/pipeline/run` hourly.
