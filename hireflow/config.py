@@ -100,6 +100,16 @@ class Settings:
             if part.strip()
         ]
     )
+    career_source_enabled: bool = field(
+        default_factory=lambda: _env("CAREER_SOURCE_ENABLED", "true").lower()
+        in {"1", "true", "yes"}
+    )
+    career_source_max_companies: int = field(
+        default_factory=lambda: _int_env("CAREER_SOURCE_MAX_COMPANIES", 5)
+    )
+    career_source_max_per_company: int = field(
+        default_factory=lambda: _int_env("CAREER_SOURCE_MAX_PER_COMPANY", 8)
+    )
     semantic_search: bool = field(
         default_factory=lambda: _env("SEMANTIC_SEARCH", "").lower() in {"1", "true", "yes"}
     )

@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
 
 from hireflow.agents.base_agent import BaseAgent
+from hireflow.agents.career_source import CareerSourceAgent
 from hireflow.config import SETTINGS
 from hireflow.domain import Application, ApplicationStatus, JobPosting, Profile, WorkTypeClassifier
 from hireflow.tools.embeddings import EmbeddingRanker
@@ -13,6 +14,7 @@ from hireflow.tools.expander import QueryExpander
 from hireflow.tools.gemini import GeminiClient
 from hireflow.tools.geo import LocationMapper
 from hireflow.tools.job_source import JobSource
+from hireflow.tools.webfetch import WebFetchSource
 
 _WORK_MODE_VALUES = {"remote", "hybrid", "onsite"}
 _REMOTEISH_MARKERS = ("remote", "worldwide", "anywhere", "distributed")
@@ -414,9 +416,10 @@ class RouterAgent(BaseAgent):
             expander=QueryExpander(gemini=gemini),
         )
         self._match = MatchAgent(gemini=gemini, caps=self._caps)
+        self._career = CareerSourceAgent(fetcher=WebFetchSource())
         self._research = ResearchAgent(gemini=gemini, caps=self._caps)
         self._prepare = PrepareAgent(gemini=gemini, caps=self._caps)
-        for agent in (self._search, self._match, self._research, self._prepare):
+        for agent in (self._search, self._match, self._career, self._research, self._prepare):
             agent.progress = progress
         self._progress = progress
 
@@ -439,7 +442,7 @@ class RouterAgent(BaseAgent):
         seen_jobs: list[str] | None = None,
     ) -> dict[str, Any]:
         if progress is not None:
-            for agent in (self._search, self._match, self._research, self._prepare):
+            for agent in (self._search, self._match, self._career, self._research, self._prepare):
                 agent.progress = progress
             self._progress = progress
         errors: list[str] = []
@@ -461,6 +464,19 @@ class RouterAgent(BaseAgent):
         context["jobs"] = search["jobs"]
         match = await self._match.run(context)
         context["matches"] = match["matches"]
+
+        career = await self._career.run(context)
+        career_jobs = career["jobs"]
+        if career_jobs:
+            existing = {str(job_map.get("id", "")) for job_map in context["jobs"]}
+            fresh = [job_map for job_map in career_jobs if str(job_map.get("id", "")) not in existing]
+            context["jobs"].extend(fresh)
+            extra_ctx = dict(context)
+            extra_ctx["jobs"] = fresh
+            extra = await self._match.run(extra_ctx)
+            context["matches"].extend(extra["matches"])
+            context["matches"].sort(key=lambda m: int(m.get("score", 0)), reverse=True)
+
         research = await self._research.run(context)
         context["matches"] = research["matches"]
         prepare = await self._prepare.run(context)
@@ -468,7 +484,7 @@ class RouterAgent(BaseAgent):
 
         applications = self._build_applications(context["matches"], profile, drafts)
         await self._emit_approve(applications)
-        return self._shape_result(profile, search["jobs"], context["matches"], applications, drafts, errors)
+        return self._shape_result(profile, context["jobs"], context["matches"], applications, drafts, errors)
 
     async def _emit(self, stage: str, detail: str) -> None:
         if self._progress is not None:

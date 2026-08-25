@@ -120,7 +120,7 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 - **All backend code object-oriented.** No free functions doing work; logic lives in classes.
 - Abstract base classes define contracts:
   - `hireflow/storage/` → `Repository` (ABC): `InMemoryRepository` (default)
-  - `hireflow/agents/` → `BaseAgent` (ABC): `SearchAgent`, `MatchAgent`, `ResearchAgent`, `PrepareAgent`, `RouterAgent` — **these are the LIVE pipeline** (RouterAgent orchestrates them; every one uses `GeminiClient`)
+  - `hireflow/agents/` → `BaseAgent` (ABC): `SearchAgent`, `MatchAgent`, `ResearchAgent`, `PrepareAgent`, `CareerSourceAgent`, `RouterAgent` — **these are the LIVE pipeline** (RouterAgent orchestrates them; every one uses `GeminiClient`; `CareerSourceAgent` also uses `WebFetchSource`)
   - `hireflow/tools/` → `JobSource` (ABC): `RemoteOKSource`, `RemotiveSource`, `FreehireSource` (+ any new global sources)
   - `hireflow/tools/` → `GeminiClient` — THE only LLM entry point. No alternative/fallback LLM path, no stub.
   - `hireflow/tools/` → **search intelligence** — **PRESENT (code; live proof pending redeploy)**,
@@ -182,7 +182,9 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 │   ├── storage/             # Repository ABC + InMemory + StorageFactory (in-memory only, no DB)
 │   ├── agents/              # BaseAgent ABC, router.py (Search/Match/Research/Prepare/Router — the LIVE
 │   │                        #   pipeline; SearchAgent = query expansion + variants + location/recency
-│   │                        #   gates + seen dedup + diversity cap), adk_router.py (HireflowAgent ADK
+│   │                        #   gates + seen dedup + diversity cap), career_source.py (CareerSourceAgent
+│   │                        #   — probes top matched companies' /careers pages via WebFetchSource and
+│   │                        #   merges new jobs back for scoring), adk_router.py (HireflowAgent ADK
 │   │                        #   graph + HireflowTools), runlog.py (RunLog — in-memory per-run SSE log)
 │   ├── tools/               # JobSource ABC, RemoteOK, Remotive, Freehire (+ freehire:seek /
 │   │                        #   mycareersfuture sub-sources in app.py), geo (LocationMapper,
@@ -230,8 +232,9 @@ imports (Vertex/API access is handled by `google-genai`).
   500. Returns `status: "parsed_and_stored"` + pages + enriched fields.
 - `POST /pipeline/run?profile_id=…&seed=…&seen=…` — **async + SSE**: creates a `run_id`,
   runs the real **RouterAgent pipeline** (`SearchAgent → MatchAgent →
-  ResearchAgent → PrepareAgent`, orchestrated by `RouterAgent`, every agent
-  through `GeminiClient` Vertex-first + `JobSource` Freehire (+ `source=seek`/
+  **CareerSourceAgent** → ResearchAgent → PrepareAgent`, orchestrated by
+  `RouterAgent`, every agent through `GeminiClient` Vertex-first + `JobSource`
+  Freehire (+ `source=seek`/
   `mycareersfuture` regional passes) / RemoteOK / Remotive / LinkedIn /
   JSON-LD / ATS, with Wantedly/JapanDev flag-gated behind
   `USE_UNVERIFIED_SOURCES=1`) in a background asyncio task, and returns
@@ -275,13 +278,14 @@ SSE streaming, AND the search-intelligence pass (its `/pipeline/run` answers
   are thin clients of the deployed API.
 - **`/pipeline/run` is now async + SSE** — it returns `{"run_id":…,"status":"started"}`,
   runs the real **RouterAgent pipeline** (`SearchAgent → MatchAgent →
-  ResearchAgent → PrepareAgent`, every agent through `GeminiClient`
+  **CareerSourceAgent** → ResearchAgent → PrepareAgent`, every agent through
+  `GeminiClient`
   Vertex-first + the full keyless source registry: Freehire (incl. `source=seek`/
   `mycareersfuture` regional passes), RemoteOK/Remotive, LinkedIn, JSON-LD, and
   ATS boards, orchestrated by `RouterAgent`) in a background asyncio task
   writing to an in-memory `RunLog`
   (`hireflow/agents/runlog.py`), and `GET /pipeline/run/{run_id}/events` streams
-  `parse → audit → search → match → research → prepare → approve` events then a
+  `parse → audit → search → match → career → research → prepare → approve` events then a
   final `done` payload. `/upload` now runs a real Gemini parse (text, or vision
   via PyMuPDF page-images when the PDF text is thin) so `skills` /
   `years_experience` are populated. The deployed build still predates this: the
@@ -392,6 +396,22 @@ search — that is why Israel/Tel-Aviv jobs appeared for a Johor query. `geo.py`
 `johor → my` (via `_STATES`) and the location gate means an unmapped location **never silently
 widens to "anywhere"**. **Still needs the redeploy + curl e2e to prove it live.**
 
+**Career-page company sourcing — IMPLEMENTED (code; live proof pending redeploy):** the missing
+"career page company website" tap. After scoring, `CareerSourceAgent`
+(`hireflow/agents/career_source.py`) takes the distinct companies of the scored
+matches (capped by `CAREER_SOURCE_MAX_COMPANIES`, default 5), probes each
+company's `/careers` page + ATS boards via `WebFetchSource.webfetch_company`
+(reusing the existing `_company_candidates` JSON-LD→ATS→HTML extractor), and
+merges the new jobs (deduped by id against the board-job pool) back into the
+pipeline so they compete in scoring/prepare — surfacing jobs that don't appear
+on boards. Knobs: `CAREER_SOURCE_ENABLED` (default true), `CAREER_SOURCE_MAX_COMPANIES`
+(default 5), `CAREER_SOURCE_MAX_PER_COMPANY` (default 8). Emits a `career` SSE stage
+(probing … N companies → M new jobs). Soft-fail: a company with no parseable
+careers page contributes 0 + a source note in `errors`, never a 500. This is a
+**separate path** from `WEB_DISCOVERY_COMPANIES` (that static opt-in list stays);
+the career path is automatic from the matched results. **Still needs the redeploy +
+curl e2e (SSE `career` stage must show companies + new jobs) to count.**
+
 **Layer 0 — Universal catch-all (every country, everyone):**
 - **Universal webfetch + discovery layer** (`webfetch.py`/`discovery.py`) — **PRESENT (code; live proof
   pending redeploy)**, the replacement for the retired CSE 50-site whitelist:
@@ -456,7 +476,7 @@ widens to "anywhere"**. **Still needs the redeploy + curl e2e to prove it live.*
 
 **Now (the base, mandatory — stops the "partial runtime" myth):**
 1. ~~Unblock the import tree~~ — **DONE**: `ResumeFinding` + `WorkTypeClassifier` are in `hireflow/domain/__init__.py` and `hireflow.tools.gemini` imports cleanly.
-2. ~~Wire the 5 named agents into the server pipeline~~ — **DONE (code; live proof pending redeploy)**: `RouterAgent` now orchestrates `SearchAgent → MatchAgent → ResearchAgent → PrepareAgent` as the ACTUAL `/pipeline/run` executor. Each agent carries its prompt-engineering and calls the same `GeminiClient` methods (`score_fit`, `research_company`, `draft/review/revise_application`, `audit_resume`). Stages are tagged in SSE as `search`/`match`/`research`/`prepare`. `HireflowTools` is reduced to the ADK `FunctionTool` layer; `HireflowAgent` keeps the mandated ADK `LlmAgent` graph and delegates to `RouterAgent` when wired.
+2. ~~Wire the 5 named agents into the server pipeline~~ — **DONE (code; live proof pending redeploy)**: `RouterAgent` now orchestrates `SearchAgent → MatchAgent → **CareerSourceAgent** → ResearchAgent → PrepareAgent` as the ACTUAL `/pipeline/run` executor. Each agent carries its prompt-engineering and calls the same `GeminiClient` methods (`score_fit`, `research_company`, `draft/review/revise_application`, `audit_resume`); `CareerSourceAgent` reads matched companies' `/careers` pages via `WebFetchSource.webfetch_company`. Stages are tagged in SSE as `search`/`match`/`career`/`research`/`prepare`. `HireflowTools` is reduced to the ADK `FunctionTool` layer; `HireflowAgent` keeps the mandated ADK `LlmAgent` graph and delegates to `RouterAgent` when wired.
 3. ~~Fix `freehire.py`~~ — **DONE**: live endpoint (`/api/v1/agent/jobs/search`) + facets, `LocationMapper` geo codes, stable `source`/`title`/etc. core schema across all sources.
 4. ~~Offline tests removed~~ — **DONE**: `tests/` deleted (stub agent, `_StubGemini`, `TestClient`). There is no offline gate — the acceptance gate is the online curl e2e in steps 5 & 6 against the live Cloud Run URL (real `.pdf`, real Gemini via Vertex).
 5. **Re-deploy to Cloud Run** (docs/DEPLOY.md) → curl `/health`, then a **real** e2e: upload a real `.pdf` → `/pipeline/run` → `/jobs` live results → `/dashboard` reflects it → `/approve`. **Video-record the curl-to-cloud proof.**
@@ -466,6 +486,7 @@ widens to "anywhere"**. **Still needs the redeploy + curl e2e to prove it live.*
 7. **Search intelligence (query expansion + location/recency gates + variation + dedup/diversity)** — **DONE (code; live proof pending redeploy)**: `QueryExpander` (Gemini synonym expansion per role, deterministic fallback synonym map), multiple query variants per source (SSE `search` stage shows the expanded terms), gate-then-cap with a real **location gate** (fixes the Johor/Israel false-global — `geo.py` maps `johor → my`), recency filter (`JOB_RECENCY_DAYS`), cross-run seen-job dedup (`?seen=` on `/pipeline/run`), `DIVERSITY_MAX_SAME_COMPANY` cap. Knobs `QUERY_EXPANSION` / `QUERY_EXPANSION_TERMS` / `JOB_RECENCY_DAYS` / `DIVERSITY_MAX_SAME_COMPANY` / `USE_UNVERIFIED_SOURCES` / `FREEHIRE_SOURCES` all in `config.py`. **Proof pending: redeploy + curl e2e (SSE `search` stage must show expanded terms).** This is the work that makes the agent feel like a Taskmaster agent (it *understands* the profile and *acts* across sources) rather than a keyword fetcher.
 8. **Global job-source registry** — ✅ **IMPLEMENTED + curl-verified (2026-08-23)**: `LinkedInSource` (guest API), `JsonLdSource` (schema.org career pages), `AtsBoardSource` (Greenhouse+Ashby). Registered in `_build_default_agent()` after RemoteOK/Remotive/Freehire. Lever (404) and Workable (0 jobs) are coded but **disabled** — add rows only once curl-verified. **Still pending: redeploy + live curl e2e** against the `.run.app` URL to prove this on the live deploy.
 9. **APAC keyless relays — IMPLEMENTED (code; live proof pending redeploy):** freehire `source=seek` (JobStreet engine → MY/ID/SG/AU/NZ) + `source=mycareersfuture` (SG) via `FreehireRegionalSource` (in `api/app.py`), registered by default through `SETTINGS.freehire_sources` — the honest keyless APAC path since JobStreet/Kalibrr/Maukerja/Indeed direct APIs are **blocked**. Wantedly/JapanDev (JP) are **in the tree but flag-gated** behind `USE_UNVERIFIED_SOURCES=1` until live-proven. Live e2e on the `.run.app` URL still pending.
+9b. **Career-page company sourcing — IMPLEMENTED (code; live proof pending redeploy):** `CareerSourceAgent` probes the top matched companies' `/careers` pages + ATS boards via `WebFetchSource.webfetch_company` and merges the new jobs (deduped by id) back for scoring/prepare. Knobs `CAREER_SOURCE_ENABLED` / `CAREER_SOURCE_MAX_COMPANIES` / `CAREER_SOURCE_MAX_PER_COMPANY` in `config.py`; emits a `career` SSE stage. Proof pending: redeploy + curl e2e (SSE `career` stage must show companies + new jobs).
 10. **Universal webfetch + discovery layer + embeddings re-rank + real-submit sandbox ATS** — the parallel code-agent pass, **DONE (code; live proof pending redeploy)**: `webfetch.py`/`discovery.py`/`embeddings.py`, `/sandbox/ats/apply`, and `ApplicationStatus.SUBMITTED` are **in this tree** — grep the tree, then prove with the redeploy + curl e2e. **Agent Search (formerly CSE) is OPTIONAL + NOT set up** (only indexes domains Zach can verify he owns — `docs/GCP_SETUP.md` §3). Finish **Layer II** Playwright/Chromium (Chromium in the Dockerfile, ADK `FunctionTool`) for SPA-only career pages — currently scaffolded/opt-in.
 11. Build the **Vite + React app** (`frontend/`, to be scaffolded) wired to the live backend (fetch) — the dashboard calls the same endpoints the CLI calls; `hireflow-frontend.html` is retired as the reference prototype.
 12. **Demo & docs**: clean architecture diagram image (README currently has ASCII), README spin-up, ≤4-min unedited video showing Cloud Run console + Vertex AI logs + live `.run` calls. Email `testing@devpost.com` / `cloudhackathons@google.com` access.
@@ -498,7 +519,7 @@ widens to "anywhere"**. **Still needs the redeploy + curl e2e to prove it live.*
 
 ## 14. Next session: where to pick up
 
-1. Re-deploy to Cloud Run (`docs/DEPLOY.md`) → curl `/health`, then the live curl e2e with a real `.pdf` (`docs/CURL_E2E.md`): upload → run (`?seed=` + `?seen=`) → SSE events → jobs → approve. **This proves the phase — not the offline green.** The SSE `search` stage must show **expanded query terms** + per-source counts, and a Johor-style location must NOT widen to a global search (search intelligence is now in the tree — prove it live).
+1. Re-deploy to Cloud Run (`docs/DEPLOY.md`) → curl `/health`, then the live curl e2e with a real `.pdf` (`docs/CURL_E2E.md`): upload → run (`?seed=` + `?seen=`) → SSE events → jobs → approve. **This proves the phase — not the offline green.** The SSE `search` stage must show **expanded query terms** + per-source counts, the `career` stage must show **companies probed + new jobs**, and a Johor-style location must NOT widen to a global search (search intelligence + career-page sourcing are now in the tree — prove them live).
 2. **Watch for the in-flight parallel pass** (§10/§12): universal webfetch (`webfetch.py`) + discovery (`discovery.py`), embeddings re-rank (`embeddings.py`, `gemini-embedding-001`), real-submit sandbox ATS (`/sandbox/ats/apply`, `ApplicationStatus.SUBMITTED`, `/approve` submits). Grep the tree each session — mark done ONLY when each is present + redeployed + curl-e2e'd. Agent Search stays OPTIONAL (domain-verify, `docs/GCP_SETUP.md` §3).
 3. Scaffold + wire the **Vite + React app** (`frontend/`) to the deployed API via fetch (dashboard + approve).
 4. **Layer II Playwright/Chromium wiring in the Dockerfile** (scaffolded/opt-in — Chromium is not in the image yet).
