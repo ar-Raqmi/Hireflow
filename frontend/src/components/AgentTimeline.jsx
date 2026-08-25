@@ -1,4 +1,5 @@
-import Icon from './Icon.jsx';
+import { M3eLinearProgressIndicator } from '@m3e/react/progress-indicator';
+import M3eIcon from './M3eIcon.jsx';
 
 const STAGE_META = {
   parse: { icon: 'description', title: 'Parsing résumé' },
@@ -34,7 +35,7 @@ export default function AgentTimeline({ events = [], running = false }) {
     <section className="console" aria-label="Agent timeline">
       <div className="con-head">
         <div className="con-title">
-          <Icon name="monitoring" />Agent timeline
+          <M3eIcon name="monitoring" />Agent timeline
         </div>
         <span className={`phase-chip ${running ? 'live' : ''}`}>{running ? 'running' : 'idle'}</span>
       </div>
@@ -47,6 +48,7 @@ export default function AgentTimeline({ events = [], running = false }) {
           />
         ))}
       </div>
+      {running && <M3eLinearProgressIndicator className="con-progress" indeterminate />}
 
       <ol className="tl">
         {stages.map((s, i) => {
@@ -66,7 +68,7 @@ export default function AgentTimeline({ events = [], running = false }) {
             >
               <div className="ck-rail">
                 <div className="ck-node">
-                  <Icon name={meta.icon} size={20} />
+                  <M3eIcon name={meta.icon} size={20} />
                 </div>
                 <div className="ck-line"><i /></div>
               </div>

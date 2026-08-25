@@ -1,19 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
+import { M3eButton } from '@m3e/react/button';
+import { M3eTabs, M3eTab } from '@m3e/react/tabs';
 import { health, startPipeline, streamEvents } from './api.js';
 import { loadPrefs, savePrefs, loadHistory, pushHistory, clearHistory, loadSeen, markSeen } from './storage.js';
 import ResumeDrop from './components/ResumeDrop.jsx';
 import PrefsModal from './components/PrefsModal.jsx';
 import AgentTimeline from './components/AgentTimeline.jsx';
 import MatchesList from './components/MatchesList.jsx';
-import ApplicationsList from './components/ApplicationsList.jsx';
 import HistoryTab from './components/HistoryTab.jsx';
 import Toast from './components/Toast.jsx';
-import Icon from './components/Icon.jsx';
+import M3eIcon from './components/M3eIcon.jsx';
 
 const VIEWS = [
   { key: 'agent', label: 'Agent run', icon: 'monitoring' },
-  { key: 'matches', label: 'Ranked matches', icon: 'work' },
-  { key: 'applications', label: 'Applications', icon: 'description' },
+  { key: 'results', label: 'Results', icon: 'work' },
   { key: 'history', label: 'History', icon: 'history' },
 ];
 
@@ -64,6 +64,10 @@ export default function App() {
     setPrefsOpen(false);
     showToast('Using résumé defaults');
     if (profile) handleRun();
+  }
+
+  function handleViewTab(key) {
+    setView(key);
   }
 
   async function handleRun(override) {
@@ -124,10 +128,6 @@ export default function App() {
     }
   }
 
-  function handleApproved(res) {
-    showToast(`Submitted — ${res.ats_confirmation}`, 'success');
-  }
-
   function handleClearHistory() {
     clearHistory();
     setHistory([]);
@@ -135,7 +135,6 @@ export default function App() {
   }
 
   const matchCount = matches.length;
-  const appCount = applications.length;
 
   return (
     <div className="app">
@@ -149,30 +148,29 @@ export default function App() {
             {running ? 'Agent running' : apiUp === false ? 'backend offline' : apiUp === true ? 'Agent idle' : 'connecting…'}
           </span>
           <button type="button" className="pill prefschip" onClick={() => setPrefsOpen(true)}>
-            <Icon name="tune" size={16} />
+            <M3eIcon name="tune" size={16} />
             {prefs.work_type}
             {prefs.locations.length > 0 ? ` · ${prefs.locations.join(', ')}` : ''}
           </button>
         </div>
       </header>
 
-      <nav className="wrap viewtabs" aria-label="Views">
+      <M3eTabs variant="secondary" className="wrap viewtabs" onChange={(e) => handleViewTab(e.target?.selectedTab?.getAttribute('data-view') || view)}>
         {VIEWS.map((v) => {
-          const badge = v.key === 'matches' ? matchCount : v.key === 'applications' ? appCount : 0;
+          const badge = v.key === 'results' ? matchCount : 0;
           return (
-            <button
-              type="button"
+            <M3eTab
               key={v.key}
-              className={`vtab ${view === v.key ? 'active' : ''}`}
-              onClick={() => setView(v.key)}
+              data-view={v.key}
+              selected={view === v.key}
             >
-              <Icon name={v.icon} size={16} />
+              <M3eIcon slot="icon" name={v.icon} size={16} />
               {v.label}
               {badge > 0 && <span className="vbadge">{badge}</span>}
-            </button>
+            </M3eTab>
           );
         })}
-      </nav>
+      </M3eTabs>
 
       {view === 'agent' && (
         <main>
@@ -189,10 +187,16 @@ export default function App() {
                     Drop in a résumé and Hireflow takes it from there — parsing, auditing, searching,
                     ranking and tailoring. You only approve.
                   </p>
-                  <button type="button" className="filled runbtn" onClick={() => handleRun()} disabled={!profile || running}>
-                    <Icon name={running ? 'progress_activity' : 'play_arrow'} size={18} />
+                  <M3eButton
+                    variant="filled"
+                    className="runbtn"
+                    disabled={!profile || running}
+                    onClick={() => handleRun()}
+                  >
+                    {running && <M3eIcon name="progress_activity" size={18} className="spin" />}
+                    {!running && <M3eIcon name="play_arrow" size={18} />}
                     {running ? 'Running…' : profile ? 'Run the agent' : 'Upload a résumé to start'}
-                  </button>
+                  </M3eButton>
                 </div>
                 <ResumeDrop onUploaded={handleUploaded} onError={(e) => showToast(`Upload failed: ${e.message}`, 'error', 6000)} prefs={prefs} />
               </div>
@@ -200,7 +204,7 @@ export default function App() {
             {profile && (
               <div className="profile-strip">
                 <span className="filechip">
-                  <Icon name="description" size={15} />
+                  <M3eIcon name="description" size={15} />
                   <span className="fc-name">{profile.filename || profile.id}</span>
                 </span>
                 {profile.target_roles && profile.target_roles.length > 0 && (
@@ -211,7 +215,7 @@ export default function App() {
             <AgentTimeline events={events} running={running} />
             {result && (result.errors && result.errors.length > 0) && (
               <div className="riskbanner high">
-                <Icon name="warning" size={28} />
+                <M3eIcon name="warning" size={28} />
                 <div className="rb-txt">
                   <b>Backend reported {result.errors.length} error{result.errors.length === 1 ? '' : 's'}:</b>{' '}
                   {result.errors.slice(0, 4).join(' · ')}
@@ -222,35 +226,19 @@ export default function App() {
         </main>
       )}
 
-      {view === 'matches' && (
+      {view === 'results' && (
         <main>
           <div className="wrap">
             <section className="results in">
               <div className="results-head">
                 <div>
-                  <h2>Ranked matches</h2>
+                  <h2>Results</h2>
                   <div className="res-meta">
                     {running ? 'agent still running…' : matchCount === 0 ? 'run the agent to see matches' : `${matchCount} matches from the live pipeline`}
                   </div>
                 </div>
               </div>
-              <MatchesList matches={matches} applications={applications} onApproved={handleApproved} onError={(e) => showToast(e.message, 'error', 6000)} />
-            </section>
-          </div>
-        </main>
-      )}
-
-      {view === 'applications' && (
-        <main>
-          <div className="wrap">
-            <section className="results in">
-              <div className="results-head">
-                <div>
-                  <h2>Applications</h2>
-                  <div className="res-meta">{appCount === 0 ? 'no applications yet' : `${appCount} from the live pipeline`}</div>
-                </div>
-              </div>
-              <ApplicationsList applications={applications} />
+              <MatchesList matches={matches} applications={applications} drafts={result?.drafts || {}} onError={(e) => showToast(e.message, 'error', 6000)} />
             </section>
           </div>
         </main>
