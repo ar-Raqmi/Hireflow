@@ -185,8 +185,8 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 │   │                        #   gates + seen dedup + diversity cap), career_source.py (CareerSourceAgent
 │   │                        #   — probes top matched companies' /careers pages via WebFetchSource and
 │   │                        #   merges new jobs back for scoring), adk_router.py (HireflowAgent ADK
-│   │                        #   graph + HireflowTools — kept for the mandatory-ADK rule, NOT wired
-│   │                        #   into the live /pipeline path), runlog.py (RunLog — in-memory per-run SSE log)
+│   │                        #   graph — the LIVE orchestrator: LlmAgent + Runner + FunctionTool
+│   │                        #   wrapping RouterAgent), runlog.py (RunLog — in-memory per-run SSE log)
 │   ├── tools/               # JobSource ABC, RemoteOK, Remotive, Freehire (+ freehire:seek /
 │   │                        #   mycareersfuture sub-sources in app.py), geo (LocationMapper,
 │   │                        #   incl. Johor → my), expander (QueryExpander), wantedly (JP),
@@ -262,7 +262,7 @@ The cleanup pass removed these — if you grep and find a reference to them, it 
 - The dead package re-exports in `hireflow/tools/__init__.py`, `agents/__init__.py`, `storage/__init__.py`, `api/__init__.py`, and `hireflow/__init__.py` (`__version__`) — now empty package markers; import submodules directly.
 - `ApplicationStatus` is now exactly `MATCHED`/`ROUTED`/`DRAFTED`/`SUBMITTED`.
 - The per-file `_USER_AGENT` literals were consolidated into one `USER_AGENT` constant in `hireflow/tools/job_source.py` — import it from there.
-- `HireflowAgent`/`HireflowTools` (`adk_router.py`) are **kept intentionally** as the mandatory-ADK compliance artifact (RULES §6), even though they are not wired into the live `/pipeline` path — do NOT delete them.
+- `HireflowAgent` (`adk_router.py`) is the **LIVE ADK orchestrator**: an `LlmAgent` + `Runner` + in-memory session service expose `RouterAgent` as a single `FunctionTool`, injected deterministically via `before_model_callback` (no wasted LLM round-trip). This satisfies the RULES §6 Google Agent Framework mandate — do NOT delete it.
 
 ---
 
@@ -536,7 +536,7 @@ curl e2e (SSE `career` stage must show companies + new jobs) to count.**
 
 **Now (the base, mandatory — stops the "partial runtime" myth):**
 1. ~~Unblock the import tree~~ — **DONE**: `ResumeFinding` + `WorkTypeClassifier` are in `hireflow/domain/__init__.py` and `hireflow.tools.gemini` imports cleanly.
-2. ~~Wire the 5 named agents into the server pipeline~~ — **DONE (code; live proof pending redeploy)**: `RouterAgent` now orchestrates `SearchAgent → MatchAgent → **CareerSourceAgent** → ResearchAgent → PrepareAgent` as the ACTUAL `/pipeline/run` executor. Each agent carries its prompt-engineering and calls the same `GeminiClient` methods (`score_fit`, `research_company`, `draft/review/revise_application`, `audit_resume`); `CareerSourceAgent` reads matched companies' `/careers` pages via `WebFetchSource.webfetch_company`. Stages are tagged in SSE as `search`/`match`/`career`/`research`/`prepare`. `HireflowAgent`/`HireflowTools` in `adk_router.py` are the ADK-framework compliance artifact (kept for RULES §6 mandate, not wired into the live path).
+2. ~~Wire the 5 named agents into the server pipeline~~ — **DONE (code; live proof pending redeploy)**: `RouterAgent` orchestrates `SearchAgent → MatchAgent → **CareerSourceAgent** → ResearchAgent → PrepareAgent` as the `/pipeline/run` executor, and is exposed as a single ADK `FunctionTool` on `HireflowAgent`'s `LlmAgent` graph — so the pipeline genuinely runs through Google ADK (RULES §6). Each agent calls the same `GeminiClient` methods (`score_fit`, `research_company`, `draft/review/revise_application`, `audit_resume`); `CareerSourceAgent` reads matched companies' `/careers` pages via `WebFetchSource.webfetch_company`. Stages are tagged in SSE as `search`/`match`/`career`/`research`/`prepare`.
 3. ~~Fix `freehire.py`~~ — **DONE**: live endpoint (`/api/v1/agent/jobs/search`) + facets, `LocationMapper` geo codes, stable `source`/`title`/etc. core schema across all sources.
 4. ~~Offline tests removed~~ — **DONE**: `tests/` deleted (stub agent, `_StubGemini`, `TestClient`). There is no offline gate — the acceptance gate is the online curl e2e in steps 5 & 6 against the live Cloud Run URL (real `.pdf`, real Gemini via Vertex).
 5. **Re-deploy to Cloud Run** (docs/DEPLOY.md) → curl `/health`, then a **real** e2e: upload a real `.pdf` → `/pipeline/run` → `/jobs` live results → `/dashboard` reflects it → `/approve`. **Video-record the curl-to-cloud proof.**
