@@ -7,8 +7,10 @@ from collections import Counter
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
+from hireflow.agents.adk_router import HireflowAgent
 from hireflow.agents.router import RouterAgent
 from hireflow.agents.runlog import RunLog
 from hireflow.config import JSONLD_COMPANY_URLS, SETTINGS
@@ -113,7 +115,7 @@ class FreehireRegionalSource(FreehireSource):
 
 async def _execute_run(
     runlog: RunLog,
-    agent: RouterAgent,
+    agent: HireflowAgent,
     storage: StorageFactory,
     run_id: str,
     profile: Profile,
@@ -178,7 +180,7 @@ async def _sse_events(runlog: RunLog, run_id: str, last_seq: int = 0):
         await asyncio.sleep(0.5)
 
 
-def _build_default_agent() -> RouterAgent:
+def _build_default_agent() -> HireflowAgent:
     gemini = GeminiClient()
     sources = [
         LinkedInSource(detail=False),
@@ -204,14 +206,21 @@ def _build_default_agent() -> RouterAgent:
         sources.append(PlaywrightSource())
         if SETTINGS.jobstreet_enabled:
             sources.append(JobStreetSource())
-    return RouterAgent(sources=sources, gemini=gemini)
+    router = RouterAgent(sources=sources, gemini=gemini)
+    return HireflowAgent(router=router)
 
 
 def create_app(
-    storage: StorageFactory | None = None, agent: RouterAgent | None = None
+    storage: StorageFactory | None = None, agent: HireflowAgent | None = None
 ) -> FastAPI:
     """App factory — injectable storage/agent; defaults to real ones."""
     api = FastAPI(title="Hireflow API", version="0.3.0")
+    api.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     api.state.storage = storage or StorageFactory()
     api.state.agent = agent or _build_default_agent()
     api.state.parser = ResumeParser()
