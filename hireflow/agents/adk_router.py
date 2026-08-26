@@ -89,7 +89,7 @@ class HireflowAgent:
                         function_call=types.FunctionCall(
                             name="_run_pipeline_tool",
                             args={
-                                "profile": {"id": self._profile_id},
+                                "profile_id": self._profile.id,
                                 "seed": self._seed,
                                 "seen_jobs": self._seen_jobs,
                             },
@@ -103,12 +103,12 @@ class HireflowAgent:
 
     async def _run_pipeline_tool(
         self,
-        profile: dict[str, Any],
+        profile_id: str = "",
         seed: int = 0,
         seen_jobs: list[str] | None = None,
     ) -> dict[str, Any]:
         result = await self._router.run_pipeline(
-            Profile.from_mapping(profile),
+            self._profile,
             progress=self._progress,
             seed=seed,
             seen_jobs=seen_jobs or [],
@@ -125,7 +125,7 @@ class HireflowAgent:
     ) -> dict[str, Any]:
         self._progress = progress
         self._last_result = None
-        self._profile_id = profile.id
+        self._profile = profile
         self._seed = seed
         self._seen_jobs = list(seen_jobs or [])
         user_id = "hireflow"
