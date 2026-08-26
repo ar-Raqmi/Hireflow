@@ -278,7 +278,7 @@ class HireflowCli:
             print("\n  TOP MATCHES")
             print("  " + "-" * 60)
             for match in matches:
-                when = ago(match.get("posted_at"), SETTINGS.job_recency_days)
+                when = ago(match.get("posted_at"))
                 if is_expired(match.get("posted_at"), SETTINGS.job_recency_days):
                     when += " · ⚠ expired"
                 print(f"  #{match['rank']:<2} {match['score']:>3}  {match['title']} @ {match['company']}")

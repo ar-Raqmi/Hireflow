@@ -30,5 +30,7 @@ dist/
 *.swp
 # local browser-capture artifacts + exported reports
 .playwright-mcp/
+.pytest_cache/
 result-demo.html
 result-demo.json
+sandbox_ats.json

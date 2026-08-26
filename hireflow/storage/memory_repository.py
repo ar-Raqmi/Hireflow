@@ -7,7 +7,6 @@ class InMemoryRepository(Repository):
     """Dict-backed repository for local development and tests (no credentials)."""
 
     def __init__(self, entity_type: type) -> None:
-        self._entity_type = entity_type
         self._store: dict[str, object] = {}
 
     async def get(self, entity_id: str):

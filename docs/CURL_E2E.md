@@ -158,11 +158,10 @@ APP_ID="<applications[0].id from step 3>"
 curl -s -X POST "$BASE_URL/approve?application_id=$APP_ID"
 ```
 
-**Proves success:** `{"id":"<app-id>","status":"approved"}`. Re-query
-`/applications` to see the same id now `"approved"`.
-> Note: approval currently only flips the status — real submission to the
-> sandbox ATS (`/sandbox/ats/apply`, `ApplicationStatus.SUBMITTED`) is **in
-> flight (verify)** and not in this tree yet.
+**Proves success:** `{"id":"<app-id>","status":"submitted","submitted_at":"...","ats_confirmation":"HFS-..."}`.
+Re-query `/applications` to see the same id now `"submitted"` with an
+`ats_confirmation` recorded via `/sandbox/ats/apply` (the sandbox ATS real-submit
+path — in-memory + best-effort `sandbox_ats.json`, no DB).
 
 ---
 
@@ -213,5 +212,5 @@ agent working before the final report renders.
       **Johor-style location never degrades to a global search** (location gate active)
 - [ ] results render **"posted X ago"** / mark expired (recency gate active, `JOB_RECENCY_DAYS`)
 - [ ] `dashboard` reflects the run
-- [ ] `approve` flips status
+- [ ] `approve` returns `status:"submitted"` + `ats_confirmation` (real sandbox-ATS submit)
 - [ ] CLI run prints live progress + a report `--url $BASE_URL`

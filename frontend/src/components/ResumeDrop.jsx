@@ -47,6 +47,19 @@ export default function ResumeDrop({ onUploaded, onError, prefs }) {
     setBusy(false);
   }
 
+  const emptyDropzone = (
+    <div className="dz-empty">
+      <div className="dz-badge">
+        <M3eIcon name="upload_file" size={36} />
+      </div>
+      <div className="dz-title">Drop your résumé here</div>
+      <div className="dz-sub">PDF, DOCX or TXT — parsed &amp; audited by the live agent</div>
+      <M3eButton variant="tonal" className="browse" onClick={(e) => { e.stopPropagation(); inputRef.current && inputRef.current.click(); }}>
+        browse files
+      </M3eButton>
+    </div>
+  );
+
   return (
     <div
       className={`dz ${dragging ? 'dragging' : ''} ${file ? 'has-file' : ''}`}
@@ -70,18 +83,7 @@ export default function ResumeDrop({ onUploaded, onError, prefs }) {
       }}
     >
       <div className="dz-inner">
-        {!file && (
-          <div className="dz-empty">
-            <div className="dz-badge">
-              <M3eIcon name="upload_file" size={36} />
-            </div>
-            <div className="dz-title">Drop your résumé here</div>
-            <div className="dz-sub">PDF, DOCX or TXT — parsed &amp; audited by the live agent</div>
-            <M3eButton variant="tonal" className="browse" onClick={(e) => { e.stopPropagation(); inputRef.current && inputRef.current.click(); }}>
-              browse files
-            </M3eButton>
-          </div>
-        )}
+        {!file && emptyDropzone}
         {file && (
           <div className="dz-file">
             <div className="dz-center">
@@ -105,16 +107,7 @@ export default function ResumeDrop({ onUploaded, onError, prefs }) {
                   </div>
                 </div>
               ) : (
-                <div className="dz-empty">
-                  <div className="dz-badge">
-                    <M3eIcon name="upload_file" size={36} />
-                  </div>
-                  <div className="dz-title">Drop your résumé here</div>
-                  <div className="dz-sub">PDF, DOCX or TXT — parsed &amp; audited by the live agent</div>
-                  <M3eButton variant="tonal" className="browse" onClick={(e) => { e.stopPropagation(); inputRef.current && inputRef.current.click(); }}>
-                    browse files
-                  </M3eButton>
-                </div>
+                emptyDropzone
               )}
             </div>
             <div className="file-bottom">

@@ -20,10 +20,6 @@ _COUNTRY_SUBDOMAINS = {
 }
 _DEFAULT_SUBDOMAIN = _COUNTRY_SUBDOMAINS["my"]
 
-_USER_AGENT = (
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-)
 _JOB_ID_RE = re.compile(r"/job/(\d+)")
 _UNIT_DAYS = {
     "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,

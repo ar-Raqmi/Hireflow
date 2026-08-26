@@ -138,9 +138,9 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
     (`embeddings.py`). All landed in the tree; still need a redeploy + curl e2e to count.
 - Domain models in `hireflow/domain/` — plain typed classes, no framework imports:
   - `Profile` (incl. `residence`, `work_type`, preferred `locations`, `salary_floor`)
-  - `JobPosting`, `Application` (+ `ApplicationStatus` — `MATCHED`/`ROUTED`/`DRAFTED`/`APPROVED` + **`SUBMITTED`** are used at runtime; `SUBMITTED` is present in the enum)
+  - `JobPosting`, `Application` (+ `ApplicationStatus` — `MATCHED`/`ROUTED`/`DRAFTED`/`SUBMITTED`; `SUBMITTED` is the real-submit state)
   - **`ResumeFinding`** — one ATS-health finding produced by `GeminiClient.audit_resume` (now present; `from hireflow.domain import JobPosting, Profile, ResumeFinding` resolves).
-  - **`WorkTypeClassifier`** — deterministic `remote|hybrid|onsite|any` gate (now present; used by `ResumeParser.infer_work_type` and `SearchAgent._infer_work_type`).
+  - **`WorkTypeClassifier`** — deterministic `remote|hybrid|onsite|any` gate (used by `SearchAgent._infer_work_type`).
 - **Naming:** classes `PascalCase`, methods/vars `snake_case`, constants `UPPER_SNAKE`, private helpers `_underscore`.
 - **No code comments unless asked.**
 - Type hints everywhere (Python 3.11+).
@@ -177,7 +177,7 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 │   ├── export_html.py       # HtmlExporter — full result → self-contained result-demo.html (+ .json)
 │   │                        #   inline CSS only, clickable links, no truncation (client-side, stdlib)
 │   ├── domain/__init__.py   # Profile, JobPosting, Application, ApplicationStatus (MATCHED/ROUTED/
-│   │                        #   DRAFTED/APPROVED — no SUBMITTED yet), ResumeFinding,
+│   │                        #   DRAFTED/SUBMITTED), ResumeFinding,
 │   │                        #   WorkTypeClassifier (all present — import tree unblocked)
 │   ├── storage/             # Repository ABC + InMemory + StorageFactory (in-memory only, no DB)
 │   ├── agents/              # BaseAgent ABC, router.py (Search/Match/Research/Prepare/Router — the LIVE
@@ -185,7 +185,8 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 │   │                        #   gates + seen dedup + diversity cap), career_source.py (CareerSourceAgent
 │   │                        #   — probes top matched companies' /careers pages via WebFetchSource and
 │   │                        #   merges new jobs back for scoring), adk_router.py (HireflowAgent ADK
-│   │                        #   graph + HireflowTools), runlog.py (RunLog — in-memory per-run SSE log)
+│   │                        #   graph — the LIVE orchestrator: LlmAgent + Runner + FunctionTool
+│   │                        #   wrapping RouterAgent), runlog.py (RunLog — in-memory per-run SSE log)
 │   ├── tools/               # JobSource ABC, RemoteOK, Remotive, Freehire (+ freehire:seek /
 │   │                        #   mycareersfuture sub-sources in app.py), geo (LocationMapper,
 │   │                        #   incl. Johor → my), expander (QueryExpander), wantedly (JP),
@@ -222,7 +223,11 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
                              #   no /100), rank label, Open Link, View Draft (CV + cover letter
                              #   from the done payload `drafts[job_id]`), expandable reasons +
                              #   research (markdown rendered via `marked`). `ApplicationsList` +
-                             #   `ScoreDial` are DELETED (dead after the merge). Components:
+                             #   `ScoreDial` are DELETED (dead after the merge). 2026-08-26 audit:
+                             #   removed dead api.js exports (`fetchJobs`/`fetchApplications`/
+                             #   `fetchDashboard`/`approveApplication`), dead CSS (`.gate`/`.hint`/
+                             #   `.dz-note`/`.po-sub`/`.paused`), and deduped the dropzone markup.
+                             #   Components:
                              #   M3eIcon, ResumeDrop, PrefsModal, AgentTimeline, MatchesList,
                              #   HistoryTab, Toast; lib/md.js (marked), api.js (fetch layer),
                              #   storage.js (localStorage). timeline animates from the real stream
@@ -245,6 +250,19 @@ imports (Vertex/API access is handled by `google-genai`).
 **Ghosts of the tree — do NOT restore them as ground truth:**
 - `cli.py` — **was never committed** (only `.pyc` proved it existed). Now it IS committed: `hireflow/cli.py` (thin client of the deployed API) + `hireflow.sh` (bash driver).
 - `json_repository.py`, `openrouter.py`, `mock_gemini.py` — existed only as `.pyc`; do NOT take them as ground truth. Never rebuild a mock Gemini path.
+
+**Code audit — 2026-08-26 (dead code removed, do NOT resurrect):**
+The cleanup pass removed these — if you grep and find a reference to them, it is stale:
+- `ResumeParser.read()` / `_read_pdf()` / `_read_docx()` / `infer_work_type()` — removed; the live path uses `parse_bytes`/`validate`/`pdf_page_images` only.
+- `Settings.job_source_poll_hours` (config knob) — removed; nothing read it.
+- `ApplicationStatus.APPROVED` + `Application.followup_due` / `Application.notes` — removed (never used; approve path is `SUBMITTED`).
+- `BaseAgent.pre_run` / `post_run` hooks — removed (never overridden/called).
+- `WebFetchSource.last_via` — removed (never read).
+- `InMemoryRepository._entity_type` — removed (never read).
+- The dead package re-exports in `hireflow/tools/__init__.py`, `agents/__init__.py`, `storage/__init__.py`, `api/__init__.py`, and `hireflow/__init__.py` (`__version__`) — now empty package markers; import submodules directly.
+- `ApplicationStatus` is now exactly `MATCHED`/`ROUTED`/`DRAFTED`/`SUBMITTED`.
+- The per-file `_USER_AGENT` literals were consolidated into one `USER_AGENT` constant in `hireflow/tools/job_source.py` — import it from there.
+- `HireflowAgent` (`adk_router.py`) is the **LIVE ADK orchestrator**: an `LlmAgent` + `Runner` + in-memory session service expose `RouterAgent` as a single `FunctionTool`, injected deterministically via `before_model_callback` (no wasted LLM round-trip). This satisfies the RULES §6 Google Agent Framework mandate — do NOT delete it.
 
 ---
 
@@ -510,7 +528,7 @@ curl e2e (SSE `career` stage must show companies + new jobs) to count.**
 - `GET /pipeline/run/{run_id}` — run status `{exists, done, status, result}` (resume-after-refresh)
 - `POST /pipeline/run/{run_id}/cancel` — cancel the background task (stops paid Gemini work)
 - healthcheck (`/health`) for Cloud Run
-- Optional in-flight knobs: **embeddings re-rank** (`gemini-embedding-001`, `EMBEDDING_MODEL` fallback `text-embedding-005` — code present, gated `SEMANTIC_SEARCH`) and **Agent Search** (`AGENT_SEARCH_DATASTORE`) per `docs/GCP_SETUP.md` §3–4
+- Optional in-flight knobs: **embeddings re-rank** (`gemini-embedding-001`, `EMBEDDING_MODEL` fallback `text-embedding-005` — code present, gated `SEMANTIC_SEARCH`; `docs/GCP_SETUP.md` §4). **Agent Search is OPTIONAL + NOT wired** — no code reads an `AGENT_SEARCH_DATASTORE` env var (`docs/GCP_SETUP.md` §3).
 
 ---
 
@@ -518,7 +536,7 @@ curl e2e (SSE `career` stage must show companies + new jobs) to count.**
 
 **Now (the base, mandatory — stops the "partial runtime" myth):**
 1. ~~Unblock the import tree~~ — **DONE**: `ResumeFinding` + `WorkTypeClassifier` are in `hireflow/domain/__init__.py` and `hireflow.tools.gemini` imports cleanly.
-2. ~~Wire the 5 named agents into the server pipeline~~ — **DONE (code; live proof pending redeploy)**: `RouterAgent` now orchestrates `SearchAgent → MatchAgent → **CareerSourceAgent** → ResearchAgent → PrepareAgent` as the ACTUAL `/pipeline/run` executor. Each agent carries its prompt-engineering and calls the same `GeminiClient` methods (`score_fit`, `research_company`, `draft/review/revise_application`, `audit_resume`); `CareerSourceAgent` reads matched companies' `/careers` pages via `WebFetchSource.webfetch_company`. Stages are tagged in SSE as `search`/`match`/`career`/`research`/`prepare`. `HireflowTools` is reduced to the ADK `FunctionTool` layer; `HireflowAgent` keeps the mandated ADK `LlmAgent` graph and delegates to `RouterAgent` when wired.
+2. ~~Wire the 5 named agents into the server pipeline~~ — **DONE (code; live proof pending redeploy)**: `RouterAgent` orchestrates `SearchAgent → MatchAgent → **CareerSourceAgent** → ResearchAgent → PrepareAgent` as the `/pipeline/run` executor, and is exposed as a single ADK `FunctionTool` on `HireflowAgent`'s `LlmAgent` graph — so the pipeline genuinely runs through Google ADK (RULES §6). Each agent calls the same `GeminiClient` methods (`score_fit`, `research_company`, `draft/review/revise_application`, `audit_resume`); `CareerSourceAgent` reads matched companies' `/careers` pages via `WebFetchSource.webfetch_company`. Stages are tagged in SSE as `search`/`match`/`career`/`research`/`prepare`.
 3. ~~Fix `freehire.py`~~ — **DONE**: live endpoint (`/api/v1/agent/jobs/search`) + facets, `LocationMapper` geo codes, stable `source`/`title`/etc. core schema across all sources.
 4. ~~Offline tests removed~~ — **DONE**: `tests/` deleted (stub agent, `_StubGemini`, `TestClient`). There is no offline gate — the acceptance gate is the online curl e2e in steps 5 & 6 against the live Cloud Run URL (real `.pdf`, real Gemini via Vertex).
 5. **Re-deploy to Cloud Run** (docs/DEPLOY.md) → curl `/health`, then a **real** e2e: upload a real `.pdf` → `/pipeline/run` → `/jobs` live results → `/dashboard` reflects it → `/approve`. **Video-record the curl-to-cloud proof.**

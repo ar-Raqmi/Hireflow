@@ -1,7 +1,7 @@
 # python:3.11-slim provably boots on Cloud Run (uvicorn :8080, /health 200).
 # Chromium (Playwright) is installed HERE on the proven base instead of using
 # the heavy mcr playwright image (which failed to boot inside Cloud Run).
-# Chromium is fetched at build time; deploy needs --memory 2Gi+.
+# Chromium is fetched at build time; deploy needs --memory 1Gi+.
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -18,16 +18,12 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 
 COPY hireflow ./hireflow
 
+# Deliberate runtime overrides. Everything else uses config.py defaults —
+# pass optional knobs (SEMANTIC_SEARCH, USE_UNVERIFIED_SOURCES, QUERY_EXPANSION,
+# JOB_RECENCY_DAYS, ...) at deploy time when you want them on.
 ENV GCP_PROJECT_ID="hireflow-506207"
-ENV VERTEX_LOCATION="global"
-ENV GEMINI_MODEL="gemini-3.5-flash"
 ENV GEMINI_USE_VERTEX="true"
-ENV SEMANTIC_SEARCH="1"
-ENV EMBEDDING_MODEL="gemini-embedding-001"
 ENV HIREFLOW_PLAYWRIGHT="1"
-ENV JOBSTREET_ENABLED="true"
-ENV USE_UNVERIFIED_SOURCES="1"
-ENV SANDBOX_ATS_FILE="sandbox_ats.json"
 
 EXPOSE 8080
 

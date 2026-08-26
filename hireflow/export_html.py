@@ -15,7 +15,7 @@ def _as_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
-def ago(posted_at: Any, recency_days: int = 14) -> str:
+def ago(posted_at: Any) -> str:
     """Human "posted X ago" label for a job; 'date unknown' when absent."""
     parsed = _parse_dt(posted_at)
     if parsed is None:

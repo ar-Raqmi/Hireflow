@@ -322,9 +322,9 @@ class ResearchAgent(BaseAgent):
         researched: dict[str, dict[str, Any]] = {}
         chosen = matches[: self._caps["max_research"]]
         companies = [
-            JobPosting.from_mapping(match["job"]).company
+            job.company
             for match in chosen
-            if JobPosting.from_mapping(match["job"]).company
+            if (job := JobPosting.from_mapping(match["job"])).company
         ]
         total = len(dict.fromkeys(companies))
         done = 0
@@ -568,7 +568,7 @@ class RouterAgent(BaseAgent):
     ) -> dict[str, Any]:
         needs_human: list[dict[str, Any]] = []
         ranked: list[dict[str, Any]] = []
-        for index, match in enumerate(matches[:10], start=1):
+        for index, match in enumerate(matches[: self._caps["max_score"]], start=1):
             job = JobPosting.from_mapping(match["job"])
             ranked.append(
                 {

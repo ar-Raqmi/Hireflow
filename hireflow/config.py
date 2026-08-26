@@ -38,7 +38,6 @@ class Settings:
         default_factory=lambda: _env("GEMINI_USE_VERTEX", "").lower() in {"1", "true", "yes"}
     )
     base_url: str = field(default_factory=lambda: _env("HIREFLOW_BASE_URL", DEFAULT_BASE_URL))
-    job_source_poll_hours: int = 6
     approve_threshold_auto: int = 80
     approve_threshold_draft: int = 60
     pipeline_max_jobs: int = field(default_factory=lambda: _int_env("PIPELINE_MAX_JOBS", 25))

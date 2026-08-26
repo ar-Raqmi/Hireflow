@@ -18,9 +18,3 @@ class BaseAgent(ABC):
     async def _emit(self, stage: str, detail: str) -> None:
         if self.progress is not None:
             await self.progress(stage, detail)
-
-    async def pre_run(self, context: dict) -> None:
-        """Hook before run. Override to log, enrich, or validate."""
-
-    async def post_run(self, context: dict, outcome: dict) -> None:
-        """Hook after run. Override to persist audit events."""

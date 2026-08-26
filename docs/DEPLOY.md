@@ -29,15 +29,17 @@ grant the role to that SA instead.
 gcloud run deploy hireflow-backend --region us-central1 --source . \
   --allow-unauthenticated \
   --set-env-vars GCP_PROJECT_ID=hireflow-506207,GEMINI_USE_VERTEX=true,VERTEX_LOCATION=global,GEMINI_MODEL=gemini-3.5-flash,RESUME_PARSE_MODE=hybrid \
-  --memory 512Mi --timeout 900
+  --memory 1Gi --timeout 3600
 ```
 
 - `--source .` builds the `Dockerfile` via Cloud Build. `.dockerignore`
   excludes `.env`, `API.md`, `*-credential.json`, `.venv`, etc. from the build
   context.
-- `--timeout 900` — the pipeline now streams SSE progress from a background
-  task; the request must stay open while the client drains `/events`, so give it
-  room (Cloud Run max is 3600s).
+- `--memory 1Gi --timeout 3600` — Chromium (Playwright) is installed in the
+  image, and the pipeline streams SSE progress from a background task; the
+  request must stay open while the client drains `/events`, so give it room
+  (Cloud Run max is 3600s). Bump to `--memory 2G --cpu 2` under heavy Playwright
+  load.
 - `RESUME_PARSE_MODE` — `hybrid` (default): Gemini text parse, upgraded to
   Gemini **vision** page-images when the PDF's extracted text is thin;
   `vision`: always render PDF pages + Gemini vision; `text`: text-only parse.

@@ -7,16 +7,11 @@ from typing import Any, Iterable
 import httpx
 
 from hireflow.domain import JobPosting
-from hireflow.tools.job_source import JobSource
+from hireflow.tools.job_source import USER_AGENT, JobSource
 
 _LD_SCRIPT_RE = re.compile(
     r'<script\s+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', re.S
 )
-_USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-)
-
 
 class JsonLdSource(JobSource):
     """Career-page source built on schema.org ``JobPosting`` JSON-LD.
@@ -64,7 +59,7 @@ class JsonLdSource(JobSource):
         return jobs[:limit]
 
     async def _fetch_html(self, url: str) -> str:
-        async with httpx.AsyncClient(timeout=15.0, headers={"User-Agent": _USER_AGENT}) as client:
+        async with httpx.AsyncClient(timeout=15.0, headers={"User-Agent": USER_AGENT}) as client:
             response = await client.get(url, follow_redirects=True)
             response.raise_for_status()
         return response.text

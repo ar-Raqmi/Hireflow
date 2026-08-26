@@ -190,7 +190,7 @@ def _render(result: dict) -> None:
     matches = result.get("matches") or []
     print(f"\nTOP MATCHES ({len(matches)})")
     for m in matches[:10]:
-        when = ago(m.get("posted_at"), SETTINGS.job_recency_days)
+        when = ago(m.get("posted_at"))
         if is_expired(m.get("posted_at"), SETTINGS.job_recency_days):
             when += " · ⚠ expired"
         print(f'  {m.get("score",0):>3}  {str(m.get("title",""))[:46]:<46} @ {str(m.get("company",""))[:28]:<28}')

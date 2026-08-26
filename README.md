@@ -47,7 +47,7 @@ Set `VITE_HIREFLOW_API=https://hireflow-backend-296941301245.us-central1.run.app
 
 ## Stack
 - **Gemini 3.5 Flash** via Vertex AI — `hireflow/config.py`
-- **Google ADK** (Python) — `hireflow/agents/adk_router.py` (LlmAgent graph + FunctionTools)
+- **Google ADK** (Python) — `hireflow/agents/adk_router.py` (the live orchestrator: `LlmAgent` + `Runner` expose the multi-agent `RouterAgent` as a `FunctionTool`)
 - **FastAPI** backend — `hireflow/api/app.py` (stateless, in-memory per run; no DB)
 - **Cloud Run** (scale-to-zero) — `Dockerfile`
 - Frontend: **Vite + React** (`frontend/`) — wired to the live backend via fetch; `hireflow-frontend.html` is the retired reference prototype only

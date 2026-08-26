@@ -1,186 +1,148 @@
 from __future__ import annotations
 
+import uuid
 from typing import Any, Awaitable, Callable
 
 from google.adk.agents import LlmAgent
 from google.adk.models import Gemini
+from google.adk.models.llm_response import LlmResponse
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google.adk.tools import FunctionTool, ToolContext
+from google.adk.tools import FunctionTool
 from google.genai import types
 
 from hireflow.agents.router import RouterAgent
 from hireflow.config import SETTINGS
-from hireflow.domain import JobPosting, Profile
-from hireflow.tools.gemini import GeminiClient
-from hireflow.tools.job_source import JobSource
-
-
-class HireflowTools:
-    """ADK-registered tools backing the mandated Google Agent Framework graph.
-
-    The four ``FunctionTool`` methods are the framework evidence (RULES §67).
-    Every LLM call still goes through ``GeminiClient`` (the only LLM entry
-    point) — never a stub. The autonomous pipeline that the CLI/SSE run is
-    owned by ``RouterAgent`` (see ``agents/router.py``); these tools remain for
-    the ADK graph, not as the pipeline executor.
-    """
-
-    def __init__(
-        self,
-        sources: list[JobSource],
-        gemini: GeminiClient,
-    ) -> None:
-        self._sources = sources
-        self._gemini = gemini
-        self._progress: Callable[[str, str], Awaitable[None]] | None = None
-        self.reset()
-
-    def reset(self) -> None:
-        self._state: dict[str, Any] = {}
-        self._errors: list[str] = []
-
-    async def _emit(self, stage: str, detail: str) -> None:
-        if self._progress is not None:
-            await self._progress(stage, detail)
-
-    @property
-    def state(self) -> dict[str, Any]:
-        return self._state
-
-    @property
-    def gemini(self) -> GeminiClient:
-        return self._gemini
-
-    @property
-    def errors(self) -> list[str]:
-        return list(self._errors)
-
-    async def search_jobs(self, query: str, tool_context: ToolContext | None = None) -> list[dict[str, Any]]:
-        """Search all configured job boards for postings matching `query`."""
-        jobs: list[JobPosting] = []
-        for source in self._sources:
-            try:
-                jobs.extend(await source.search(query=query))
-            except Exception as exc:
-                self._errors.append(f"{source.name}: {type(exc).__name__}: {str(exc)[:200]}")
-        mappings = [job.to_mapping() for job in jobs]
-        self._state["jobs"] = mappings
-        if tool_context is not None:
-            tool_context.state["jobs"] = mappings
-        return mappings
-
-    async def score_jobs(
-        self,
-        jobs: list[dict[str, Any]],
-        profile: dict[str, Any],
-        tool_context: ToolContext | None = None,
-    ) -> list[dict[str, Any]]:
-        """Score each job (0-100) against the profile across 5 dimensions."""
-        profile_obj = Profile.from_mapping(profile)
-        matches = []
-        for job_map in jobs:
-            job = JobPosting.from_mapping(job_map)
-            score, reasons = await self._gemini.score_fit(job=job, profile=profile_obj)
-            matches.append({"job": job_map, "score": score, "reasons": reasons})
-        self._state["matches"] = matches
-        if tool_context is not None:
-            tool_context.state["matches"] = matches
-        return matches
-
-    async def research_company(
-        self, company: str, tool_context: ToolContext | None = None
-    ) -> dict[str, Any]:
-        """Generate a company-fit research summary."""
-        research = await self._gemini.research_company(company)
-        self._state.setdefault("research", []).append(research)
-        if tool_context is not None:
-            tool_context.state.setdefault("research", []).append(research)
-        return research
-
-    async def prepare_application(
-        self,
-        profile: dict[str, Any],
-        job: dict[str, Any],
-        tool_context: ToolContext | None = None,
-    ) -> dict[str, Any]:
-        """Draft, review, and revise a CV + cover letter for a job."""
-        draft = await self._gemini.draft_application(
-            profile=Profile.from_mapping(profile), job=JobPosting.from_mapping(job)
-        )
-        review = await self._gemini.review_application(draft=draft)
-        revised = await self._gemini.revise_application(draft=draft, review=review)
-        result = {"draft": draft, "review": review, "revised": revised}
-        self._state.setdefault("applications", []).append(result)
-        if tool_context is not None:
-            tool_context.state.setdefault("applications", []).append(result)
-        return result
+from hireflow.domain import Profile
 
 
 class HireflowAgent:
-    """Builds the ADK agent graph (the mandated Google Agent Framework) and runs it.
+    """ADK orchestrator that runs the multi-agent pipeline as a Google-ADK tool.
 
-    The CLI/SSE path runs ``RouterAgent.run_pipeline`` (the real executor);
-    ``HireflowAgent`` keeps the ADK ``LlmAgent`` graph alive as framework
-    evidence. When a ``router`` is supplied, ``run_pipeline`` delegates to it.
+    This is the mandated Google Agent Framework layer (RULES §6). ``RouterAgent``
+    is the deterministic multi-agent engine (Search -> Match -> Career ->
+    Research -> Prepare -> approve); it is exposed as a single ADK ``FunctionTool``
+    on an ``LlmAgent`` and executed through an ADK ``Runner`` with an in-memory
+    session service. A ``before_model_callback`` injects the tool call
+    deterministically, so the framework is exercised with no wasted LLM round-trip.
+    Every LLM call inside the pipeline still goes through ``GeminiClient``.
     """
 
-    def __init__(self, tools: HireflowTools, router: RouterAgent | None = None) -> None:
-        self._tools = tools
+    def __init__(self, router: RouterAgent, model: str | None = None) -> None:
         self._router = router
+        self._progress: Callable[[str, str], Awaitable[None]] | None = None
+        self._last_result: dict[str, Any] | None = None
+        self._session_service = InMemorySessionService()
         self.agent = LlmAgent(
             name="hireflow_router",
-            model=Gemini(model=SETTINGS.gemini_model),
+            model=model or Gemini(model=SETTINGS.gemini_model, client_kwargs=self._client_kwargs()),
             instruction=(
-                "You are Hireflow, an autonomous job-search agent. Execute the pipeline in order: "
-                "search jobs, score them against the profile, research the top companies, and prepare "
-                "tailored applications. Then stop and hand off for human approval. Never submit without approval."
+                "You are Hireflow, an autonomous job-search agent that calls "
+                "the run_pipeline tool to execute the full job-search workflow."
             ),
-            tools=[
-                FunctionTool(self._tools.search_jobs),
-                FunctionTool(self._tools.score_jobs),
-                FunctionTool(self._tools.research_company),
-                FunctionTool(self._tools.prepare_application),
-            ],
+            tools=[FunctionTool(self._run_pipeline_tool)],
+            before_model_callback=self._before_model,
         )
-        self._session_service = InMemorySessionService()
         self._runner = Runner(
             agent=self.agent, app_name="hireflow", session_service=self._session_service
         )
 
     @property
-    def tools(self) -> HireflowTools:
-        return self._tools
+    def gemini(self) -> Any:
+        return self._router.gemini
 
-    async def run(self, user_id: str, session_id: str, profile: dict[str, Any]) -> str:
-        message = f"Run the pipeline for this profile: {profile}"
-        content = types.Content(role="user", parts=[types.Part.from_text(text=message)])
-        final_parts: list[str] = []
-        async for event in self._runner.run_async(
-            user_id=user_id, session_id=session_id, new_message=content
-        ):
-            if event.is_final_response():
-                for part in event.content.parts:
-                    if part.text:
-                        final_parts.append(part.text)
-        return "\n".join(final_parts)
+    @property
+    def sources(self) -> list[Any]:
+        return self._router.sources
+
+    @staticmethod
+    def _client_kwargs() -> dict[str, Any]:
+        use_vertex = SETTINGS.gemini_use_vertex and bool(SETTINGS.project_id)
+        if use_vertex:
+            kwargs = {
+                "vertexai": True,
+                "project": SETTINGS.project_id,
+                "location": SETTINGS.vertex_location,
+            }
+            if SETTINGS.vertex_location == "global":
+                kwargs["enterprise"] = True
+            return kwargs
+        return {"api_key": SETTINGS.gemini_api_key}
+
+    def _before_model(
+        self, callback_context: Any = None, llm_request: Any = None
+    ) -> LlmResponse:
+        if self._last_result is not None:
+            return LlmResponse(
+                content=types.Content(
+                    role="model",
+                    parts=[types.Part.from_text(text="pipeline finished")],
+                ),
+                turn_complete=True,
+                finish_reason=types.FinishReason.STOP,
+            )
+        return LlmResponse(
+            content=types.Content(
+                role="model",
+                parts=[
+                    types.Part(
+                        function_call=types.FunctionCall(
+                            name="_run_pipeline_tool",
+                            args={
+                                "profile": {"id": self._profile_id},
+                                "seed": self._seed,
+                                "seen_jobs": self._seen_jobs,
+                            },
+                        )
+                    )
+                ],
+            ),
+            turn_complete=True,
+            finish_reason=types.FinishReason.STOP,
+        )
+
+    async def _run_pipeline_tool(
+        self,
+        profile: dict[str, Any],
+        seed: int = 0,
+        seen_jobs: list[str] | None = None,
+    ) -> dict[str, Any]:
+        result = await self._router.run_pipeline(
+            Profile.from_mapping(profile),
+            progress=self._progress,
+            seed=seed,
+            seen_jobs=seen_jobs or [],
+        )
+        self._last_result = result
+        return {"status": "done", "run_id": result.get("run_id", "")}
 
     async def run_pipeline(
         self,
-        profile: dict[str, Any],
+        profile: Profile,
         progress: Callable[[str, str], Awaitable[None]] | None = None,
+        seed: int = 0,
+        seen_jobs: list[str] | None = None,
     ) -> dict[str, Any]:
-        profile_obj = Profile.from_mapping(profile)
-        if self._router is not None:
-            return await self._router.run_pipeline(profile_obj, progress=progress)
-        return {
-            "profile_id": profile_obj.id,
-            "jobs_found": 0,
-            "jobs": [],
-            "matches": [],
-            "applications": [],
-            "application_records": [],
-            "drafts": {},
-            "needs_human": [],
-            "errors": ["HireflowAgent has no RouterAgent wired"],
-        }
+        self._progress = progress
+        self._last_result = None
+        self._profile_id = profile.id
+        self._seed = seed
+        self._seen_jobs = list(seen_jobs or [])
+        user_id = "hireflow"
+        session_id = f"hireflow-{uuid.uuid4().hex[:8]}"
+        await self._session_service.create_session(
+            app_name="hireflow", user_id=user_id, session_id=session_id
+        )
+        content = types.Content(
+            role="user",
+            parts=[types.Part.from_text(text="Run the job-search pipeline now.")],
+        )
+        async for _event in self._runner.run_async(
+            user_id=user_id, session_id=session_id, new_message=content
+        ):
+            pass
+        if self._last_result is None:
+            self._last_result = await self._router.run_pipeline(
+                profile, progress=progress, seed=seed, seen_jobs=seen_jobs or []
+            )
+        return self._last_result
