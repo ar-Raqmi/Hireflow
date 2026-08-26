@@ -7,6 +7,7 @@ from collections import Counter
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from hireflow.agents.router import RouterAgent
@@ -212,6 +213,15 @@ def create_app(
 ) -> FastAPI:
     """App factory — injectable storage/agent; defaults to real ones."""
     api = FastAPI(title="Hireflow API", version="0.3.0")
+    api.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "https://hireflow-dun.vercel.app/",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     api.state.storage = storage or StorageFactory()
     api.state.agent = agent or _build_default_agent()
     api.state.parser = ResumeParser()
