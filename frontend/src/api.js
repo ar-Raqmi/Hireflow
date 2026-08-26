@@ -14,6 +14,9 @@ function resolveBase() {
 
 const BASE = resolveBase();
 
+console.log('Hireflow API BASE:', BASE);
+console.log('VITE_HIREFLOW_API:', import.meta.env.VITE_HIREFLOW_API);
+
 async function jsonRequest(res, context) {
   let body;
   try {

@@ -216,7 +216,7 @@ def create_app(
     api.add_middleware(
         CORSMiddleware,
         allow_origins=[
-            "https://hireflow-dun.vercel.app/",
+            "https://hireflow-pi-five.vercel.app/",
         ],
         allow_credentials=True,
         allow_methods=["*"],
