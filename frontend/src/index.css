@@ -165,11 +165,11 @@ m3e-icon { vertical-align: middle; }
 .ck[data-state='active'] .ck-status { color: var(--md-sys-color-primary); font-weight: 600; }
 .ck[data-state='failed'] .ck-status { color: var(--red); font-weight: 600; }
 .ck-detail { font-family: var(--fm); font-size: 12px; }
-.ck-feed { margin-top: 10px; background: #2a2115; border-radius: 12px; padding: 10px 14px; }
+.ck-feed { margin-top: 10px; background: #2a2115; border-radius: 12px; padding: 10px 14px; overflow: hidden; }
 .fls { display: grid; gap: 5px; }
 .fl { display: flex; gap: 12px; font: 400 11.5px/1.5 var(--fm); color: #d8cbb8; }
 .fl.err { color: #f0a9a0; }
-.fl .ts { color: #7a6950; flex: none; min-width: 5ch; }
+.fl .ts { color: #7a6950; flex: 1; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 
 .profile-strip { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
 .newresume { --m3e-button-font-size: 12px; margin-left: 4px; }
