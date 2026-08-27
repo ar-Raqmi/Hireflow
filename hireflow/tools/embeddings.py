@@ -14,7 +14,7 @@ class EmbeddingRanker:
     re-ranks only jobs that tie, using cosine similarity between the profile
     query and each job's title/description embedded via ``GeminiClient.embed``.
     If embeddings are unavailable (model not enabled, quota, error) it returns
-    ``None`` so the caller keeps the existing order — never fakes a vector.
+    ``None`` so the caller keeps the existing order - never fakes a vector.
     """
 
     def __init__(self, gemini: GeminiClient | None = None) -> None:

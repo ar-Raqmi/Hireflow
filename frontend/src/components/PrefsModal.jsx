@@ -12,8 +12,6 @@ const WORK_OPTIONS = [
   { value: 'any', label: 'Any', icon: 'public' },
 ];
 
-// PrefsModal — work-type + locations + target roles. Skippable ("Any").
-// Saved to localStorage; used as the /upload + /pipeline/run prefs.
 export default function PrefsModal({ open, initial, onSave, onSkip, onClose }) {
   const [workType, setWorkType] = useState((initial && initial.work_type) || 'any');
   const [locations, setLocations] = useState((initial && initial.locations) || []);
@@ -39,7 +37,7 @@ export default function PrefsModal({ open, initial, onSave, onSkip, onClose }) {
       <div className="pf-eyebrow">Before the agent runs</div>
       <h3 id="pfTitle">Tell Hireflow how to work</h3>
       <p className="pf-sub">
-        These preferences shape the search. You can skip — the agent will fall back to your résumé.
+        These preferences shape the search. You can skip - the agent will fall back to your résumé.
       </p>
 
       <div className="pf-q">Work type</div>

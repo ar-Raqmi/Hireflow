@@ -59,7 +59,7 @@ class GeminiClient:
     def _profile_prompt(text: str) -> str:
         return (
             "Parse this resume into a structured profile. "
-            "Residence means where the person lives (city, state/country) — not where they want to work. "
+            "Residence means where the person lives (city, state/country) - not where they want to work. "
             'Return ONLY JSON: {"name": str, "headline": str, "residence": str, "email": str, '
             '"skills": [str], "experience": [{"role": str, "company": str, "range": str}], '
             '"education": [{"degree": str, "school": str, "range": str}], "certs": [str], '
@@ -80,8 +80,8 @@ class GeminiClient:
         prompt = (
             "Audit this resume for ATS health. Parsed profile so far: "
             f"{json.dumps(parsed)}\n"
-            "Score overall health 0-100. Each finding: sev=error|warn|tip; type=fix (you can repair it — "
-            "give before/after text) or input (you need a value from the user — give field + placeholder); "
+            "Score overall health 0-100. Each finding: sev=error|warn|tip; type=fix (you can repair it - "
+            "give before/after text) or input (you need a value from the user - give field + placeholder); "
             "delta = health points recovered when resolved. "
             'Return ONLY JSON: {"health": int, "findings": [{"id": str, "sev": str, "type": str, '
             '"title": str, "area": str, "detail": str, "delta": int, "before": str|null, "after": str|null, '
@@ -108,7 +108,7 @@ class GeminiClient:
     async def embed(
         self, texts: list[str], model: str | None = None
     ) -> list[list[float]] | None:
-        """Embed texts via Vertex (real call). Returns None on any failure — never fakes.
+        """Embed texts via Vertex (real call). Returns None on any failure - never fakes.
 
         Uses ``SETTINGS.embedding_model`` (default ``gemini-embedding-001``)
         with a ``text-embedding-005`` retry, since availability varies per

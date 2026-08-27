@@ -12,8 +12,8 @@ class JapanDevSource(JobSource):
 
     Intended route: ``https://japan-dev.com/jobs?q=...`` SSR HTML carrying
     ``application/ld+json`` ``JobPosting`` nodes. As of 2026-08-23 the SSR
-    carries only WebSite/Organization JSON-LD — the actual job postings are
-    embedded in a client-side Nuxt state blob — so this source is a
+    carries only WebSite/Organization JSON-LD - the actual job postings are
+    embedded in a client-side Nuxt state blob - so this source is a
     best-effort tap: it walks any JSON-LD ``JobPosting`` found and otherwise
     degrades to ``[]``. Kept flag-gated (``USE_UNVERIFIED_SOURCES=1``) until a
     live-verified extraction path is confirmed. ``source="japan_dev"``.

@@ -5,9 +5,6 @@ import { M3eLoadingIndicator } from '@m3e/react/loading-indicator';
 import { uploadResume } from '../api.js';
 import M3eIcon from './M3eIcon.jsx';
 
-// ResumeDrop — the hero dropzone. Drag-drop or browse → uploads the file to
-// the REAL /upload endpoint (via uploadResume). Shows parsed fields returned
-// by the backend (skills, years, residence) once upload completes.
 export default function ResumeDrop({ onUploaded, onError, prefs }) {
   const inputRef = useRef(null);
   const abortRef = useRef(null);
@@ -53,7 +50,7 @@ export default function ResumeDrop({ onUploaded, onError, prefs }) {
         <M3eIcon name="upload_file" size={36} />
       </div>
       <div className="dz-title">Drop your résumé here</div>
-      <div className="dz-sub">PDF, DOCX or TXT — parsed &amp; audited by the live agent</div>
+      <div className="dz-sub">PDF, DOCX or TXT - parsed &amp; audited by the live agent</div>
       <M3eButton variant="tonal" className="browse" onClick={(e) => { e.stopPropagation(); inputRef.current && inputRef.current.click(); }}>
         browse files
       </M3eButton>

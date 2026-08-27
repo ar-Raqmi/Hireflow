@@ -19,7 +19,7 @@ class JsonLdSource(JobSource):
     Given a list of company career-page URLs, fetches each page, regexes out
     ``<script type="application/ld+json">`` blocks, and turns any
     ``JobPosting`` node into a ``JobPosting``. Pages without JSON-LD or that
-    block the request degrade to ``[]`` (recorded in ``last_error``) — a page
+    block the request degrade to ``[]`` (recorded in ``last_error``) - a page
     with no structured data simply contributes nothing.
 
     Scope is intentionally narrow: this is the "career page tap" layer for

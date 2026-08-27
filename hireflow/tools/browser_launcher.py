@@ -4,10 +4,6 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 
-# Rough location -> (IANA timezone, accept-language, locale). Derives a
-# realistic browser fingerprint from the user's preferred work location so a
-# hireflow user anywhere on earth looks like a local browser, not a fixed
-# Malaysia constant (AGENTS.md: never US-only / never one-region-only).
 _LOCATION_HINTS: dict[str, tuple[str, str, str]] = {
     "kuala lumpur": ("Asia/Kuala_Lumpur", "en-MY,ms-MY;q=0.9,en;q=0.8", "en-MY"),
     "selangor": ("Asia/Kuala_Lumpur", "en-MY,ms-MY;q=0.9,en;q=0.8", "en-MY"),
@@ -43,13 +39,11 @@ def _resolve_hint(locations: list[str] | None) -> tuple[str, str, str]:
 
 
 STEALTH_INIT_SCRIPT = r"""
-// Hide Playwright/automation signals so the browser looks like a normal user.
 Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
 window.chrome = window.chrome || { runtime: {} };
 Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
 Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
 Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
-// Fake a subtle "canvas/hardware" signal some anti-bot checks read.
 const origQuery = window.navigator.permissions && window.navigator.permissions.query;
 if (origQuery) {
   window.navigator.permissions.query = (parameters) =>
@@ -86,7 +80,7 @@ def stealth_context_kwargs(locations: list[str] | None = None) -> dict[str, Any]
 
     Falls back to a Malaysia default (the tool's origin market) when the
     location is unknown or empty. Only the request's *fingerprint* is derived
-    from the user's location — the outbound IP is always Cloud Run's egress.
+    from the user's location - the outbound IP is always Cloud Run's egress.
     """
     tz, accept_lang, locale = _resolve_hint(locations)
     return {

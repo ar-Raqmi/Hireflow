@@ -34,10 +34,10 @@ _DURATION_WORDS = frozenset(
     {"day", "days", "week", "weeks", "month", "months", "ago", "and", "listed", "posted"}
 )
 
-_SALARY_PAIR_PATTERN = r"(RM\s?[\d,]+\s?[–—-]\s?RM\s?[\d,]+\s?per month)"
+_SALARY_PAIR_PATTERN = r"(RM\s?[\d,]+\s?[–--]\s?RM\s?[\d,]+\s?per month)"
 _SALARY_ANY_PATTERN = (
     r"((?:RM|SGD|S\$|MYR|IDR|PHP|THB|VND|Rp|₱)\s?[\d,.]+\s?"
-    r"(?:[–—-]\s?(?:RM|SGD|S\$|MYR|IDR|PHP|THB|VND|Rp|₱)?\s?[\d,.]+\s?)?per month)"
+    r"(?:[–--]\s?(?:RM|SGD|S\$|MYR|IDR|PHP|THB|VND|Rp|₱)?\s?[\d,.]+\s?)?per month)"
 )
 _LISTED_SHORT_PATTERN = r"(\d+)\s*d\s+ago"
 _LISTED_LONG_PATTERN = r"Listed\s+((?:[a-z0-9]+\s+){1,4}ago)"
@@ -95,16 +95,16 @@ class JobStreetSource(JobSource):
     """Browser-rendered JobStreet search (Layer II, Cloudflare-guarded).
 
     JobStreet returns HTTP 403 to plain HTTP clients, so this source drives a
-    real headless Chromium through ``playwright.async_api`` — the only path
+    real headless Chromium through ``playwright.async_api`` - the only path
     that matches what a human browser sees. URL shape:
     ``https://{cc}.jobstreet.com/{role-slug}-jobs/in-{location-slug}`` with a
     per-country subdomain (my/sg/id/ph/th/vn). Cards are ``article`` elements;
     title/company/location/work-type/salary/listed-age are read from the DOM
     via one ``eval_on_selector_all`` pass. ToS-respect: low volume, personal
-    use — one page per run, hard-capped card count (``limit`` ≤20), no paging,
+    use - one page per run, hard-capped card count (``limit`` ≤20), no paging,
     no distributed crawling. Soft-fails everywhere (playwright missing,
     Chromium missing, 403/Cloudflare, timeout, no cards) by returning ``[]``
-    with ``last_error`` set — never raises into a pipeline run.
+    with ``last_error`` set - never raises into a pipeline run.
     """
 
     name = "jobstreet"

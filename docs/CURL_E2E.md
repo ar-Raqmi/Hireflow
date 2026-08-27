@@ -1,4 +1,4 @@
-# Hireflow — Online End-to-End (curl) Playbook
+# Hireflow - Online End-to-End (curl) Playbook
 
 > Rule (AGENTS.md §16): no local-only anything. Every milestone is proven with curl
 > against the **live Cloud Run URL**, with a real `.pdf` resume and the real Gemini
@@ -11,7 +11,7 @@ BASE_URL=https://hireflow-backend-296941301245.us-central1.run.app
 ```
 
 Redeploy note: the instance currently live returns `{"status":"ok"}` on `/health`
-but was built before the pipeline wiring AND the SSE streaming — its
+but was built before the pipeline wiring AND the SSE streaming - its
 `/pipeline/run` answers `agent_not_configured` and `/upload` answers
 `status:"stored"`. Upload this code, then the sequence below is the acceptance
 test for the redeploy.
@@ -57,7 +57,7 @@ curl -s -X POST "$BASE_URL/upload" \
 }
 ```
 
-- `skills` / `years_experience` are **not empty** — they come from the real
+- `skills` / `years_experience` are **not empty** - they come from the real
   Gemini parse (text-only normally; Gemini vision page-images when the PDF's
   extracted text is thin, or when `RESUME_PARSE_MODE=vision`).
 - HTTP 400 instead of this ⇒ either the extension is unsupported (only
@@ -71,11 +71,11 @@ Grab the `id` from the response:
 PROFILE_ID="<id from step 1>"
 ```
 
-## 2. Run the pipeline — async, SSE live progress (the centerpiece)
+## 2. Run the pipeline - async, SSE live progress (the centerpiece)
 
 The pipeline now runs **in the background**; `/pipeline/run` returns a `run_id`
 immediately, and a second endpoint streams Server-Sent Events showing each
-pipeline stage live. Pass the browser's seen-job list (`?seen=` — comma-separated
+pipeline stage live. Pass the browser's seen-job list (`?seen=` - comma-separated
 job ids the user already viewed, from client `localStorage`) so the agent
 de-duplicates across runs; `?seed=` rotates query/source order run-to-run:
 
@@ -98,21 +98,21 @@ Then stream the live progress:
 curl -N "$BASE_URL/pipeline/run/$RUN_ID/events"
 ```
 
-**Expected output (proves the agent is actually working — live terminal proof):**
+**Expected output (proves the agent is actually working - live terminal proof):**
 
 ```text
 event: started
 data: {"run_id":"<uuid>","status":"started"}
 
-data: {"seq":1,"stage":"parse","detail":"resume ready — 14 skills · 6.0 yrs · roles ['ML Engineer']","ts":...}
+data: {"seq":1,"stage":"parse","detail":"resume ready - 14 skills · 6.0 yrs · roles ['ML Engineer']","ts":...}
 
 data: {"seq":2,"stage":"audit","detail":"ATS health 72/100 · 3 findings","ts":...}
 
-data: {"seq":3,"stage":"search","detail":"freehire(Singapore,Kuala Lumpur,Tokyo): 12 found — queries: ['ML Engineer','Machine Learning Engineer','Deep Learning Engineer']","ts":...}
+data: {"seq":3,"stage":"search","detail":"freehire(Singapore,Kuala Lumpur,Tokyo): 12 found - queries: ['ML Engineer','Machine Learning Engineer','Deep Learning Engineer']","ts":...}
 
-data: {"seq":4,"stage":"search","detail":"remoteok: 9 found — queries: ['ML Engineer','Machine Learning Engineer']","ts":...}
+data: {"seq":4,"stage":"search","detail":"remoteok: 9 found - queries: ['ML Engineer','Machine Learning Engineer']","ts":...}
 
-data: {"seq":5,"stage":"search","detail":"remotive: 11 found — queries: ['ML Engineer','Machine Learning Engineer']","ts":...}
+data: {"seq":5,"stage":"search","detail":"remotive: 11 found - queries: ['ML Engineer','Machine Learning Engineer']","ts":...}
 
 data: {"seq":6,"stage":"match","detail":"scoring 10 jobs… 5/10 done (best so far: 87 Acme · ML Engineer)","ts":...}
 
@@ -136,7 +136,7 @@ data: {"profile_id":"<id>","run_id":"<uuid>","status":"completed","jobs_found":3
   - `applications` present for scores ≥ 60 (`drafted` for ≥ 80, `routed` for 60–79)
   - `drafts` contains a non-empty `cv` + `cover_letter` (Prepare stage ran)
 - Non-fatal source failures degrade to `errors` entries and are shown as
-  `search` stage events with `0 found` — never a 500.
+  `search` stage events with `0 found` - never a 500.
 
 ## 3. Read-back endpoints (proof of persistence)
 
@@ -161,7 +161,7 @@ curl -s -X POST "$BASE_URL/approve?application_id=$APP_ID"
 **Proves success:** `{"id":"<app-id>","status":"submitted","submitted_at":"...","ats_confirmation":"HFS-..."}`.
 Re-query `/applications` to see the same id now `"submitted"` with an
 `ats_confirmation` recorded via `/sandbox/ats/apply` (the sandbox ATS real-submit
-path — in-memory + best-effort `sandbox_ats.json`, no DB).
+path - in-memory + best-effort `sandbox_ats.json`, no DB).
 
 ---
 
@@ -177,27 +177,27 @@ python -m hireflow.cli ./real_resume.pdf \
   --url "$BASE_URL"
 ```
 
-Interactive mode (mirrors the frontend's prefs modal — work-type dialog first,
+Interactive mode (mirrors the frontend's prefs modal - work-type dialog first,
 then locations, then target roles, each skippable):
 
 ```bash
 python -m hireflow.cli ./real_resume.pdf --url "$BASE_URL"
 ```
 
-CLI prints the styled report **after streaming live per-stage progress** — each
+CLI prints the styled report **after streaming live per-stage progress** - each
 SSE event is printed with an elapsed clock (`[+12s] ▶ search …`), so you see the
 agent working before the final report renders.
 
 ## What each curl proves is REAL Gemini running on Google Cloud
 
-1. **Resume parse**: `/upload` returns non-empty `skills` + `years_experience` —
+1. **Resume parse**: `/upload` returns non-empty `skills` + `years_experience` -
    a real Gemini extraction (vision page-rendering when text is thin).
 2. **Live pipeline**: the SSE stream shows `match`/`research`/`prepare` stages
-   advancing in real time with company/job names — a stub could not produce
+   advancing in real time with company/job names - a stub could not produce
    varied 0–100 scores with per-job reasons.
 3. **Vertex AI**: `drafts` cv + cover letter are generated text.
 4. **Cloud Run dashboard** confirms `/dashboard` `jobs_found`/`applications`
-   grew — state changes via the exact HTTP surface the frontend will use.
+   grew - state changes via the exact HTTP surface the frontend will use.
 5. Record this terminal-to-cloudrun session for the demo video, with Vertex AI
    logs on screen.
 

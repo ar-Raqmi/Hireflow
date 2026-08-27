@@ -33,7 +33,7 @@ class InputPrefs:
 class HireflowCli:
     """Thin client for the deployed Hireflow backend.
 
-    Owns no pipeline logic — it uploads a resume and preferences to the API and
+    Owns no pipeline logic - it uploads a resume and preferences to the API and
     renders whatever the agent returns.
     """
 
@@ -94,7 +94,7 @@ class HireflowCli:
         return InputPrefs(work_type=work_type, locations=locations, target_roles=target_roles)
 
     def _prompt_work_type(self) -> str:
-        print("\n=== Work type (your gate — hard filter) ===")
+        print("\n=== Work type (your gate - hard filter) ===")
         while True:
             raw = input("remote | hybrid | onsite | any  [any]: ").strip().lower()
             if not raw:
@@ -241,7 +241,7 @@ class HireflowCli:
         apps = result.get("applications") or []
         targets = [app for app in apps if app.get("status") in {"drafted", "routed"}]
         if not targets:
-            print("\n  [approve] no drafted/routed application to submit — nothing sent.")
+            print("\n  [approve] no drafted/routed application to submit - nothing sent.")
             return result
         application_id = str(targets[0].get("id", ""))
         with httpx.Client(timeout=60) as client:
@@ -306,7 +306,7 @@ class HireflowCli:
             print("\n  NEEDS HUMAN")
             print("  " + "-" * 60)
             for item in needs_human:
-                print(f"   {item.get('company', '')} · {item.get('title', '')} — {item.get('reason', '')}")
+                print(f"   {item.get('company', '')} · {item.get('title', '')} - {item.get('reason', '')}")
 
         if errors:
             print("\n  SOURCE NOTES (non-fatal)")

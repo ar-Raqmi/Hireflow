@@ -227,7 +227,7 @@ class SearchAgent(BaseAgent):
 class MatchAgent(BaseAgent):
     """Scores jobs (0-100) against the profile across the five dimensions.
 
-    Uses ``GeminiClient.score_fit`` — the 5-dimension scoring prompt (skills,
+    Uses ``GeminiClient.score_fit`` - the 5-dimension scoring prompt (skills,
     experience, location, salary, culture). Emits per-job ``match`` progress.
     """
 
@@ -277,7 +277,7 @@ class MatchAgent(BaseAgent):
             ranked = None
         if ranked is None:
             await self._emit(
-                "match", "semantic re-rank off (embeddings unavailable — Gemini scores kept)"
+                "match", "semantic re-rank off (embeddings unavailable - Gemini scores kept)"
             )
             return
         order = {job.id: index for index, job in enumerate(ranked)}
@@ -455,7 +455,7 @@ class RouterAgent(BaseAgent):
 
         await self._emit(
             "parse",
-            f"resume ready — {len(profile.skills)} skills · "
+            f"resume ready - {len(profile.skills)} skills · "
             f"{profile.years_experience} yrs · roles {profile.target_roles or 'inferred'}",
         )
         await self._audit(profile, errors)
@@ -492,7 +492,7 @@ class RouterAgent(BaseAgent):
 
     async def _audit(self, profile: Profile, errors: list[str]) -> None:
         if not profile.resume_text:
-            await self._emit("audit", "no resume text to audit — skipping ATS check")
+            await self._emit("audit", "no resume text to audit - skipping ATS check")
             return
         try:
             audit = await self._gemini.audit_resume(profile.resume_text, profile)
@@ -607,7 +607,7 @@ class RouterAgent(BaseAgent):
                         "application_id": application.id,
                         "title": application.job.title,
                         "company": application.job.company,
-                        "reason": "salary range may fall below your floor — negotiate",
+                        "reason": "salary range may fall below your floor - negotiate",
                     }
                 )
 

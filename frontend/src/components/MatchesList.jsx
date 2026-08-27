@@ -15,7 +15,6 @@ const SORTS = [
   { key: 'date-old', label: 'Oldest first' },
 ];
 
-// sortMatches — client-side sort of the in-memory match list.
 function sortMatches(matches, sort) {
   const out = [...matches];
   const dateOf = (m) => (m.posted_at ? new Date(m.posted_at).getTime() : 0);
@@ -33,10 +32,6 @@ function sortMatches(matches, sort) {
   }
 }
 
-// MatchesList — the Results list. Each card shows the real score (M3E circular
-// indicator), rank, company, location, posting link, reasons + research, and
-// the drafted CV / cover letter (from the done payload `drafts`, keyed by
-// job_id). All filtering/sorting is client-side over the in-memory matches.
 export default function MatchesList({ matches = [], applications = [], drafts = {}, onError }) {
   const [sort, setSort] = useState('best');
   const [sources, setSources] = useState(null); // null = all
@@ -81,7 +76,7 @@ export default function MatchesList({ matches = [], applications = [], drafts = 
   }
 
   if (!matches || matches.length === 0) {
-    return <div className="nores on"><span>No matches yet — run the agent first.</span></div>;
+    return <div className="nores on"><span>No matches yet - run the agent first.</span></div>;
   }
 
   return (
@@ -137,7 +132,7 @@ export default function MatchesList({ matches = [], applications = [], drafts = 
               {m.reasons && m.reasons.length > 0 && (
                 <div className="jtake">
                   {m.reasons.map((r, j) => (
-                    <div key={j}>— {r}</div>
+                    <div key={j}>- {r}</div>
                   ))}
                 </div>
               )}
@@ -168,7 +163,7 @@ export default function MatchesList({ matches = [], applications = [], drafts = 
                   </div>
                   <h3>{m.title || 'Untitled role'}</h3>
                   <div className="meta">
-                    {m.company || '—'} {m.location ? `· ${m.location}` : ''}
+                    {m.company || '-'} {m.location ? `· ${m.location}` : ''}
                   </div>
                   <div className="jmeta">
                     {m.post_url && (

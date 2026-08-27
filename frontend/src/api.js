@@ -1,14 +1,8 @@
-// api.js — the single place the frontend talks to the REAL Hireflow backend.
-// Base URL: VITE_HIREFLOW_API (the deployed `.run.app` URL, no trailing slash).
-// When unset and served by the Vite dev server, `/api/...` is proxied to the
-// backend by vite.config.js. Every function returns real API data — nothing is
-// mocked or hardcoded.
 
 function resolveBase() {
   if (import.meta.env.VITE_HIREFLOW_API) {
     return import.meta.env.VITE_HIREFLOW_API.replace(/\/$/, '');
   }
-  // Dev server proxies /api -> backend (see vite.config.js proxy).
   return '/api';
 }
 
@@ -26,7 +20,7 @@ async function jsonRequest(res, context) {
   }
   if (!res.ok) {
     const detail = body && (body.detail || body.error || body.message);
-    const err = new Error(`${context}: ${res.status} ${res.statusText}${detail ? ` — ${detail}` : ''}`);
+    const err = new Error(`${context}: ${res.status} ${res.statusText}${detail ? ` - ${detail}` : ''}`);
     err.status = res.status;
     err.payload = body;
     throw err;
@@ -39,8 +33,6 @@ export async function health() {
   return jsonRequest(res, 'health check');
 }
 
-// upload — multipart resume file + preferences. Returns the parsed Profile.
-// Pass AbortSignal (via `signal`) to cancel the in-flight upload.
 export async function uploadResume({ file, work_type, locations, target_roles, salary_floor, signal }) {
   const form = new FormData();
   form.append('file', file);
@@ -52,7 +44,6 @@ export async function uploadResume({ file, work_type, locations, target_roles, s
   return jsonRequest(res, 'resume upload');
 }
 
-// startPipeline — POST /pipeline/run?profile_id=...&seed=...&seen=...
 export async function startPipeline(profileId, { seed = 0, seen = [] } = {}) {
   const qs = new URLSearchParams({ profile_id: profileId, seed: String(seed) });
   if (seen && seen.length) qs.set('seen', seen.join(','));
@@ -60,24 +51,16 @@ export async function startPipeline(profileId, { seed = 0, seen = [] } = {}) {
   return jsonRequest(res, 'start pipeline');
 }
 
-// fetchRunStatus — GET /pipeline/run/{runId} → {exists, done, status, result}.
-// Used on app mount to resume a run after a refresh.
 export async function fetchRunStatus(runId) {
   const res = await fetch(`${BASE}/pipeline/run/${encodeURIComponent(runId)}`);
   return jsonRequest(res, 'pipeline status');
 }
 
-// cancelPipeline — POST /pipeline/run/{runId}/cancel → stops the background
-// task so the backend stops doing work for an abandoned run.
 export async function cancelPipeline(runId) {
   const res = await fetch(`${BASE}/pipeline/run/${encodeURIComponent(runId)}/cancel`, { method: 'POST' });
   return jsonRequest(res, 'cancel pipeline');
 }
 
-// streamEvents — consume the SSE stream for a run. Calls onEvent(data) for
-// each `data:` line and onDone(result) on the final `event: done`. Handles
-// `id:` lines for resume via Last-Event-ID. Uses fetch + ReadableStream so it
-// works from both the dev proxy and the deployed origin.
 export async function streamEvents(runId, { onEvent, onDone, onError } = {}) {
   let lastId = 0;
   let done = false;

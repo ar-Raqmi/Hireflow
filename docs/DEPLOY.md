@@ -1,7 +1,7 @@
-# Hireflow — Cloud Run redeploy (for Izaaz)
+# Hireflow - Cloud Run redeploy (for Izaaz)
 
 Target: the **existing** Cloud Run service `hireflow-backend` in `us-central1`
-(project `hireflow-506207`) — the one already serving
+(project `hireflow-506207`) - the one already serving
 `https://hireflow-backend-296941301245.us-central1.run.app`. Redeploying updates
 it in place; the URL does not change. No secrets are needed on the command line
 (ADC / runtime SA handles Vertex auth).
@@ -35,12 +35,12 @@ gcloud run deploy hireflow-backend --region us-central1 --source . \
 - `--source .` builds the `Dockerfile` via Cloud Build. `.dockerignore`
   excludes `.env`, `API.md`, `*-credential.json`, `.venv`, etc. from the build
   context.
-- `--memory 1Gi --timeout 3600` — Chromium (Playwright) is installed in the
+- `--memory 1Gi --timeout 3600` - Chromium (Playwright) is installed in the
   image, and the pipeline streams SSE progress from a background task; the
   request must stay open while the client drains `/events`, so give it room
   (Cloud Run max is 3600s). Bump to `--memory 2G --cpu 2` under heavy Playwright
   load.
-- `RESUME_PARSE_MODE` — `hybrid` (default): Gemini text parse, upgraded to
+- `RESUME_PARSE_MODE` - `hybrid` (default): Gemini text parse, upgraded to
   Gemini **vision** page-images when the PDF's extracted text is thin;
   `vision`: always render PDF pages + Gemini vision; `text`: text-only parse.
 - Optional tuning (defaults are fine for the demo):

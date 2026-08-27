@@ -17,7 +17,7 @@ class CareerSourceAgent(BaseAgent):
     and returns the new jobs that were not already on the pipeline's job list.
     These are merged back into the pipeline so they compete with board jobs in
     scoring/preparation. A company with no parseable careers page contributes 0
-    jobs plus a source note — it never breaks a run. Jobs carry ``source``
+    jobs plus a source note - it never breaks a run. Jobs carry ``source``
     ``webfetch`` (with ``raw_data["webfetch_via"]`` = jsonld | ats | html).
     """
 

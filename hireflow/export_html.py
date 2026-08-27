@@ -62,7 +62,7 @@ class HtmlExporter:
     The output embeds all CSS inline (no CDN/fonts/scripts), is UTF-8, and never
     truncates anything: titles, URLs, reasons, research summaries, application
     rows and drafts all render in full, with every post_url as a real clickable
-    link. Pure stdlib — no backend or Gemini involvement.
+    link. Pure stdlib - no backend or Gemini involvement.
     """
 
     def export(self, result: dict[str, Any], out_path: str | Path) -> str:
@@ -243,7 +243,7 @@ class HtmlExporter:
                 "<li>"
                 f'<strong>{self._esc(item.get("company", ""))}</strong>'
                 f' · {self._esc(item.get("title", ""))}'
-                f' — {self._esc(item.get("reason", ""))}'
+                f' - {self._esc(item.get("reason", ""))}'
                 f' <code>({self._esc(item.get("application_id", ""))})</code>'
                 "</li>"
             )

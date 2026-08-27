@@ -49,12 +49,10 @@ m3e-icon { vertical-align: middle; }
 
 .app { display: flex; flex-direction: column; min-height: 100vh; }
 
-/* topbar */
 .topbar { display: flex; align-items: center; gap: 14px; padding: 22px 0 14px; flex-wrap: wrap; }
 .logo { font: 700 23px/1 var(--fd); letter-spacing: -0.02em; display: flex; align-items: center; gap: 4px; }
 .logo b { color: var(--ember); }
 
-/* view tabs (M3E tabs) */
 .viewtabs { display: flex; gap: 8px; margin-bottom: 18px; width: 100%; overflow: visible; }
 .vbadge {
   display: inline-grid; place-items: center; min-width: 18px; height: 18px; border-radius: 999px;
@@ -62,7 +60,6 @@ m3e-icon { vertical-align: middle; }
   margin-left: 6px; vertical-align: middle;
 }
 
-/* hero */
 .hero {
   background: var(--hero-ink); border-radius: 34px; padding: clamp(28px, 4.5vw, 50px);
   color: var(--cream); overflow: hidden;
@@ -75,7 +72,6 @@ m3e-icon { vertical-align: middle; }
 .hero h1 .accent { color: var(--ember-bright); font-weight: 800; }
 .hero .sub { margin-top: 18px; font: 400 clamp(15px, 1.4vw, 16.5px)/1.65 var(--fu); color: #cdbfaa; max-width: 46ch; }
 
-/* dropzone (custom — M3E has no dropzone) */
 .dz {
   position: relative; background: #221a0f; border: 1.5px dashed #63503a; border-radius: 30px 92px 30px 30px;
   min-height: 270px; padding: 24px; cursor: pointer;
@@ -111,12 +107,10 @@ m3e-icon { vertical-align: middle; }
 .parsed-summary .sk { font: 500 12px/1 var(--fm); }
 .parsed-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font: 400 12px/1.4 var(--fm); color: #b7a78e; }
 
-/* buttons */
 .runbtn { margin-top: 22px; }
 .runbtn m3e-icon.spin { animation: spin 1.2s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* console + timeline (custom markup, M3E progress bar) */
 .console { background: var(--surface); border: 1px solid var(--line); border-radius: 28px; margin-top: 20px; overflow: hidden; }
 .con-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 18px 24px 14px; }
 .con-title { font: 700 clamp(18px, 2vw, 21px)/1.2 var(--fd); display: flex; align-items: center; gap: 10px; }
@@ -176,18 +170,15 @@ m3e-icon { vertical-align: middle; }
 .fl.err { color: #f0a9a0; }
 .fl .ts { color: #7a6950; flex: none; min-width: 5ch; }
 
-/* profile strip */
 .profile-strip { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
 .hchip { font: 500 11.5px/1 var(--fm); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; background: var(--surface-low); color: var(--ink-soft); }
 
-/* results */
 .results { max-width: 1140px; margin: 8px auto 0; }
 .results-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .results h2 { font: 600 clamp(24px, 2.8vw, 31px)/1.15 var(--fd); letter-spacing: -0.02em; }
 .res-meta { font: 400 12px/1.5 var(--fm); color: var(--ink-soft); margin-top: 8px; }
 .head-actions { display: flex; align-items: center; gap: 10px; }
 
-/* risk banner + errors */
 .riskbanner {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap; border: 1.5px solid #e9c996;
   background: #fff4df; border-radius: 18px; padding: 14px 18px; margin-top: 18px;
@@ -198,7 +189,6 @@ m3e-icon { vertical-align: middle; }
 .rb-txt { flex: 1; min-width: 260px; font: 400 13px/1.6 var(--fu); color: #6e5b44; }
 .rb-txt b { color: var(--ink); }
 
-/* job cards */
 .joblist { margin-top: 18px; }
 .job-wrap { margin-bottom: 14px; }
 .job-wrap.in .job { animation: rise 0.65s var(--spring) both; animation-delay: var(--d, 0ms); }
@@ -211,14 +201,12 @@ m3e-icon { vertical-align: middle; }
 .job:hover { transform: translateY(-2px); box-shadow: 0 14px 34px -18px rgba(36, 27, 18, 0.35); border-color: #d8c4a8; }
 .job.featured { padding-block: 32px; border-radius: 30px; }
 
-/* results filter bar */
 .reslist { margin-top: 18px; }
 .filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 22px; margin-bottom: 6px; }
 .fgroup { display: flex; flex-direction: column; gap: 6px; min-width: 200px; }
 .flabel { font: 500 11px/1.4 var(--fm); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); }
 .fsort { width: 100%; }
 
-/* M3E circular score with the number centered inside */
 .score-cell { display: flex; flex: none; }
 .score-ring {
   --m3e-circular-flat-progress-indicator-diameter: 74px;
@@ -249,7 +237,6 @@ m3e-icon { vertical-align: middle; }
 .research span li { margin: 3px 0; }
 .research span strong { color: var(--ink); }
 
-/* collapsed detail body with expand/collapse */
 .detail { position: relative; max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.35s var(--spring), opacity 0.3s; }
 .detail.open { max-height: 360px; overflow-y: auto; opacity: 1; margin-top: 4px; }
 .morebtn { margin-top: 4px; --m3e-button-font-size: 12px; }
@@ -267,7 +254,6 @@ m3e-icon { vertical-align: middle; }
 .openbtn, .draftbtn { padding: 12px 16px; }
 .nores { border: 1.5px dashed var(--line); border-radius: 20px; padding: 28px; text-align: center; color: var(--ink-soft); font: 400 14.5px/1.5 var(--fu); margin-top: 18px; }
 
-/* prefs modal (content inside M3E dialog) */
 .pfmodal { width: min(540px, 92vw); }
 .pf-eyebrow { font: 600 11px/1.4 var(--fm); letter-spacing: 0.16em; text-transform: uppercase; color: var(--md-sys-color-primary); margin-bottom: 10px; }
 .pfmodal h3 { font: 600 26px/1.2 var(--fd); letter-spacing: -0.015em; margin: 0 0 0; }
@@ -281,7 +267,6 @@ m3e-icon { vertical-align: middle; }
 .pf-foot { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 22px; flex-wrap: wrap; }
 .pf-back { margin-right: auto; }
 
-/* history */
 .hcard { border: 1px solid var(--line); border-radius: 20px; background: var(--surface); padding: 20px 24px; margin-top: 14px; display: grid; gap: 12px; }
 .h-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .h-file { font: 600 16px/1.3 var(--fd); letter-spacing: -0.01em; }

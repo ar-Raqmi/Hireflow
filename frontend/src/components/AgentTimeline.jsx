@@ -13,22 +13,14 @@ const STAGE_META = {
   approve: { icon: 'how_to_reg', title: 'Awaiting approval' },
 };
 
-// AgentTimeline — renders the SSE live stages as a vertical timeline.
-// `events` is the ordered list of {seq, stage, detail} frames streamed from
-// the backend; `running` drives the translucent ring state.
 export default function AgentTimeline({ events = [], running = false, onCancel }) {
   const stages = Object.keys(STAGE_META);
   const seenSet = new Set(events.filter((e) => e && e.stage).map((e) => e.stage));
 
-  // For each stage, "reached" = this stage OR any later stage has been seen.
-  // The pipeline is sequential (parse→audit→search→match→…→approve), so seeing a
-  // later stage implies the earlier ones passed — even if the backend emits them
-  // slightly out of order.
   const reachedIdx = stages.reduce(
     (acc, s, i) => (seenSet.has(s) ? i : acc),
     -1,
   );
-  // Furthest index reached = the max index of any seen stage.
   let furthest = -1;
   stages.forEach((s, i) => { if (seenSet.has(s) && i > furthest) furthest = i; });
 

@@ -55,13 +55,13 @@ _COMPANY_STOPWORDS = {
 
 
 class WebFetchSource:
-    """Universal URL extractor — any URL becomes jobs, no domain whitelist.
+    """Universal URL extractor - any URL becomes jobs, no domain whitelist.
 
     Given any company/job page URL, tries, in order: schema.org ``JobPosting``
     JSON-LD (reusing ``JsonLdSource``), ATS board detection (Greenhouse / Lever /
     Ashby / Workable via their public unauthenticated APIs), then a tolerant
     generic HTML card parse (title / detail links / meta). Every step soft-fails
-    to ``[]`` with ``last_error`` set — a page that yields nothing never raises
+    to ``[]`` with ``last_error`` set - a page that yields nothing never raises
     and never sinks a run. ``source`` is ``webfetch``.
     """
 

@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 
 COPY hireflow ./hireflow
 
-# Deliberate runtime overrides. Everything else uses config.py defaults —
+# Deliberate runtime overrides. Everything else uses config.py defaults -
 # pass optional knobs (SEMANTIC_SEARCH, USE_UNVERIFIED_SOURCES, QUERY_EXPANSION,
 # JOB_RECENCY_DAYS, ...) at deploy time when you want them on.
 ENV GCP_PROJECT_ID="hireflow-506207"

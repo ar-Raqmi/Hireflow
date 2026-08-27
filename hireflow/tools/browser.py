@@ -21,7 +21,7 @@ class PlaywrightSource(JobSource):
     ``HIREFLOW_PLAYWRIGHT=1``; when disabled it is a no-op returning ``[]`` with
     ``last_error`` set. Parses any ``application/ld+json`` ``JobPosting`` nodes
     the page renders (the common SPA pattern) and falls back to one row per
-    page when there are none. Soft-fails at every step — a missing Chromium, a
+    page when there are none. Soft-fails at every step - a missing Chromium, a
     failed navigation or a refused connection never sinks a run. Personal-use,
     low volume; respect each site's terms of service and robots.txt. Never a
     brute-force scraper.

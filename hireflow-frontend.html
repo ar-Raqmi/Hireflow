@@ -1,10 +1,9 @@
 <!DOCTYPE html>
-<!-- HIREFLOW v0.6 — prefs gate (work type + locations) · run history · tabs -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hireflow — the job hunt, running itself</title>
+<title>Hireflow - the job hunt, running itself</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='16' fill='%238F4100'/><path d='M20 16v32M20 30c9-9 15-7 15 5v13' stroke='%23F7EFE3' stroke-width='7' stroke-linecap='round' fill='none'/><circle cx='45' cy='45' r='8' fill='%23FFA45C'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,7 +24,6 @@ button{font-family:var(--fu)}
 .mono{font-family:var(--fm);font-variant-numeric:tabular-nums}
 md-icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;direction:ltr;-webkit-font-smoothing:antialiased;font-size:18px;font-variation-settings:'FILL' 0,'wght' 500,'GRAD' 0,'opsz' 24;opacity:0;transition:opacity .25s ease .05s}
 .fonts-ready md-icon{opacity:1}
-/* topbar */
 .topbar{display:flex;align-items:center;gap:14px;padding:22px 0 14px;flex-wrap:wrap}
 .logo{font:700 23px/1 var(--fd);letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
 .logo b{color:var(--ember)}
@@ -71,7 +69,6 @@ md-icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:nor
 .hi-gray{background:#EFE7D8;color:var(--ink-soft)}
 .sc-name{font:600 14.5px/1.3 var(--fu);margin-top:6px;display:block}
 .sc-desc{font:400 12px/1.5 var(--fu);color:var(--ink-soft);margin-top:3px;display:block}
-/* view tabs */
 .viewtabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
 .vtab{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:10px 16px;font:600 13px/1 var(--fu);color:var(--ink-soft);cursor:pointer;transition:background .2s,color .2s,border-color .2s}
 .vtab:hover:not(:disabled):not(.active){border-color:#CBB495;color:var(--ink)}
@@ -81,7 +78,6 @@ md-icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:nor
 .vbadge{display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:999px;background:var(--ember);color:#fff;font:600 10px/1 var(--fm);padding:0 5px}
 .vtab.active .vbadge{background:var(--ember-bright);color:#241C12}
 .vbadge[hidden]{display:none}
-/* hero + dropzone */
 .hero{background:var(--hero-ink);border-radius:34px;padding:clamp(28px,4.5vw,50px);color:var(--cream);--md-sys-color-primary:var(--ember-bright);--md-sys-color-on-primary:#241C12;overflow:hidden;transition:max-height .55s var(--ease),opacity .35s var(--ease),padding .55s var(--ease)}
 .hero.gone{max-height:0!important;opacity:0;padding-top:0!important;padding-bottom:0!important;pointer-events:none;border-radius:20px}
 .hero-grid{display:grid;grid-template-columns:1.04fr .96fr;gap:clamp(28px,4vw,56px);align-items:center}
@@ -115,7 +111,6 @@ md-icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:nor
 .uprow md-linear-progress{flex:1}
 .uplabel{display:inline-flex;align-items:center;gap:6px;font:400 12px/1 var(--fm);color:#B7A78E;white-space:nowrap}
 .uplabel md-icon{font-size:14px;color:#8FCB9B}
-/* console + timeline */
 .console{background:var(--surface);border:1px solid var(--line);border-radius:28px;margin-top:20px;overflow:hidden}
 .con-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:18px 24px 14px}
 .con-title{font:700 clamp(18px,2vw,21px)/1.2 var(--fd);display:flex;align-items:center;gap:10px}
@@ -190,7 +185,6 @@ md-icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:nor
 .fl .ts{color:#7A6950;flex:none;min-width:5ch}
 .fl.ok{color:#9ADFA6}
 .fl.err{color:#F0A9A0}
-/* panel content */
 .fadeitem{opacity:0;transform:translateY(8px);transition:opacity .4s var(--ease),transform .4s var(--ease)}
 .fadeitem.in{opacity:1;transform:none}
 @keyframes pin{from{opacity:0;transform:translateY(8px)}}
@@ -221,7 +215,6 @@ md-icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:nor
 .pf-tips li{font:400 12.5px/1.5 var(--fu);color:#6E5B44;display:flex;gap:8px}
 .pf-tips li::before{content:'→';color:var(--red);font-family:var(--fm)}
 .pf-btns{display:flex;gap:8px;flex-wrap:wrap}
-/* audit */
 .audit-top{display:flex;gap:20px;align-items:center;margin:12px 0 16px;flex-wrap:wrap}
 .dial{position:relative;width:96px;height:96px;flex:none}
 .dial svg{width:100%;height:100%;transform:rotate(-90deg)}
@@ -267,7 +260,6 @@ md-icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:nor
 .f-add{--md-filled-tonal-button-container-height:38px}
 .added-val{display:inline-flex;align-items:center;gap:6px;margin-top:10px;background:var(--leaf-container);color:var(--leaf-deep);border-radius:999px;padding:7px 13px;font:500 12.5px/1.3 var(--fu)}
 .added-val md-icon{font-size:16px}
-/* gate */
 .gate{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1.5px solid #E9CE96;background:#FFF6E3;border-radius:18px;padding:16px 18px;margin-top:14px;animation:pin .45s var(--spring)}
 .gate.high{border-color:#F0C4B4;background:#FFEDE6}
 .gate-ic{width:44px;height:44px;border-radius:50%;background:var(--amber-container);display:grid;place-items:center;flex:none}
@@ -280,7 +272,6 @@ md-icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:nor
 .gate-txt p b{color:var(--ink)}
 .gate-btns{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto;--md-filled-button-container-height:40px;--md-text-button-container-height:40px}
 .as-is-btn{--md-filled-tonal-button-container-color:#FFEFC7;--md-filled-tonal-button-label-text-color:#7A5600;--md-filled-tonal-button-icon-color:#7A5600;--md-filled-tonal-button-container-height:40px}
-/* search / rank / tailor / done */
 .flt{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 14px}
 .srcrow{display:grid;grid-template-columns:36px 1fr auto 130px;gap:12px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line-soft)}
 .srcrow:last-of-type{border-bottom:0}
@@ -335,7 +326,6 @@ md-icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:nor
 .rtile.amber b{color:var(--amber)}
 .rtile span{font:500 10px/1.5 var(--fm);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);display:block;margin-top:6px}
 .done-cta{display:flex;gap:10px;flex-wrap:wrap}
-/* results */
 .results{max-width:1140px;margin:8px auto 0;padding:0 clamp(16px,4vw,32px);opacity:0;transform:translateY(18px)}
 .results.in{opacity:1;transform:none;transition:opacity .6s var(--ease),transform .6s var(--spring)}
 .results-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
@@ -401,7 +391,6 @@ md-icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:nor
 .nores{display:none;border:1.5px dashed var(--line);border-radius:20px;padding:28px;text-align:center;color:var(--ink-soft);font:400 14.5px/1.5 var(--fu)}
 .nores.on{display:block}
 .sending{display:inline-flex;align-items:center;gap:9px}
-/* prefs modal */
 .pfscrim{z-index:142}
 .pfmodal{width:min(540px,92vw);z-index:143;padding:28px 28px 24px}
 .pf-eyebrow{font:600 11px/1.4 var(--fm);letter-spacing:.16em;text-transform:uppercase;color:var(--ember);margin-bottom:10px}
@@ -427,7 +416,6 @@ md-icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:nor
 #pfHome{margin-left:auto}
 .pf-foot{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:22px;flex-wrap:wrap}
 .pf-back{margin-right:auto}
-/* history */
 .hcard{border:1px solid var(--line);border-radius:20px;background:var(--surface);padding:20px 24px;margin-top:14px;display:grid;gap:12px;transition:transform .25s var(--spring),box-shadow .25s}
 .hcard:hover{transform:translateY(-2px);box-shadow:0 14px 34px -18px rgba(36,27,18,.35)}
 .h-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -444,7 +432,6 @@ md-icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:nor
 .hempty b{display:block;font:600 16px/1.4 var(--fu);color:var(--ink);margin:10px 0 4px}
 .sortbtn.armed{border-color:var(--red);color:var(--red);background:var(--red-container)}
 .sortbtn.armed md-icon{color:var(--red)}
-/* toast + dialogs */
 .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,18px);display:flex;align-items:center;gap:6px;background:#241C12;color:var(--cream);border-radius:16px;padding:10px 12px 12px 16px;box-shadow:0 18px 44px -14px rgba(20,14,6,.55);opacity:0;pointer-events:none;transition:.35s var(--spring);z-index:150;max-width:min(92vw,560px);overflow:hidden;--md-sys-color-primary:#FFB87C}
 .toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
 .toast>md-icon{color:var(--ember-bright);font-size:22px;flex:none}
@@ -494,7 +481,6 @@ md-icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:nor
 .cf-body{font:400 13px/1.65 var(--fu);color:#6E5B44;margin-top:10px}
 .cf-btns{display:flex;justify-content:flex-end;gap:8px;width:100%;margin-top:22px;flex-wrap:wrap}
 footer{max-width:1140px;margin:48px auto 26px;padding:0 clamp(16px,4vw,32px);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font:400 11px/1.6 var(--fm);color:#9A8970}
-/* responsive */
 @media(max-width:960px){.hero-grid{grid-template-columns:1fr}.dz{min-height:220px}.dz-inner{min-height:180px}.pc-grid{grid-template-columns:1fr}.con-stats{margin-left:0;width:100%}}
 @media(max-width:760px){.job{grid-template-columns:auto 1fr}.act{grid-column:1/-1;flex-direction:row;align-items:center;gap:14px;width:100%}.act .hint{margin-left:auto;text-align:right;max-width:150px}.wm{display:none}.results-head{flex-direction:column;align-items:flex-start}.m-pad{padding:0 20px 10px}.erow{grid-template-columns:1fr;gap:4px}.erow md-icon{display:none}.srcrow{grid-template-columns:36px 1fr auto}.src-state{grid-column:2/-1;justify-content:flex-start;min-width:0}.gate-btns{margin-left:0;width:100%}}
 @media(max-width:560px){.ck{grid-template-columns:38px 1fr;column-gap:12px}.ck-node{width:38px;height:38px;border-radius:13px}.ck-node md-icon{font-size:16px}.tl{padding:6px 16px 16px}.segbar{padding:2px 16px 12px}.ck-title{font-size:16px}.top-actions{width:100%;justify-content:flex-end}.pfmodal{padding:22px 20px 20px}}
@@ -527,21 +513,21 @@ footer{max-width:1140px;margin:48px auto 26px;padding:0 clamp(16px,4vw,32px);dis
         <div>
           <div class="eyebrow">Autonomous job-search agent</div>
           <h1>The job hunt,<br><span class="accent">running itself.</span></h1>
-          <p class="sub">Drop in a résumé and Hireflow takes it from there — parsing, <b>auditing &amp; fixing</b>, searching, ranking and tailoring. If the résumé needs work, it stops and asks you first.</p>
+          <p class="sub">Drop in a résumé and Hireflow takes it from there - parsing, <b>auditing &amp; fixing</b>, searching, ranking and tailoring. If the résumé needs work, it stops and asks you first.</p>
         </div>
         <div class="dz" id="dz" role="button" tabindex="0" aria-label="Drop your résumé here or press Enter to browse files">
           <div class="dz-inner">
             <div class="dz-empty">
               <div class="dz-badge"><md-icon>upload_file</md-icon></div>
               <div class="dz-title">Drop your résumé here</div>
-              <div class="dz-sub">PDF, DOCX or TXT — parsed &amp; audited right here in your browser</div>
+              <div class="dz-sub">PDF, DOCX or TXT - parsed &amp; audited right here in your browser</div>
               <md-text-button id="browseBtn"><md-icon slot="icon">folder_open</md-icon>or browse files</md-text-button>
               <div class="dz-note">nothing leaves this machine</div>
             </div>
             <div class="dz-file">
               <div class="file-row">
                 <div class="file-ic"><md-icon>description</md-icon></div>
-                <div><div class="file-name" id="fName">resume.pdf</div><div class="file-sub" id="fSize">—</div></div>
+                <div><div class="file-name" id="fName">resume.pdf</div><div class="file-sub" id="fSize">-</div></div>
                 <div class="file-btns"><md-text-button id="fReplace">Replace</md-text-button><md-icon-button id="fRemove" aria-label="Remove résumé"><md-icon>close</md-icon></md-icon-button></div>
               </div>
               <div class="uprow"><md-linear-progress id="upBar" value="0" aria-label="Upload progress"></md-linear-progress><span class="uplabel" id="upLabel">uploading…</span></div>
@@ -598,11 +584,11 @@ footer{max-width:1140px;margin:48px auto 26px;padding:0 clamp(16px,4vw,32px);dis
       <div class="head-actions"><button class="sortbtn" id="histClear"><md-icon>delete</md-icon>Clear history</button></div>
     </div>
     <div id="histList"></div>
-    <div class="hempty" id="histEmpty" hidden><md-icon>history</md-icon><b>Past runs will appear here</b>Run a test scenario or drop a résumé — every completed run lands here, saved locally on this device.</div>
+    <div class="hempty" id="histEmpty" hidden><md-icon>history</md-icon><b>Past runs will appear here</b>Run a test scenario or drop a résumé - every completed run lands here, saved locally on this device.</div>
   </section>
 </div>
 </main>
-<footer><span>hireflow v0.6 — UI prototype</span><span>all data mocked · runs 100% locally</span></footer>
+<footer><span>hireflow v0.6 - UI prototype</span><span>all data mocked · runs 100% locally</span></footer>
 <div class="toast" id="toast" role="status"><md-icon id="toastIcon">auto_awesome</md-icon><span id="toastText"></span><md-text-button id="toastAct"></md-text-button><i class="toastbar"></i></div>
 <div class="scrim" id="scrim"></div>
 <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
@@ -616,7 +602,7 @@ footer{max-width:1140px;margin:48px auto 26px;padding:0 clamp(16px,4vw,32px);dis
     </div>
     <div class="m-sec"><div class="sec-h"><md-icon>auto_awesome</md-icon>The agent&rsquo;s take</div><p class="take" id="mTake"></p></div>
     <div class="m-sec"><div class="sec-h"><md-icon>warning</md-icon>Watch-outs</div><div class="watch" id="mWatch"></div></div>
-    <div class="m-sec"><div class="sec-h"><md-icon>fact_check</md-icon>Fit evidence — posting vs. your résumé</div><div class="evi" id="mEvi"></div></div>
+    <div class="m-sec"><div class="sec-h"><md-icon>fact_check</md-icon>Fit evidence - posting vs. your résumé</div><div class="evi" id="mEvi"></div></div>
     <div class="m-sec"><div class="sec-h"><md-icon>edit_note</md-icon>Tailored for this role</div>
       <div class="tdiff"><div class="ba"><span>before</span><div class="before" id="mTaughtB"></div></div><div class="ba"><span>after</span><div class="after" id="mTaughtA"></div></div></div>
       <div class="tcover" id="mCover"></div>
@@ -639,18 +625,16 @@ footer{max-width:1140px;margin:48px auto 26px;padding:0 clamp(16px,4vw,32px);dis
 <script type="module">
 const sources=['https://cdn.jsdelivr.net/npm/@material/web@2.3.0/all.js/+esm'];
 for(const src of sources){try{await import(src);if(customElements.get('md-filled-button'))break;}catch(e){}}
-if(!customElements.get('md-filled-button'))console.warn && console.warn('Material Web components did not load — buttons may render unstyled.');
+if(!customElements.get('md-filled-button'))console.warn && console.warn('Material Web components did not load - buttons may render unstyled.');
 </script>
 <script>
 (function(){'use strict';
-console.log('%cHireflow v0.6 — script loaded OK','background:#8F4100;color:#FFDCC2;padding:3px 8px;border-radius:4px;font-weight:bold');
+console.log('%cHireflow v0.6 - script loaded OK','background:#8F4100;color:#FFDCC2;padding:3px 8px;border-radius:4px;font-weight:bold');
 document.fonts.load('20px "Material Symbols Rounded"').then(()=>document.documentElement.classList.add('fonts-ready'));
 setTimeout(()=>document.documentElement.classList.add('fonts-ready'),2500);
-/* helpers */
 const $=(s,c=document)=>c.querySelector(s),$$=(s,c=document)=>[...c.querySelectorAll(s)],sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'),fmt=n=>n.toLocaleString('en-US');
 const on=(s,ev,fn)=>{const el=$(s);if(el)el.addEventListener(ev,fn)};
-/* ---------- preferences + history (localStorage) ---------- */
 const PREFS_KEY='hireflow.prefs.v1',HIST_KEY='hireflow.history.v1';
 const WT_LABEL={remote:'Remote',onsite:'On-site',hybrid:'Hybrid',any:'Any'};
 const WT_SHORT={remote:'remote-only',onsite:'on-site-only',hybrid:'hybrid-only',any:'any work type'};
@@ -667,32 +651,28 @@ function prefsSummary(){const p=[];if(state.workType!=='any')p.push(WT_LABEL[sta
 function prefsFeedStr(){const p=[];if(state.workType!=='any')p.push(WT_SHORT[state.workType]);state.locations.forEach(l=>p.push(l));return p.length?p.join(' · '):'no constraints';}
 function updatePrefsChip(){const c=$('#prefsChip');if(!c)return;c.hidden=false;$('#prefsChipTxt').textContent=prefsSummary();}
 function relTs(ts){const d=Date.now()-ts;if(d<60e3)return'just now';if(d<3600e3)return Math.floor(d/60e3)+'m ago';if(d<86400e3)return Math.floor(d/3600e3)+'h ago';if(d<7*86400e3)return Math.floor(d/86400e3)+'d ago';return new Date(ts).toLocaleDateString();}
-/* ---------- agent-side mock data ---------- */
 const mockData={pipelineSteps:[{id:'parsed',label:'Parsing Resume'},{id:'audit',label:'Résumé Audit'},{id:'searching',label:'Searching Jobs'},{id:'ranking',label:'Ranking Matches'},{id:'tailoring',label:'Tailoring Materials'},{id:'done',label:'Ready!'}],
 STEP_ICON:{parsed:'description',audit:'health_and_safety',searching:'search',ranking:'leaderboard',tailoring:'edit_note',done:'check'},
 searchSources:[{name:'LinkedIn',icon:'work',postings:412,dur:'3.1s'},{name:'Indeed',icon:'rss_feed',postings:268,dur:'2.2s'},{name:'Company boards',icon:'corporate_fare',postings:389,dur:'3.8s'},{name:'HN “Who’s Hiring”',icon:'tag',postings:147,dur:'1.7s'},{name:'Otta',icon:'bolt',postings:68,dur:'1.2s'}],
 searchFilters:['Remote-friendly','Senior (L5+)','Full-time','Backend / infra','TC ≥ $160k'],
 funnel:[{label:'raw postings',n:1284,w:100},{label:'after dedupe',n:903,w:70},{label:'filters applied',n:214,w:19},{label:'plausible fits',n:37,w:7}],
-scanLines:['scan · Senior Platform Engineer — Cloudflare','scan · Staff SRE (Rust) — Netflix','dedupe · 381 duplicate postings merged','scan · Lead Engineer, Payments — Stripe','hard filter · constraints → 214 remain','scan · Staff Engineer, Feed Ranking — Meta'],
+scanLines:['scan · Senior Platform Engineer - Cloudflare','scan · Staff SRE (Rust) - Netflix','dedupe · 381 duplicate postings merged','scan · Lead Engineer, Payments - Stripe','hard filter · constraints → 214 remain','scan · Staff Engineer, Feed Ranking - Meta'],
 ranking:[{company:'Google',title:'Senior Software Engineer',score:92,verdict:'match',workType:'remote'},{company:'Stripe',title:'Lead Engineer',score:88,verdict:'match',workType:'onsite'},{company:'Meta',title:'Staff Engineer',score:85,verdict:'match',workType:'remote'},{company:'Netflix',title:'Staff SRE',score:71,verdict:'pass',reason:'Requires production Rust',workType:'remote'},{company:'Airbnb',title:'Senior Backend Engineer',score:64,verdict:'pass',reason:'Scope reads mid-level',workType:'onsite'},{company:'Amazon',title:'Sr. SDE, Core',score:61,verdict:'pass',reason:'10+ yrs required (you: 7)',workType:'onsite'},{company:'Datadog',title:'Staff Engineer',score:58,verdict:'pass',reason:'Seattle on-site',workType:'onsite'},{company:'Figma',title:'Sr. Platform Engineer',score:55,verdict:'pass',reason:'Design-infra stack mismatch',workType:'onsite'}],
 jobMatches:[
-{id:1,title:"Senior Software Engineer",company:"Google",location:"Remote (US)",score:92,workType:'remote',salary:"$198k–$243k + equity",posted:"2d ago",applicants:"Under 20 applicants",type:"Full-time",fitReasons:["Skills Match","Remote","Senior Level"],breakdown:{'Skills overlap':95,'Seniority':90,'Location':100,'Growth':74},agentTake:"Your Kafka and Go years at Northwind map almost one-to-one onto this storage-infrastructure posting — the “own services end-to-end” line is your on-call story, verbatim. The one stretch is their petabyte-tier scale; lead with the 2.1B events/day pipeline and it stops being a question.",watchOuts:["3 of 5 interview rounds are system design","Team of 12 — expect deep, not broad, infra questions","Rarely open to remote in this org — apply early"],evidence:[["Own services end-to-end","Ran 14 microservices with on-call ownership at Northwind"],["Kafka pipelines at scale","Built the 2.1B events/day ingestion pipeline (2023)"],["Go + distributed systems","Go primary language since 2019; gRPC everywhere"]],tailored:{before:"Full-stack engineer with 7 years building web applications. Comfortable across the stack with React, Go and AWS.",after:"Infrastructure engineer running <b>Go services at 2.1B events/day with on-call ownership</b> — targeting <b>storage-infrastructure</b> roles at petabyte scale.",cover:"Your posting reads like my last two years wrote it — I ran the exact Kafka-to-storage pipeline pattern your Storage Infra team owns, at 2.1B events/day, and I’ve carried the pager for it…"}},
-{id:2,title:"Lead Engineer",company:"Stripe",location:"San Francisco, CA",score:88,workType:'onsite',salary:"$215k–$265k + equity",posted:"5d ago",applicants:"~120 applicants",type:"Full-time",fitReasons:["Skills Match","Culture Fit"],breakdown:{'Skills overlap':88,'Seniority':92,'Location':45,'Growth':81},agentTake:"The best seniority signal of the three — your incident-command experience is literally what payments-reliability leads do all day. The catch is geography: on-site 3 days in SF. The agent kept the score high because the posting explicitly mentions a relocation package.",watchOuts:["On-site 3 days/week — San Francisco","Lead role: expect people-management questions","Payments domain depth probed in round 1"],evidence:[["Reliability leadership","Incident commander for revenue-critical pipelines, 3 yrs"],["Payments-adjacent scale","Processed $40M/yr billing pipeline at Vantage"],["Mentoring","Onboarded 5 engineers; ran Northwind’s Go guild"]],tailored:{before:"Full-stack engineer with 7 years building web applications. Comfortable across the stack with React, Go and AWS.",after:"Systems engineer with <b>incident-command experience on payment-critical pipelines — 99.99% uptime over 3 years</b> — seeking <b>reliability leadership</b>.",cover:"I’ve been the on-call incident commander for pipelines where a dropped event meant lost revenue — that’s the reliability muscle your Payments team is hiring, and it’s a muscle I’d bring on day one…"}},
-{id:3,title:"Staff Engineer",company:"Meta",location:"Remote (US)",score:85,workType:'remote',salary:"$240k–$290k",posted:"1d ago",applicants:"200+ applicants",type:"Full-time",fitReasons:["Skills Match","Growth Potential"],breakdown:{'Skills overlap':82,'Seniority':84,'Location':100,'Growth':77},agentTake:"The title says Staff — a level jump. The agent ranked it high because your scale numbers clear their published bar, but the loop will test design leadership you haven’t formally held. It’s also the newest posting of the three: apply early to beat the 200-strong pile.",watchOuts:["Level jump L5 → Staff; design-leadership bar is real","200+ applicants — speed matters","Return-to-team matching adds uncertainty"],evidence:[["Scale beyond 1B events/day","2.1B/day pipeline; 40-node Kafka cluster ops"],["Cross-team influence","Led the migration of 6 teams onto shared gRPC contracts"],["Design ownership","Authored Northwind’s infra RFC process (adopted org-wide)"]],tailored:{before:"Full-stack engineer with 7 years building web applications. Comfortable across the stack with React, Go and AWS.",after:"Distributed-systems engineer scaling <b>feed-like pipelines to 2B+ events/day</b>, ready for <b>Staff-level design ownership</b>.",cover:"Scale has been the constant of my career — 2B events/day at Northwind taught me the exact failure modes your Feed Ranking infra lives with, and I’ve written the RFCs to fix a few of them…"}}]};
-/* ---------- résumé-side scenarios ---------- */
+{id:1,title:"Senior Software Engineer",company:"Google",location:"Remote (US)",score:92,workType:'remote',salary:"$198k–$243k + equity",posted:"2d ago",applicants:"Under 20 applicants",type:"Full-time",fitReasons:["Skills Match","Remote","Senior Level"],breakdown:{'Skills overlap':95,'Seniority':90,'Location':100,'Growth':74},agentTake:"Your Kafka and Go years at Northwind map almost one-to-one onto this storage-infrastructure posting - the “own services end-to-end” line is your on-call story, verbatim. The one stretch is their petabyte-tier scale; lead with the 2.1B events/day pipeline and it stops being a question.",watchOuts:["3 of 5 interview rounds are system design","Team of 12 - expect deep, not broad, infra questions","Rarely open to remote in this org - apply early"],evidence:[["Own services end-to-end","Ran 14 microservices with on-call ownership at Northwind"],["Kafka pipelines at scale","Built the 2.1B events/day ingestion pipeline (2023)"],["Go + distributed systems","Go primary language since 2019; gRPC everywhere"]],tailored:{before:"Full-stack engineer with 7 years building web applications. Comfortable across the stack with React, Go and AWS.",after:"Infrastructure engineer running <b>Go services at 2.1B events/day with on-call ownership</b> - targeting <b>storage-infrastructure</b> roles at petabyte scale.",cover:"Your posting reads like my last two years wrote it - I ran the exact Kafka-to-storage pipeline pattern your Storage Infra team owns, at 2.1B events/day, and I’ve carried the pager for it…"}},
+{id:2,title:"Lead Engineer",company:"Stripe",location:"San Francisco, CA",score:88,workType:'onsite',salary:"$215k–$265k + equity",posted:"5d ago",applicants:"~120 applicants",type:"Full-time",fitReasons:["Skills Match","Culture Fit"],breakdown:{'Skills overlap':88,'Seniority':92,'Location':45,'Growth':81},agentTake:"The best seniority signal of the three - your incident-command experience is literally what payments-reliability leads do all day. The catch is geography: on-site 3 days in SF. The agent kept the score high because the posting explicitly mentions a relocation package.",watchOuts:["On-site 3 days/week - San Francisco","Lead role: expect people-management questions","Payments domain depth probed in round 1"],evidence:[["Reliability leadership","Incident commander for revenue-critical pipelines, 3 yrs"],["Payments-adjacent scale","Processed $40M/yr billing pipeline at Vantage"],["Mentoring","Onboarded 5 engineers; ran Northwind’s Go guild"]],tailored:{before:"Full-stack engineer with 7 years building web applications. Comfortable across the stack with React, Go and AWS.",after:"Systems engineer with <b>incident-command experience on payment-critical pipelines - 99.99% uptime over 3 years</b> - seeking <b>reliability leadership</b>.",cover:"I’ve been the on-call incident commander for pipelines where a dropped event meant lost revenue - that’s the reliability muscle your Payments team is hiring, and it’s a muscle I’d bring on day one…"}},
+{id:3,title:"Staff Engineer",company:"Meta",location:"Remote (US)",score:85,workType:'remote',salary:"$240k–$290k",posted:"1d ago",applicants:"200+ applicants",type:"Full-time",fitReasons:["Skills Match","Growth Potential"],breakdown:{'Skills overlap':82,'Seniority':84,'Location':100,'Growth':77},agentTake:"The title says Staff - a level jump. The agent ranked it high because your scale numbers clear their published bar, but the loop will test design leadership you haven’t formally held. It’s also the newest posting of the three: apply early to beat the 200-strong pile.",watchOuts:["Level jump L5 → Staff; design-leadership bar is real","200+ applicants - speed matters","Return-to-team matching adds uncertainty"],evidence:[["Scale beyond 1B events/day","2.1B/day pipeline; 40-node Kafka cluster ops"],["Cross-team influence","Led the migration of 6 teams onto shared gRPC contracts"],["Design ownership","Authored Northwind’s infra RFC process (adopted org-wide)"]],tailored:{before:"Full-stack engineer with 7 years building web applications. Comfortable across the stack with React, Go and AWS.",after:"Distributed-systems engineer scaling <b>feed-like pipelines to 2B+ events/day</b>, ready for <b>Staff-level design ownership</b>.",cover:"Scale has been the constant of my career - 2B events/day at Northwind taught me the exact failure modes your Feed Ranking infra lives with, and I’ve written the RFCs to fix a few of them…"}}]};
 const BASE_PROFILE={name:'Jordan Reyes',headline:'Full-stack → infra engineer · 7 yrs',location:'Austin, TX · open to remote',email:'jordan.reyes@…',skills:['Go','TypeScript','React','Kafka','Kubernetes','PostgreSQL','gRPC','Terraform','AWS','Redis','Docker','Prometheus'],experience:[{role:'Senior Software Engineer',co:'Northwind Labs',range:'2021 – now'},{role:'Software Engineer',co:'Vantage Systems',range:'2018 – 2021'}],education:'BS Computer Science · UT Austin',certs:'AWS Solutions Architect Pro'};
 const SCEN={
-strong:{key:'strong',label:'Strong résumé',file:'jordan_reyes_resume.pdf',size:'214 KB',health:88,desc:'Clean, quantified, zero errors. Watch the agent sail straight through — no gate, no penalty.',parseOk:true,parseSummary:'2 roles · 12 skills · 1 cert extracted',profile:{...BASE_PROFILE,headline:'Infrastructure engineer · Go · Kafka · 7 yrs'},searchFilters:mockData.searchFilters,searchNotes:['seniority pinned to Senior (L5) from clean title history'],audit:{start:88,feedLine:'auditing 31 bullets · dates · links · metrics · keywords',issues:[{id:'s1',sev:'tip',type:'fix',area:'Summary',title:'Lead with scale, not stack',delta:4,detail:'“Comfortable across the stack” is filler — your 2.1B events/day number should open the summary. Optional, but it reads better.',before:'Full-stack engineer comfortable across the stack…',after:'Infrastructure engineer running 2.1B events/day pipelines…'}]}},
-needswork:{key:'needswork',label:'Needs work',file:'resume_2024.pdf',size:'96 KB',health:62,desc:'Two errors, two warnings, one tip. The default path — full gate with a decision to make.',parseOk:true,parseSummary:'2 roles · 12 skills · 1 cert extracted',profile:BASE_PROFILE,searchFilters:mockData.searchFilters,searchNotes:['seniority pinned to Senior (L5) from title history'],applyRisk:'Unparseable date ranges are a common cause of instant ATS rejection.',audit:{start:62,feedLine:'auditing 34 bullets · dates · links · metrics · keywords',issues:[{id:'a1',sev:'error',type:'fix',area:'Experience §2',title:'Unparseable date range',delta:6,detail:'“2019 — present??” could not be read. Several ATS parsers will silently drop this role.',before:'2019 — present??',after:'Mar 2019 – Present'},{id:'a2',sev:'error',type:'fix',area:'Header',title:'Portfolio link returns 404',delta:4,detail:'jordanreyes.dev timed out at 8.2s then failed. Recruiter click-through dies here.',before:'jordanreyes.dev  ·  404',after:'link removed — pending new URL'},{id:'a3',sev:'warn',type:'fix',area:'Experience · 6 bullets',title:'Weak opening verbs',delta:9,detail:'Six bullets start with “Responsible for”. Recruiters scan verbs first — the agent rewrote all six.',before:'Responsible for maintaining backend services',after:'Owned 14 backend services through on-call rotations'},{id:'a4',sev:'warn',type:'fix',area:'Whole document',title:'Zero quantified outcomes',delta:8,detail:'14 bullets, no numbers. Three metrics were drafted from your repos & on-call notes — verify them before sending.',before:'Improved pipeline performance',after:'Cut p95 latency 38% <em>(verify: on-call dashboards)</em>'},{id:'a5',sev:'tip',type:'fix',area:'Skills line',title:'Missing role keywords',delta:5,detail:'Target postings repeatedly mention three terms absent from your skills line.',before:'—',after:'Added: system design · CI/CD · observability'}]}},
-error:{key:'error',label:'Error-heavy',file:'resume_final_v3 (1).pdf',size:'1.2 MB',health:38,desc:'Six errors — fused skills, dead links, broken dates, embedded photo. The dramatic one.',parseOk:true,parseSummary:'2 roles · 12 skills · 1 cert extracted (dates unreliable)',profile:{...BASE_PROFILE},searchFilters:mockData.searchFilters,searchNotes:['dates corrupted — seniority inferred loosely from bullet content'],applyRisk:'With three unparseable date ranges and dead links, most ATS parsers will drop or mangle this file.',audit:{start:38,feedLine:'auditing 27 bullets · dates · links · structure · images',issues:[{id:'e1',sev:'error',type:'fix',area:'Experience ×3',title:'Three unparseable date ranges',delta:8,detail:'“2019 — present??”, “2020 – ” and “Mar-2021-2019” could not be read. Most ATS parsers silently drop every role they can’t date — that’s half your history.',before:'2019 — present?? · 2020 – · Mar-2021-2019',after:'normalized to MMM YYYY – MMM YYYY'},{id:'e2',sev:'error',type:'fix',area:'Header links',title:'Dead portfolio & GitHub links',delta:7,detail:'Both links 404. Recruiter click-through dies here — and some scanners log dead links as low effort.',before:'jordanreyes.dev → 404 · github.com/jreyes → 404',after:'removed — pending new URLs'},{id:'e3',sev:'error',type:'fix',area:'Skills line',title:'Corrupted skills section',delta:8,detail:'Four tags fused into a single word — parsers read it as one unknown skill, so keyword matching fails across the board.',before:'GoKubernetesTerraformAWS',after:'split into 12 discrete skills'},{id:'e4',sev:'warn',type:'fix',area:'9 bullets',title:'Every bullet opens with “Responsible for”',delta:10,detail:'Nine passive openers in a row. Recruiters scan verbs first — all nine were rewritten in active voice.',before:'Responsible for maintaining backend services',after:'Owned 14 backend services through on-call rotations'},{id:'e5',sev:'warn',type:'fix',area:'Whole document',title:'Zero quantified outcomes',delta:9,detail:'Nothing is measured anywhere. Draft metrics were inserted from your repos and on-call notes — verify before sending.',before:'Improved pipeline performance',after:'Cut p95 latency 38% <em>(verify: on-call dashboards)</em>'},{id:'e6',sev:'tip',type:'fix',area:'Header',title:'Embedded photo breaks ATS parsers',delta:7,detail:'Several major parsers choke on embedded images — and photos introduce bias risk in blind screens.',before:'photo.jpg embedded in header',after:'removed'}]}},
-missing:{key:'missing',label:'Missing info',file:'JReyes CV 2024 copy.txt',size:'8 KB',health:50,desc:'Nothing is wrong — it’s absent. No email, no location, no education. Fill the gaps yourself.',parseOk:true,parseSummary:'parsed with holes — email · location · education missing',profile:{name:'Jordan Reyes',headline:null,email:null,location:null,skills:['Go','PostgreSQL','AWS'],skillNote:'+9 expected at this level',experience:[{role:'Senior Software Engineer',co:'Northwind Labs',range:'2021 – now'},{role:'(7-month gap)',co:null,range:'2022',gap:true},{role:'Software Engineer',co:'Vantage Systems',range:'2018 – 2021'}],education:null,certs:null},searchFilters:['Remote-friendly','Full-time','Backend / infra'],searchNotes:['seniority unknown — widened to all levels','no location — search radius set to all US'],applyRisk:'With no contact email, some boards reject the application before a human ever sees it.',audit:{start:50,feedLine:'auditing structure · contact block · sections · density',issues:[{id:'m1',sev:'error',type:'input',field:'email',ph:'you@domain.com',title:'No contact email',area:'Header',delta:10,detail:'No email anywhere in the document. Recruiters have no way to reach you — several boards reject contact-less applicants outright.'},{id:'m2',sev:'warn',type:'input',field:'location',ph:'City, ST — or “Remote”',title:'No location',area:'Header',delta:7,detail:'Unknown location forced the agent to widen its search to all of the US — you’re competing with everyone.'},{id:'m3',sev:'warn',type:'input',field:'education',ph:'e.g. BS Computer Science',title:'No education section',area:'Education',delta:8,detail:'Many ATS filters screen on degree fields. Even “in progress” or a bootcamp helps.'},{id:'m4',sev:'warn',type:'fix',area:'Skills',title:'Only 3 skills detected',delta:10,detail:'Three skills for seven years is thin. The agent can infer 9 more from your experience bullets.',before:'Go · PostgreSQL · AWS',after:'Added: TypeScript, React, Kafka, Kubernetes, gRPC, Terraform, Redis, Docker, Prometheus'},{id:'m5',sev:'tip',type:'none',area:'2022',title:'Unexplained 7-month gap',delta:0,detail:'Flagged for your awareness — recruiters notice gaps over six months. One honest line defuses it.'}]}},
+strong:{key:'strong',label:'Strong résumé',file:'jordan_reyes_resume.pdf',size:'214 KB',health:88,desc:'Clean, quantified, zero errors. Watch the agent sail straight through - no gate, no penalty.',parseOk:true,parseSummary:'2 roles · 12 skills · 1 cert extracted',profile:{...BASE_PROFILE,headline:'Infrastructure engineer · Go · Kafka · 7 yrs'},searchFilters:mockData.searchFilters,searchNotes:['seniority pinned to Senior (L5) from clean title history'],audit:{start:88,feedLine:'auditing 31 bullets · dates · links · metrics · keywords',issues:[{id:'s1',sev:'tip',type:'fix',area:'Summary',title:'Lead with scale, not stack',delta:4,detail:'“Comfortable across the stack” is filler - your 2.1B events/day number should open the summary. Optional, but it reads better.',before:'Full-stack engineer comfortable across the stack…',after:'Infrastructure engineer running 2.1B events/day pipelines…'}]}},
+needswork:{key:'needswork',label:'Needs work',file:'resume_2024.pdf',size:'96 KB',health:62,desc:'Two errors, two warnings, one tip. The default path - full gate with a decision to make.',parseOk:true,parseSummary:'2 roles · 12 skills · 1 cert extracted',profile:BASE_PROFILE,searchFilters:mockData.searchFilters,searchNotes:['seniority pinned to Senior (L5) from title history'],applyRisk:'Unparseable date ranges are a common cause of instant ATS rejection.',audit:{start:62,feedLine:'auditing 34 bullets · dates · links · metrics · keywords',issues:[{id:'a1',sev:'error',type:'fix',area:'Experience §2',title:'Unparseable date range',delta:6,detail:'“2019 - present??” could not be read. Several ATS parsers will silently drop this role.',before:'2019 - present??',after:'Mar 2019 – Present'},{id:'a2',sev:'error',type:'fix',area:'Header',title:'Portfolio link returns 404',delta:4,detail:'jordanreyes.dev timed out at 8.2s then failed. Recruiter click-through dies here.',before:'jordanreyes.dev  ·  404',after:'link removed - pending new URL'},{id:'a3',sev:'warn',type:'fix',area:'Experience · 6 bullets',title:'Weak opening verbs',delta:9,detail:'Six bullets start with “Responsible for”. Recruiters scan verbs first - the agent rewrote all six.',before:'Responsible for maintaining backend services',after:'Owned 14 backend services through on-call rotations'},{id:'a4',sev:'warn',type:'fix',area:'Whole document',title:'Zero quantified outcomes',delta:8,detail:'14 bullets, no numbers. Three metrics were drafted from your repos & on-call notes - verify them before sending.',before:'Improved pipeline performance',after:'Cut p95 latency 38% <em>(verify: on-call dashboards)</em>'},{id:'a5',sev:'tip',type:'fix',area:'Skills line',title:'Missing role keywords',delta:5,detail:'Target postings repeatedly mention three terms absent from your skills line.',before:'-',after:'Added: system design · CI/CD · observability'}]}},
+error:{key:'error',label:'Error-heavy',file:'resume_final_v3 (1).pdf',size:'1.2 MB',health:38,desc:'Six errors - fused skills, dead links, broken dates, embedded photo. The dramatic one.',parseOk:true,parseSummary:'2 roles · 12 skills · 1 cert extracted (dates unreliable)',profile:{...BASE_PROFILE},searchFilters:mockData.searchFilters,searchNotes:['dates corrupted - seniority inferred loosely from bullet content'],applyRisk:'With three unparseable date ranges and dead links, most ATS parsers will drop or mangle this file.',audit:{start:38,feedLine:'auditing 27 bullets · dates · links · structure · images',issues:[{id:'e1',sev:'error',type:'fix',area:'Experience ×3',title:'Three unparseable date ranges',delta:8,detail:'“2019 - present??”, “2020 – ” and “Mar-2021-2019” could not be read. Most ATS parsers silently drop every role they can’t date - that’s half your history.',before:'2019 - present?? · 2020 – · Mar-2021-2019',after:'normalized to MMM YYYY – MMM YYYY'},{id:'e2',sev:'error',type:'fix',area:'Header links',title:'Dead portfolio & GitHub links',delta:7,detail:'Both links 404. Recruiter click-through dies here - and some scanners log dead links as low effort.',before:'jordanreyes.dev → 404 · github.com/jreyes → 404',after:'removed - pending new URLs'},{id:'e3',sev:'error',type:'fix',area:'Skills line',title:'Corrupted skills section',delta:8,detail:'Four tags fused into a single word - parsers read it as one unknown skill, so keyword matching fails across the board.',before:'GoKubernetesTerraformAWS',after:'split into 12 discrete skills'},{id:'e4',sev:'warn',type:'fix',area:'9 bullets',title:'Every bullet opens with “Responsible for”',delta:10,detail:'Nine passive openers in a row. Recruiters scan verbs first - all nine were rewritten in active voice.',before:'Responsible for maintaining backend services',after:'Owned 14 backend services through on-call rotations'},{id:'e5',sev:'warn',type:'fix',area:'Whole document',title:'Zero quantified outcomes',delta:9,detail:'Nothing is measured anywhere. Draft metrics were inserted from your repos and on-call notes - verify before sending.',before:'Improved pipeline performance',after:'Cut p95 latency 38% <em>(verify: on-call dashboards)</em>'},{id:'e6',sev:'tip',type:'fix',area:'Header',title:'Embedded photo breaks ATS parsers',delta:7,detail:'Several major parsers choke on embedded images - and photos introduce bias risk in blind screens.',before:'photo.jpg embedded in header',after:'removed'}]}},
+missing:{key:'missing',label:'Missing info',file:'JReyes CV 2024 copy.txt',size:'8 KB',health:50,desc:'Nothing is wrong - it’s absent. No email, no location, no education. Fill the gaps yourself.',parseOk:true,parseSummary:'parsed with holes - email · location · education missing',profile:{name:'Jordan Reyes',headline:null,email:null,location:null,skills:['Go','PostgreSQL','AWS'],skillNote:'+9 expected at this level',experience:[{role:'Senior Software Engineer',co:'Northwind Labs',range:'2021 – now'},{role:'(7-month gap)',co:null,range:'2022',gap:true},{role:'Software Engineer',co:'Vantage Systems',range:'2018 – 2021'}],education:null,certs:null},searchFilters:['Remote-friendly','Full-time','Backend / infra'],searchNotes:['seniority unknown - widened to all levels','no location - search radius set to all US'],applyRisk:'With no contact email, some boards reject the application before a human ever sees it.',audit:{start:50,feedLine:'auditing structure · contact block · sections · density',issues:[{id:'m1',sev:'error',type:'input',field:'email',ph:'you@domain.com',title:'No contact email',area:'Header',delta:10,detail:'No email anywhere in the document. Recruiters have no way to reach you - several boards reject contact-less applicants outright.'},{id:'m2',sev:'warn',type:'input',field:'location',ph:'City, ST - or “Remote”',title:'No location',area:'Header',delta:7,detail:'Unknown location forced the agent to widen its search to all of the US - you’re competing with everyone.'},{id:'m3',sev:'warn',type:'input',field:'education',ph:'e.g. BS Computer Science',title:'No education section',area:'Education',delta:8,detail:'Many ATS filters screen on degree fields. Even “in progress” or a bootcamp helps.'},{id:'m4',sev:'warn',type:'fix',area:'Skills',title:'Only 3 skills detected',delta:10,detail:'Three skills for seven years is thin. The agent can infer 9 more from your experience bullets.',before:'Go · PostgreSQL · AWS',after:'Added: TypeScript, React, Kafka, Kubernetes, gRPC, Terraform, Redis, Docker, Prometheus'},{id:'m5',sev:'tip',type:'none',area:'2022',title:'Unexplained 7-month gap',delta:0,detail:'Flagged for your awareness - recruiters notice gaps over six months. One honest line defuses it.'}]}},
 unreadable:{key:'unreadable',label:'Unreadable scan',file:'scan_0042.pdf',size:'1.8 MB',health:null,desc:'A scanned image with no text layer. Watch the agent fail gracefully at step 1 and recover.',parseOk:false}};
-/* ---------- state ---------- */
 const state={runToken:0,running:false,done:false,phase:'idle',view:'agent',steps:[],reached:-1,stepT0:{},jobs:[],applied:new Set(),filters:new Set(),sort:'fit',subNo:1042,subNos:{},audit:null,health:0,fixes:0,added:0,healthAtContinue:null,penalty:0,scenario:null,gateResumed:false,auditLocked:false,workType:'any',locations:[],prefsDone:false,prefsEver:false,prefGate:null,history:[],curRun:null,realUpload:false,t0:0,elapsedBase:0,elapsedTimer:null,openJobId:null,pendingApply:null};
 function calcPenalty(h){if(h==null||h>=85)return 0;return Math.max(1,Math.round((85-h)*0.45));}
 const adjScore=base=>Math.max(35,base-(state.penalty||0));
 const dz=$('#dz'),input=$('#fileInput');
-/* ---------- views + hero ---------- */
 function switchView(v){state.view=v;$('#view-agent').hidden=v!=='agent';$('#view-matches').hidden=v!=='matches';$('#view-history').hidden=v!=='history';
  $$('.vtab').forEach(t=>t.classList.toggle('active',t.dataset.view===v));if(v==='history')renderHistory();window.scrollTo(0,0);}
 function refreshTabs(){const m=$('#tabMatches');m.disabled=!state.jobs.length;
@@ -706,13 +686,12 @@ function showHero(){const h=$('#hero');h.hidden=false;
 if(!h.classList.contains('gone'))return;
 h.style.maxHeight='0px';h.classList.remove('gone');
 requestAnimationFrame(()=>{h.style.maxHeight=h.scrollHeight+'px';setTimeout(()=>{h.style.maxHeight='';},650);});}
-/* ---------- timeline shell ---------- */
 function buildTimeline(){state.steps=mockData.pipelineSteps.map(s=>({...s}));state.reached=-1;
  $('#timeline').innerHTML=state.steps.map((s,i)=>`
 <li class="ck" data-i="${i}" data-state="pending" data-reach="0" data-line="0">
   <div class="ck-rail"><span class="ck-node"><md-icon>${mockData.STEP_ICON[s.id]}</md-icon></span>${i<state.steps.length-1?'<span class="ck-line"><i></i></span>':''}</div>
   <div class="ck-main">
-    <button class="ck-head" aria-expanded="false"><span class="ck-tt"><span class="ck-num">${String(i+1).padStart(2,'0')}</span><span class="ck-title">${s.label}</span></span><span class="ck-meta"><span class="ck-dur">—</span><md-icon class="chev" style="font-size:16px">expand_more</md-icon></span><span class="ck-status" data-status>queued — waiting for a résumé</span></button>
+    <button class="ck-head" aria-expanded="false"><span class="ck-tt"><span class="ck-num">${String(i+1).padStart(2,'0')}</span><span class="ck-title">${s.label}</span></span><span class="ck-meta"><span class="ck-dur">-</span><md-icon class="chev" style="font-size:16px">expand_more</md-icon></span><span class="ck-status" data-status>queued - waiting for a résumé</span></button>
     <div class="ck-panel"><div class="ck-panel-in"><div class="ck-feed" hidden><div class="fls"></div></div><div class="ck-body" data-body></div></div></div>
   </div></li>`).join('');
  $('#segbar').innerHTML=state.steps.map(()=>'<span class="seg"></span>').join('');
@@ -730,14 +709,13 @@ audit:()=>{const p=['health '+state.scenario.audit.start+'→'+state.health+'/10
 searching:()=>'1,284 postings scanned → 37 plausible fits',
 ranking:()=>{const n=mockData.jobMatches.filter(wtOK).length;return state.penalty?n+' promoted · scored −'+state.penalty+' as-is':n+' promoted to matches · '+(mockData.ranking.length-n)+' passed with reasons';},
 tailoring:()=>{const n=mockData.jobMatches.filter(wtOK).length;return (n*2)+' documents tailored at health '+state.healthAtContinue+'/100';},
-done:()=>'run complete — see the Ranked matches tab ↑'};
+done:()=>'run complete - see the Ranked matches tab ↑'};
 function setPhaseChip(txt,live,cls){const c=$('#phaseChip');c.textContent=txt;c.classList.remove('live','warn','fail');if(live)c.classList.add('live');if(cls)c.classList.add(cls);}
 function reveal(el){requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('in')));}
 function countUpEl(el,target,dur,fmtFn){const t0=performance.now();(function step(now){const p=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-p,3);el.textContent=(fmtFn||fmt)(Math.round(target*e));if(p<1)requestAnimationFrame(step);})(performance.now());}
 const ok=async(ms,token)=>{await sleep(ms);return token===state.runToken;};
 function startClock(){state.t0=performance.now();clearInterval(state.elapsedTimer);state.elapsedTimer=setInterval(()=>{$('#elapsed').textContent=(state.elapsedBase+(performance.now()-state.t0)/1000).toFixed(1)+'s';},100);}
 function pauseClock(){if(state.elapsedTimer){state.elapsedBase+=(performance.now()-state.t0)/1000;clearInterval(state.elapsedTimer);state.elapsedTimer=null;}}
-/* ---------- step lifecycle (no auto-open, no auto-scroll) ---------- */
 async function runStep(i,tok){state.reached=Math.max(state.reached,i);state.stepT0[i]=performance.now();const ck=ckEl(i);
 ck.dataset.state='active';ck.dataset.reach='1';segEl(i).classList.remove('failed');segEl(i).classList.add('active');
 setStatusLine(i,'starting…');setPhaseChip(state.steps[i].label,true);
@@ -746,8 +724,7 @@ if(r==='fail'){failStep(i);return false;}if(r==='gated')return 'gated';finishSte
 function finishStep(i){const ck=ckEl(i);ck.dataset.state='done';ck.dataset.line='1';segEl(i).classList.remove('active');segEl(i).classList.add('done');
  $('.ck-dur',ck).textContent=((performance.now()-(state.stepT0[i]||performance.now()))/1000).toFixed(1)+'s';setStatusLine(i,SUMMARY[state.steps[i].id]());const gw=$('#gateWrap');if(gw)gw.remove();}
 function failStep(i){const ck=ckEl(i);ck.dataset.state='failed';segEl(i).classList.remove('active');segEl(i).classList.add('failed');
-pauseClock();state.running=false;state.phase='failed';setStatus('failed','Parse failed');setPhaseChip('failed',false,'fail');setStatusLine(i,'couldn’t parse this file — pipeline halted');}
-/* ---------- checkpoint 1 · parse ---------- */
+pauseClock();state.running=false;state.phase='failed';setStatus('failed','Parse failed');setPhaseChip('failed',false,'fail');setStatusLine(i,'couldn’t parse this file - pipeline halted');}
 async function phaseParse(tok){const sc=state.scenario;if(!sc.parseOk)return parseFail(tok);const c=sc.profile;
 bodyEl(0).innerHTML=`<div class="pc-grid">
 <div class="pcard fadeitem"><div class="sec-h"><md-icon>person</md-icon>Profile</div>
@@ -760,34 +737,33 @@ bodyEl(0).innerHTML=`<div class="pc-grid">
 <div class="xp-row"><span class="xr">2014–18</span><span data-pf="education">${c.education?esc(c.education):'<span class="nf">education not found</span>'}</span></div>
  ${c.certs?'<div class="xp-row"><span class="xr">cert</span><span>'+esc(c.certs)+'</span></div>':''}</div>
 <div class="pcard wide fadeitem"><div class="sec-h"><md-icon>psychology</md-icon>Skills extracted<span class="count-pill" data-count>0</span></div><div class="skills" data-skills></div></div></div>`;
-feed(0,'reading '+sc.file+' — '+sc.size);setStatusLine(0,'reading document…');
+feed(0,'reading '+sc.file+' - '+sc.size);setStatusLine(0,'reading document…');
 reveal($('.pcard',bodyEl(0)));if(!(await ok(500,tok)))return false;
 feed(0,'sections: header · summary · experience · skills · education');setStatusLine(0,'mapping sections…');
 reveal($$('.pcard',bodyEl(0))[1]);if(!(await ok(550,tok)))return false;
 reveal($$('.pcard',bodyEl(0))[2]);setStatusLine(0,'extracting skills…');
 const box=$('[data-skills]',bodyEl(0)),cnt=$('[data-count]',bodyEl(0));
 for(let i=0;i<c.skills.length;i++){const chip=document.createElement('span');chip.className='sk';chip.textContent=c.skills[i];box.appendChild(chip);
-cnt.textContent=(i+1)+' skills'+(c.skillNote?' — thin for 7 yrs':'');if(i===0)feed(0,'extracting skills from experience bullets…');if(!(await ok(300,tok)))return false;}
-if(c.skillNote){box.insertAdjacentHTML('beforeend','<span class="sk warn">'+c.skillNote+'</span>');feed(0,'skill extraction thin — far below expected for 7 yrs');}
+cnt.textContent=(i+1)+' skills'+(c.skillNote?' - thin for 7 yrs':'');if(i===0)feed(0,'extracting skills from experience bullets…');if(!(await ok(300,tok)))return false;}
+if(c.skillNote){box.insertAdjacentHTML('beforeend','<span class="sk warn">'+c.skillNote+'</span>');feed(0,'skill extraction thin - far below expected for 7 yrs');}
 feed(0,'normalizing employment dates…');setStatusLine(0,'normalizing dates…');if(!(await ok(450,tok)))return false;
 feed(0,sc.parseSummary,'ok');return ok(700,tok);}
-async function parseFail(tok){const sc=state.scenario;feed(0,'reading '+sc.file+' — '+sc.size);setStatusLine(0,'reading document…');if(!(await ok(900,tok)))return false;
-feed(0,'no text layer detected — attempting OCR fallback…');setStatusLine(0,'OCR fallback…');
+async function parseFail(tok){const sc=state.scenario;feed(0,'reading '+sc.file+' - '+sc.size);setStatusLine(0,'reading document…');if(!(await ok(900,tok)))return false;
+feed(0,'no text layer detected - attempting OCR fallback…');setStatusLine(0,'OCR fallback…');
 bodyEl(0).innerHTML=`<div class="parsefail fadeitem"><div class="pf-ic"><md-icon>report</md-icon></div><b>Couldn’t read this file</b>
-<p><span class="mono">${sc.file}</span> has no extractable text — it’s a scanned image, not a text-based document. The agent can’t parse what it can’t read, so the pipeline stops here rather than guessing.</p>
-<ul class="pf-tips"><li>Re-export a text-based PDF from your editor — not a scan or print-to-image</li><li>Or run a test scenario to see the full pipeline work end-to-end</li></ul>
+<p><span class="mono">${sc.file}</span> has no extractable text - it’s a scanned image, not a text-based document. The agent can’t parse what it can’t read, so the pipeline stops here rather than guessing.</p>
+<ul class="pf-tips"><li>Re-export a text-based PDF from your editor - not a scan or print-to-image</li><li>Or run a test scenario to see the full pipeline work end-to-end</li></ul>
 <div class="pf-btns"><md-filled-button data-up><md-icon slot="icon">upload_file</md-icon>Upload a different file</md-filled-button><md-text-button data-tryscen><md-icon slot="icon">science</md-icon>Test scenarios</md-text-button></div></div>`;
 reveal($('.parsefail',bodyEl(0)));if(!(await ok(1400,tok)))return false;
-feed(0,'OCR failed — cannot parse an image-only file','err');
+feed(0,'OCR failed - cannot parse an image-only file','err');
  $('#upLabel').innerHTML='<md-icon style="color:#F0A9A0">cancel</md-icon>no text layer found';return 'fail';}
-/* ---------- checkpoint 2 · audit + gate ---------- */
 function dialColor(h){return h>=85?'var(--leaf)':h>=70?'var(--ember)':'var(--amber)';}
 function dialLabel(h){return h>=85?'send-ready':h>=70?'solid':'needs work';}
 const liveIssues=()=>(state.audit?state.audit.issues:[]),unfixedFixable=()=>liveIssues().filter(i=>i.type==='fix'&&!i.fixed),unfilledInputs=()=>liveIssues().filter(i=>i.type==='input'&&!i.filled);
 function setDial(h){const bar=$('#dialBar'),num=$('#dialNum');if(!bar)return;
 bar.style.strokeDashoffset=264*(1-h/100);bar.style.stroke=dialColor(h);num.textContent=h;num.style.color=dialColor(h);$('#dialLab').textContent=dialLabel(h);
 const v=$('#audVerdict');v.querySelector('b').innerHTML=h>=85?'<md-icon style="color:var(--leaf)">verified</md-icon>Résumé is send-ready':'<md-icon style="color:var(--amber)">build</md-icon>Résumé can be improved';
-v.querySelector('p').textContent=h>=85?'All findings resolved. Materials will be tailored from the improved version.':(unfixedFixable().length+unfilledInputs().length)+' open items — resolve them to raise health before continuing.';}
+v.querySelector('p').textContent=h>=85?'All findings resolved. Materials will be tailored from the improved version.':(unfixedFixable().length+unfilledInputs().length)+' open items - resolve them to raise health before continuing.';}
 function findingCard(iss){const topAction=iss.type==='fix'?'<md-filled-tonal-button class="f-fix" data-fix="'+iss.id+'"><md-icon slot="icon">auto_fix_high</md-icon>Apply fix</md-filled-tonal-button>':'';
 const inputRow=iss.type==='input'?'<div class="f-input"><input type="text" data-in="'+iss.id+'" placeholder="'+esc(iss.ph||'')+'" aria-label="'+esc(iss.title)+'"><md-filled-tonal-button class="f-add" data-add="'+iss.id+'"><md-icon slot="icon">add</md-icon>Add</md-filled-tonal-button></div>':'';
 const ba=(iss.type==='fix'&&iss.before)?'<div class="f-ba"><div class="ba"><span>before</span><div class="before"><s>'+esc(iss.before)+'</s></div></div><div class="ba"><span>after</span><div class="after">'+iss.after+'</div></div></div>':'';
@@ -798,34 +774,33 @@ bodyEl(1).innerHTML=`<div class="audit-top"><div class="dial"><svg viewBox="0 0 
 feed(1,sc.audit.feedLine);const list=$('#findings');
 for(let i=0;i<state.audit.issues.length;i++){list.insertAdjacentHTML('beforeend',findingCard(state.audit.issues[i]));reveal(list.lastElementChild);
 if(i===0){state.health=sc.audit.start;countUpEl($('#dialNum'),sc.audit.start,900,n=>n);setDial(state.health);}
-setStatusLine(1,'auditing — finding '+(i+1)+' of '+state.audit.issues.length+'…');
+setStatusLine(1,'auditing - finding '+(i+1)+' of '+state.audit.issues.length+'…');
 feed(1,'finding '+(i+1)+'/'+state.audit.issues.length+' · '+state.audit.issues[i].title.toLowerCase());if(!(await ok(1100,tok)))return false;}
 const e=sc.audit.issues.filter(i=>i.sev==='error').length,w=sc.audit.issues.filter(i=>i.sev==='warn').length,t=sc.audit.issues.filter(i=>i.sev==='tip').length;
-feed(1,'audit complete — '+e+' errors · '+w+' warnings · '+t+' tips','ok');
-if(state.health>=85){setStatusLine(1,'send-ready — continuing…');return ok(500,tok);}renderGate();return 'gated';}
+feed(1,'audit complete - '+e+' errors · '+w+' warnings · '+t+' tips','ok');
+if(state.health>=85){setStatusLine(1,'send-ready - continuing…');return ok(500,tok);}renderGate();return 'gated';}
 function renderGate(){const wrap=document.createElement('div');wrap.id='gateWrap';wrap.className='gate'+(state.health<50?' high':'');bodyEl(1).appendChild(wrap);paintGate();
 ckEl(1).dataset.state='paused';setStatus('paused','Waiting for your decision');setPhaseChip('paused · your call',true,'warn');
-setStatusLine(1,'pipeline paused — résumé health '+state.health+'/100 needs your decision');pauseClock();
+setStatusLine(1,'pipeline paused - résumé health '+state.health+'/100 needs your decision');pauseClock();
 openStep(1);ckEl(1).scrollIntoView({behavior:'smooth',block:'nearest'});}
 function paintGate(){const g=$('#gateWrap');if(!g)return;const p=calcPenalty(state.health),fixable=unfixedFixable().length,inputs=unfilledInputs().length,open=fixable+inputs,high=state.health<50;
 g.innerHTML=`<span class="gate-ic"><md-icon>${high?'report':'pause_circle'}</md-icon></span>
 <div class="gate-txt"><b>${high?'This résumé will get auto-rejected':'The agent needs your call'}</b>
-<p>Health <b class="mono">${state.health}/100</b> · ${open} open item${open===1?'':'s'}${inputs?' ('+inputs+' need'+(inputs===1?'':'s')+' your input — fill below)':''}. Continue as-is and every match scores <b>−${p} pts</b> below its true read${high?' — expect most ATS parsers to mangle this file before a recruiter ever sees it':''}.</p></div>
+<p>Health <b class="mono">${state.health}/100</b> · ${open} open item${open===1?'':'s'}${inputs?' ('+inputs+' need'+(inputs===1?'':'s')+' your input - fill below)':''}. Continue as-is and every match scores <b>−${p} pts</b> below its true read${high?' - expect most ATS parsers to mangle this file before a recruiter ever sees it':''}.</p></div>
 <div class="gate-btns">${fixable
 ?'<md-filled-button data-g="fixall"><md-icon slot="icon">auto_fix_high</md-icon>Apply '+fixable+' fix'+(fixable===1?'':'es')+' &amp; continue</md-filled-button><md-filled-tonal-button class="as-is-btn" data-g="asis"><md-icon slot="icon">play_arrow</md-icon>Continue as-is · −'+p+' pts</md-filled-button>'
 :'<md-filled-button data-g="asis"><md-icon slot="icon">play_arrow</md-icon>Continue · −'+p+' pts</md-filled-button>'}
 <md-text-button data-g="diff">use a different file</md-text-button></div>`;
  $$('[data-g]',g).forEach(b=>b.addEventListener('click',async()=>{const tok=state.runToken,act=b.dataset.g;
 if(act==='diff'){resetAll(null,{silent:true});if(input)input.click();return;}
-if(act==='asis'){feed(1,'user chose to continue as-is — matches docked −'+calcPenalty(state.health)+' pts');finishStep(1);continuePipeline(tok);return;}
+if(act==='asis'){feed(1,'user chose to continue as-is - matches docked −'+calcPenalty(state.health)+' pts');finishStep(1);continuePipeline(tok);return;}
 if(act==='fixall'){const list=unfixedFixable();for(let k=0;k<list.length;k++){await sleep(k?260:60);if(tok!==state.runToken)return;applyFix(list[k].id);}
-await sleep(820);if(tok!==state.runToken||state.gateResumed)return;feed(1,'fixes applied — resuming','ok');finishStep(1);continuePipeline(tok);}}));}
+await sleep(820);if(tok!==state.runToken||state.gateResumed)return;feed(1,'fixes applied - resuming','ok');finishStep(1);continuePipeline(tok);}}));}
 function refreshGate(){const g=$('#gateWrap');if(!g||state.gateResumed)return;
-if(state.health>=85){const tok=state.runToken;feed(1,'send-ready at '+state.health+'/100 — resuming automatically','ok');finishStep(1);continuePipeline(tok);return;}paintGate();}
-/* ---------- fixes & inputs ---------- */
+if(state.health>=85){const tok=state.runToken;feed(1,'send-ready at '+state.health+'/100 - resuming automatically','ok');finishStep(1);continuePipeline(tok);return;}paintGate();}
 async function applyFix(id){const iss=state.audit&&state.audit.issues.find(i=>i.id===id);const card=$('[data-issue="'+id+'"]');
 if(!iss||iss.type!=='fix'||iss.fixed||iss.busy||!card)return;
-if(state.auditLocked){toast('lock','This run already scored — use “Fix & re-run” in the Ranked matches tab.');return;}
+if(state.auditLocked){toast('lock','This run already scored - use “Fix & re-run” in the Ranked matches tab.');return;}
 iss.busy=true;const btn=$('[data-fix]',card);
 if(btn){btn.setAttribute('disabled','');btn.innerHTML='<span class="sending"><md-circular-progress indeterminate style="--md-circular-progress-size:14px;--md-circular-progress-active-indicator-color:var(--ember)"></md-circular-progress>Fixing…</span>';}
 await sleep(520);iss.fixed=true;iss.busy=false;state.health=Math.min(100,state.health+(iss.delta||0));state.fixes++;$('#cFixes').textContent=state.fixes;
@@ -836,22 +811,21 @@ feed(1,'fix applied · '+iss.title.toLowerCase()+' → health '+state.health+'/1
 if(ckEl(1).dataset.state==='done')setStatusLine(1,SUMMARY.audit());}
 async function applyInput(id){const iss=state.audit&&state.audit.issues.find(i=>i.id===id);const card=$('[data-issue="'+id+'"]');
 if(!iss||iss.type!=='input'||iss.filled||!card)return;
-if(state.auditLocked){toast('lock','This run already scored — use the banner in the Ranked matches tab to re-run.');return;}
+if(state.auditLocked){toast('lock','This run already scored - use the banner in the Ranked matches tab to re-run.');return;}
 const inp=$('[data-in]',card),val=inp?inp.value.trim():'';
-if(!val){toast('edit','Type a value first — the agent can’t invent your details.');if(inp)inp.focus();return;}
+if(!val){toast('edit','Type a value first - the agent can’t invent your details.');if(inp)inp.focus();return;}
 iss.filled=true;iss.value=val;state.added++;state.health=Math.min(100,state.health+(iss.delta||0));card.classList.add('fixed');
  $('.f-title',card).innerHTML='<s>'+iss.title+'</s>&nbsp;&nbsp;<span class="fixed-tag"><md-icon>check_circle</md-icon>added</span>&nbsp;&nbsp;<span class="delta"><md-icon>trending_up</md-icon>+'+(iss.delta||0)+'</span>';
 card.insertAdjacentHTML('beforeend','<div class="added-val"><md-icon>check</md-icon>'+esc(iss.field)+': '+esc(val)+'</div>');
 const pf=$('[data-pf="'+iss.field+'"]');if(pf)pf.innerHTML='<b>'+esc(val)+'</b>';
 setDial(state.health);feed(1,'detail added · '+iss.title.toLowerCase()+' → health '+state.health+'/100','ok');refreshGate();updateBanner();
 if(ckEl(1).dataset.state==='done')setStatusLine(1,SUMMARY.audit());}
-/* ---------- checkpoints 3–6 (real-world pacing) ---------- */
 async function phaseSearch(tok){if(state.healthAtContinue==null){state.healthAtContinue=state.health;state.penalty=calcPenalty(state.health);}
 state.auditLocked=state.penalty>0;const sc=state.scenario,b=bodyEl(2);
 const flt=[];if(state.workType!=='any')flt.push(WT_LABEL[state.workType]+' only');state.locations.forEach(l=>flt.push(l));
 sc.searchFilters.forEach(f=>{if(f!=='Remote-friendly'||state.workType==='any')flt.push(f);});
 b.innerHTML='<div class="flt">'+flt.map(f=>'<md-assist-chip label="'+esc(f)+'"></md-assist-chip>').join('')+'</div><div id="srcList">'+
-mockData.searchSources.map(s=>'<div class="srcrow" data-state="pending"><md-icon class="si">'+s.icon+'</md-icon><div><div class="src-name">'+s.name+'</div><div class="src-sub">queued</div></div><div class="src-count" data-p>—</div><div class="src-state"><span data-st>queued</span></div></div>').join('')+'</div>'+
+mockData.searchSources.map(s=>'<div class="srcrow" data-state="pending"><md-icon class="si">'+s.icon+'</md-icon><div><div class="src-name">'+s.name+'</div><div class="src-sub">queued</div></div><div class="src-count" data-p>-</div><div class="src-state"><span data-st>queued</span></div></div>').join('')+'</div>'+
 '<div class="funnel">'+mockData.funnel.map(f=>'<div class="frow"><span>'+f.label+'</span><div class="fbar"><i data-w="'+f.w+'"></i></div><b data-n="'+f.n+'">0</b></div>').join('')+'</div>';
 feed(2,'filters armed · '+flt.join(' · '));
 (sc.searchNotes||[]).forEach((n,i)=>setTimeout(()=>{if(tok===state.runToken)feed(2,n);},900+i*1600));
@@ -872,15 +846,15 @@ return ok(1200,tok);}
 async function phaseRank(tok){if(state.healthAtContinue==null){state.healthAtContinue=state.health;state.penalty=calcPenalty(state.health);}
 const b=bodyEl(3);
 const rows=mockData.ranking.map(r=>{let verdict=r.verdict,reason=r.reason;
-if(state.workType!=='any'&&r.verdict==='match'&&r.workType!==state.workType&&r.workType!=='hybrid'){verdict='pass';reason=WT_LABEL[r.workType]+' — filtered by your '+WT_SHORT[state.workType]+' preference';}
+if(state.workType!=='any'&&r.verdict==='match'&&r.workType!==state.workType&&r.workType!=='hybrid'){verdict='pass';reason=WT_LABEL[r.workType]+' - filtered by your '+WT_SHORT[state.workType]+' preference';}
 return Object.assign({},r,{verdict:verdict,reason:reason,shown:verdict==='match'?adjScore(r.score):r.score});});
 const matches=rows.filter(r=>r.verdict==='match'),passes=rows.filter(r=>r.verdict==='pass');
-const rowHtml=r=>'<div class="rkrow fadeitem '+r.verdict+'"><div class="rk-score"><b>'+r.shown+'</b><div class="rk-bar"><i data-w="'+r.shown+'"></i></div></div><div class="rk-who"><b>'+r.company+'</b><span>'+r.title+'</span><span class="rk-why">'+(r.verdict==='match'?(state.penalty?'promoted · true read '+r.score+' — docked −'+state.penalty+' for résumé health '+state.healthAtContinue+'/100':'promoted — full analysis in the matches tab'):'passed — '+r.reason)+'</span></div><span class="verdict">'+(r.verdict==='match'?'match':'pass')+'</span></div>';
-b.innerHTML='<div class="rk-g"><div class="sec-h"><md-icon>thumb_up</md-icon>Promoted to matches<span class="count-pill">'+matches.length+' of 37</span></div>'+matches.map(rowHtml).join('')+'</div><div class="rk-g"><div class="sec-h"><md-icon>block</md-icon>Passed — with reasons<span class="count-pill">'+passes.length+' shown</span></div>'+passes.map(rowHtml).join('')+'</div>';
+const rowHtml=r=>'<div class="rkrow fadeitem '+r.verdict+'"><div class="rk-score"><b>'+r.shown+'</b><div class="rk-bar"><i data-w="'+r.shown+'"></i></div></div><div class="rk-who"><b>'+r.company+'</b><span>'+r.title+'</span><span class="rk-why">'+(r.verdict==='match'?(state.penalty?'promoted · true read '+r.score+' - docked −'+state.penalty+' for résumé health '+state.healthAtContinue+'/100':'promoted - full analysis in the matches tab'):'passed - '+r.reason)+'</span></div><span class="verdict">'+(r.verdict==='match'?'match':'pass')+'</span></div>';
+b.innerHTML='<div class="rk-g"><div class="sec-h"><md-icon>thumb_up</md-icon>Promoted to matches<span class="count-pill">'+matches.length+' of 37</span></div>'+matches.map(rowHtml).join('')+'</div><div class="rk-g"><div class="sec-h"><md-icon>block</md-icon>Passed - with reasons<span class="count-pill">'+passes.length+' shown</span></div>'+passes.map(rowHtml).join('')+'</div>';
 feed(3,'scoring 37 candidates against your parsed profile…');
-if(state.penalty)feed(3,'résumé health '+state.healthAtContinue+'/100 — scores docked −'+state.penalty+' below true read');
+if(state.penalty)feed(3,'résumé health '+state.healthAtContinue+'/100 - scores docked −'+state.penalty+' below true read');
 const demoted=rows.filter((r,idx)=>mockData.ranking[idx].verdict==='match'&&r.verdict==='pass');
-if(demoted.length)feed(3,'hard filter · '+demoted.map(d=>d.company).join(', ').toLowerCase()+' demoted to pass — '+WT_SHORT[state.workType]);
+if(demoted.length)feed(3,'hard filter · '+demoted.map(d=>d.company).join(', ').toLowerCase()+' demoted to pass - '+WT_SHORT[state.workType]);
 const els=$$('.rkrow',b);
 for(let i=0;i<els.length;i++){reveal(els[i]);setStatusLine(3,'scoring '+rows[i].company+'…');
 setTimeout(()=>{const bar=$('.rk-bar i',els[i]);bar.style.width=bar.dataset.w+'%';},220);
@@ -891,22 +865,21 @@ b.innerHTML='<div class="tl-note"><md-icon>health_and_safety</md-icon>building o
 jobs.map(j=>'<div class="tcard fadeitem"><div class="t-head"><b>'+j.company+'</b><span>'+j.title+' · '+adjScore(j.score)+'% fit</span><div class="docs"><span class="tdoc">resume.pdf</span><span class="tdoc">cover_letter.md</span></div></div><div class="tdiff"><div class="ba"><span>before</span><div class="before">'+esc(j.tailored.before)+'</div></div><div class="ba"><span>after</span><div class="after">'+j.tailored.after+'</div></div></div><div class="tcover">'+esc(j.tailored.cover)+'</div></div>').join('');
 const cards=$$('.tcard',b);
 for(let i=0;i<cards.length;i++){reveal(cards[i]);const co=jobs[i].company.toLowerCase();
-setStatusLine(4,'drafting for '+jobs[i].company+'…');feed(4,'rewriting summary — '+co);
+setStatusLine(4,'drafting for '+jobs[i].company+'…');feed(4,'rewriting summary - '+co);
 if(!(await ok(1300,tok)))return false;
-feed(4,'drafting cover letter — '+co);setStatusLine(4,'drafting cover letter — '+co);
+feed(4,'drafting cover letter - '+co);setStatusLine(4,'drafting cover letter - '+co);
 if(!(await ok(1300,tok)))return false;
 countUpEl($('#cDocs'),(i+1)*2,500);}
-feed(4,(jobs.length*2)+' documents ready — all editable before send','ok');return ok(500,tok);}
+feed(4,(jobs.length*2)+' documents ready - all editable before send','ok');return ok(500,tok);}
 async function phaseDone(tok){const b=bodyEl(5),h=state.healthAtContinue??state.health,n=mockData.jobMatches.filter(wtOK).length;
 setStatusLine(5,'assembling recap…');
 b.innerHTML='<div class="recap"><div class="rtile ember"><b>'+n+'</b><span>ranked matches · '+WT_SHORT[state.workType]+'</span></div><div class="rtile"><b>37</b><span>fits from 1,284 scans</span></div><div class="rtile '+(h>=85?'leaf':'amber')+'"><b>'+h+'</b><span>health at continue · '+(state.fixes+state.added)+' applied</span></div><div class="rtile"><b>'+(n*2)+'</b><span>tailored documents</span></div>'+(state.penalty?'<div class="rtile amber"><b>−'+state.penalty+'</b><span>as-is score penalty</span></div>':'')+'</div><div class="done-cta"><md-filled-button data-goto="results"><md-icon slot="icon">arrow_forward</md-icon>View ranked matches</md-filled-button><md-text-button data-goto="audit"><md-icon slot="icon">health_and_safety</md-icon>Revisit audit &amp; fixes</md-text-button></div>';
-buildJobs();feed(5,'pipeline complete — matches ready in the Ranked matches tab');return ok(900,tok);}
-/* ---------- orchestration ---------- */
+buildJobs();feed(5,'pipeline complete - matches ready in the Ranked matches tab');return ok(900,tok);}
 const HANDLERS={parsed:phaseParse,audit:phaseAudit,searching:phaseSearch,ranking:phaseRank,tailoring:phaseTailor,done:phaseDone};
 async function executeSteps(from,to,tok){for(let i=from;i<=to;i++){
 if(i===2&&!state.prefsDone){const saved=loadPrefs();
 if(saved){state.workType=saved.workType;state.locations=saved.locations;state.prefsDone=true;state.prefsEver=true;updatePrefsChip();
-feed(2,'preferences loaded · '+prefsFeedStr());toast('tune','Preferences loaded — '+prefsSummary()+'.','Edit',openPrefs);}
+feed(2,'preferences loaded · '+prefsFeedStr());toast('tune','Preferences loaded - '+prefsSummary()+'.','Edit',openPrefs);}
 else{openPrefs(tok);return 'gated';}}
 const r=await runStep(i,tok);if(tok!==state.runToken)return false;if(r===false)return false;if(r==='gated')return 'gated';}return true;}
 async function runPipeline(tok){state.running=true;state.phase='running';state.gateResumed=false;
@@ -923,28 +896,26 @@ const n=state.jobs.length;
 setPhaseChip('complete',false);setStatus('done',n+' matches ready');updateBanner();refreshTabs();switchView('matches');
 state.curRun={ts:Date.now(),file:$('#fName').textContent||'resume.pdf',scenario:state.scenario?state.scenario.label:null,workType:state.workType,locations:[...state.locations],health:state.healthAtContinue??state.health,matches:n,applied:[]};
 state.history.unshift(state.curRun);if(state.history.length>25)state.history.length=25;saveHist();
-toast('auto_awesome',state.penalty?n+' matches scored −'+state.penalty+' as-is — fix & re-run to recover the full read.':n+' matches found, tailored & ready — with the agent’s full reasoning attached.');}
-function resetSteps(from,to){for(let i=from;i<=to;i++){const ck=ckEl(i);ck.dataset.state='pending';ck.dataset.line='0';ck.dataset.reach='0';$('.ck-dur',ck).textContent='—';
-const fb=$('.ck-feed',ck);if(fb){fb.hidden=true;$('.fls',fb).innerHTML='';}bodyEl(i).innerHTML='';segEl(i).classList.remove('active','done','failed');setStatusLine(i,'queued — waiting for a résumé');}}
-async function fixAndRerun(){if(state.running){toast('hourglass_top','The agent is mid-run — one sec.');return;}
+toast('auto_awesome',state.penalty?n+' matches scored −'+state.penalty+' as-is - fix & re-run to recover the full read.':n+' matches found, tailored & ready - with the agent’s full reasoning attached.');}
+function resetSteps(from,to){for(let i=from;i<=to;i++){const ck=ckEl(i);ck.dataset.state='pending';ck.dataset.line='0';ck.dataset.reach='0';$('.ck-dur',ck).textContent='-';
+const fb=$('.ck-feed',ck);if(fb){fb.hidden=true;$('.fls',fb).innerHTML='';}bodyEl(i).innerHTML='';segEl(i).classList.remove('active','done','failed');setStatusLine(i,'queued - waiting for a résumé');}}
+async function fixAndRerun(){if(state.running){toast('hourglass_top','The agent is mid-run - one sec.');return;}
 const tok=++state.runToken;state.gateResumed=false;state.auditLocked=false;
 switchView('agent');openStep(1);ckEl(1).scrollIntoView({behavior:'smooth',block:'nearest'});
-feed(1,'re-opening audit — user requested fixes');const pending=unfixedFixable(),unfilled=unfilledInputs();
+feed(1,'re-opening audit - user requested fixes');const pending=unfixedFixable(),unfilled=unfilledInputs();
 if(pending.length){for(let k=0;k<pending.length;k++){await sleep(k?300:80);if(tok!==state.runToken)return;applyFix(pending[k].id);}await sleep(820);if(tok!==state.runToken)return;}
 if(unfilled.length){setStatusLine(1,SUMMARY.audit());updateBanner();
-toast('edit',unfilled.length+' detail'+(unfilled.length===1?'':'s')+' still need'+(unfilled.length===1?'s':'')+' your input — add them in the audit, then hit “Fix &amp; re-run” again.');return;}
+toast('edit',unfilled.length+' detail'+(unfilled.length===1?'':'s')+' still need'+(unfilled.length===1?'s':'')+' your input - add them in the audit, then hit “Fix &amp; re-run” again.');return;}
 state.healthAtContinue=state.health;state.penalty=calcPenalty(state.health);state.auditLocked=state.penalty>0;setStatusLine(1,SUMMARY.audit());
 resetSteps(2,5);state.running=true;state.phase='running';setStatus('running','Agent running');state.elapsedBase=0;startClock();
 const r=await executeSteps(2,5,tok);if(tok!==state.runToken)return;if(r===true)finishRun();}
-/* ---------- risk banner ---------- */
 function updateBanner(){const el=$('#riskBanner');if(!el)return;
 if(!state.done||!state.penalty||!state.jobs.length){el.hidden=true;return;}
 const h=state.healthAtContinue??state.health,open=unfixedFixable().length+unfilledInputs().length;
 el.classList.toggle('high',h<50);
- $('#rbText').innerHTML='<b>Scored as-is:</b> résumé health was <b>'+h+'/100</b> when these matches were generated, so every score sits <b>−'+state.penalty+' pts</b> below its true read'+(state.scenario&&state.scenario.applyRisk?' — '+esc(state.scenario.applyRisk):'')+'. '+(open?'<b>'+open+' item'+(open===1?'':'s')+'</b> can still lift this.':'Reapply the remaining work to recover the full read.');
+ $('#rbText').innerHTML='<b>Scored as-is:</b> résumé health was <b>'+h+'/100</b> when these matches were generated, so every score sits <b>−'+state.penalty+' pts</b> below its true read'+(state.scenario&&state.scenario.applyRisk?' - '+esc(state.scenario.applyRisk):'')+'. '+(open?'<b>'+open+' item'+(open===1?'':'s')+'</b> can still lift this.':'Reapply the remaining work to recover the full read.');
  $('#rbBtn').innerHTML='<md-icon slot="icon">auto_fix_high</md-icon>Fix &amp; re-run';el.hidden=false;}
 on('#rbBtn','click',fixAndRerun);
-/* ---------- timeline delegation ---------- */
 on('#timeline','click',e=>{if(e.target.closest('.ck-head'))return;
 const add=e.target.closest('[data-add]');if(add){applyInput(add.dataset.add);return;}
 const fx=e.target.closest('[data-fix]');if(fx){applyFix(fx.dataset.fix);return;}
@@ -952,9 +923,8 @@ const go=e.target.closest('[data-goto]');if(go){go.dataset.goto==='results'?swit
 const up=e.target.closest('[data-up]');if(up){if(input)input.click();return;}
 if(e.target.closest('[data-tryscen]')){$('#scenMenu').classList.add('open');return;}});
 on('#timeline','keydown',e=>{if(e.key==='Enter'&&e.target.matches('[data-in]')){e.preventDefault();applyInput(e.target.dataset.in);}});
-/* ---------- scenarios menu ---------- */
 const SCEN_ORDER=['strong','needswork','error','missing','unreadable'];
-function buildScenMenu(){$('#scenMenu').innerHTML='<div class="scen-head">Test scenarios — one click, full run</div>'+SCEN_ORDER.map(k=>{const s=SCEN[k];
+function buildScenMenu(){$('#scenMenu').innerHTML='<div class="scen-head">Test scenarios - one click, full run</div>'+SCEN_ORDER.map(k=>{const s=SCEN[k];
 const hc=s.health==null?'hi-gray':s.health>=85?'hi-leaf':s.health>=50?'hi-amber':'hi-red';
 const ht=s.health==null?'no text':s.health+'/100';
 return '<button class="scencard" data-scen="'+k+'" role="menuitem"><span class="sc-top"><span class="sc-file">'+s.file+'</span><span class="sc-health '+hc+'">'+ht+'</span></span><span class="sc-name">'+s.label+'</span><span class="sc-desc">'+s.desc+'</span></button>';}).join('');
@@ -962,7 +932,7 @@ return '<button class="scencard" data-scen="'+k+'" role="menuitem"><span class="
 on('#scenBtn','click',e=>{e.stopPropagation();$('#scenMenu').classList.toggle('open');});
 document.addEventListener('click',e=>{if(!e.target.closest('.scenwrap'))$('#scenMenu').classList.remove('open');if(!e.target.closest('.sortwrap')||e.target.closest('.scenwrap'))$('#sortMenu').classList.remove('open');});
 function pickScenario(key){$('#scenMenu').classList.remove('open');
-if(state.running||state.phase==='uploading'){toast('hourglass_top','The agent is mid-run — one sec.');return;}
+if(state.running||state.phase==='uploading'){toast('hourglass_top','The agent is mid-run - one sec.');return;}
 if(state.done||state.phase==='failed')resetAll(null,{silent:true});
 state.scenario=SCEN[key];$('#scenChip').hidden=false;$('#scenChipTxt').textContent='scenario · '+state.scenario.label.toLowerCase();
 loadFakeFile(state.scenario.file,state.scenario.size);}
@@ -973,7 +943,6 @@ await uploadTween(tok);if(tok!==state.runToken)return;
 function uploadTween(tok){return new Promise(res=>{const bar=$('#upBar'),lab=$('#upLabel'),t0=performance.now(),dur=1400;
 (function step(now){if(tok!==state.runToken)return res();const p=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-p,2);
 bar.setAttribute('value',e.toFixed(3));lab.textContent='uploading '+Math.round(e*100)+'%';p<1?requestAnimationFrame(step):res();})(performance.now());});}
-/* ---------- real file upload ---------- */
 let dragDepth=0;
 if(dz){dz.addEventListener('dragenter',e=>{e.preventDefault();dragDepth++;dz.classList.add('dragging');});
 dz.addEventListener('dragover',e=>e.preventDefault());
@@ -984,17 +953,16 @@ dz.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&!dz.classLi
 if(input)input.addEventListener('change',()=>{const f=input.files[0];if(f)handleFile(f);input.value='';});
 on('#browseBtn','click',e=>{e.stopPropagation();if(input)input.click();});
 on('#fReplace','click',e=>{e.stopPropagation();if(!state.running&&input)input.click();});
-on('#fRemove','click',e=>{e.stopPropagation();if(!state.running)resetAll('Résumé removed — the agent is back to sleep.');});
-on('#fcRemove','click',()=>{if(!state.running)resetAll('Résumé removed — the agent is back to sleep.');});
+on('#fRemove','click',e=>{e.stopPropagation();if(!state.running)resetAll('Résumé removed - the agent is back to sleep.');});
+on('#fcRemove','click',()=>{if(!state.running)resetAll('Résumé removed - the agent is back to sleep.');});
 const fmtSize=b=>b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB';
-async function handleFile(f){if(state.running||state.phase==='uploading'){toast('ring','The agent is mid-run — one sec.');return;}
+async function handleFile(f){if(state.running||state.phase==='uploading'){toast('ring','The agent is mid-run - one sec.');return;}
 if(state.done||state.phase==='failed')resetAll(null,{silent:true});
 const tok=++state.runToken;state.scenario=SCEN.needswork;$('#scenChip').hidden=true;state.phase='uploading';
 dz.classList.add('has-file');$('#fName').textContent=f.name;
  $('#fSize').textContent=(f.name.split('.').pop()||'').toUpperCase()+' · '+fmtSize(f.size);
 await uploadTween(tok);if(tok!==state.runToken)return;
  $('#upLabel').innerHTML='<md-icon>check_circle</md-icon>stored locally';await sleep(400);if(tok!==state.runToken)return;runPipeline(tok);}
-/* ---------- results ---------- */
 const jobById=id=>state.jobs.find(j=>j.id===id);
 const sortedJobs=()=>{const c=[...state.jobs];if(state.sort==='company')c.sort((a,b)=>a.company.localeCompare(b.company));else if(state.sort==='asc')c.sort((a,b)=>a.shown-b.shown);else c.sort((a,b)=>b.shown-a.shown);return c;};
 function buildJobs(){state.jobs=mockData.jobMatches.filter(wtOK).map(j=>({...j,shown:adjScore(j.score)}));
@@ -1006,10 +974,10 @@ function jobCard(j){const feat=j.fitRank===1,rank=String(j.fitRank).padStart(2,'
 const take=feat?'<b>Agent’s pick.</b> '+j.agentTake:j.agentTake;
 const asis=state.penalty?' · <span class="asis">scored as-is −'+state.penalty+'</span>':'';
 const actions=state.applied.has(j.id)
-?'<button class="applied-pill" data-view="'+j.id+'"><md-icon>check_circle</md-icon>Applied — view submission</button>'
+?'<button class="applied-pill" data-view="'+j.id+'"><md-icon>check_circle</md-icon>Applied - view submission</button>'
 :'<div class="actbtns"><md-filled-button class="applybtn" data-apply="'+j.id+'"><md-icon slot="icon">send</md-icon>'+(feat?'Apply with Hireflow':'Apply')+'</md-filled-button><md-text-button data-details="'+j.id+'"><md-icon slot="icon">inspect</md-icon>Details</md-text-button></div>';
 const hint=feat?'<span class="hint">'+(state.applied.has(j.id)?'tap to open the submission':'agent attaches tailored résumé + cover letter')+'</span>':'';
-return '<div class="job-wrap" data-id="'+j.id+'"><article class="job'+(feat?' featured':'')+'"><div class="wm">'+rank+'</div><div class="score"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="strack" cx="50" cy="50" r="42"/><circle class="sbar" cx="50" cy="50" r="42"/></svg><div class="scorenum"><span class="n" data-score="'+j.shown+'">0</span><i>%</i></div></div><div class="main"><div class="eyebrow-sm">'+(feat?'Best match — ':'')+'rank '+rank+' · full analysis attached'+asis+'</div><h3>'+j.title+'</h3><div class="meta">'+j.company+' · '+j.location+'</div><div class="jmeta"><span><md-icon>payments</md-icon>'+j.salary+'</span><span><md-icon>schedule</md-icon>'+j.posted+'</span><span><md-icon>group</md-icon>'+j.applicants+'</span><span><md-icon>work</md-icon>'+j.type+'</span></div><div class="jtake">'+take+'</div><div class="chips">'+j.fitReasons.map(chipHtml).join('')+'</div></div><div class="act">'+actions+hint+'</div></article></div>';}
+return '<div class="job-wrap" data-id="'+j.id+'"><article class="job'+(feat?' featured':'')+'"><div class="wm">'+rank+'</div><div class="score"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="strack" cx="50" cy="50" r="42"/><circle class="sbar" cx="50" cy="50" r="42"/></svg><div class="scorenum"><span class="n" data-score="'+j.shown+'">0</span><i>%</i></div></div><div class="main"><div class="eyebrow-sm">'+(feat?'Best match - ':'')+'rank '+rank+' · full analysis attached'+asis+'</div><h3>'+j.title+'</h3><div class="meta">'+j.company+' · '+j.location+'</div><div class="jmeta"><span><md-icon>payments</md-icon>'+j.salary+'</span><span><md-icon>schedule</md-icon>'+j.posted+'</span><span><md-icon>group</md-icon>'+j.applicants+'</span><span><md-icon>work</md-icon>'+j.type+'</span></div><div class="jtake">'+take+'</div><div class="chips">'+j.fitReasons.map(chipHtml).join('')+'</div></div><div class="act">'+actions+hint+'</div></article></div>';}
 function renderJobs(animate){const list=$('#joblist'),order=sortedJobs();
 if(animate){list.innerHTML=order.map(jobCard).join('');$$('.job-wrap',list).forEach((w,i)=>{w.style.setProperty('--d',i*110+'ms');w.classList.add('in');});animateScores();}
 else flip(list,()=>order.forEach(j=>list.appendChild(wrapById(j.id))));applyFilterUI();}
@@ -1019,7 +987,6 @@ setTimeout(()=>{const bar=$('.sbar',w),n=$('.n',w),target=+n.dataset.score,t0=pe
 (function step(now){const p=Math.min(1,(now-t0)/900),e=1-Math.pow(1-p,3);bar.style.strokeDashoffset=(264*(1-(target/100)*e)).toFixed(1);n.textContent=Math.round(target*e);if(p<1)requestAnimationFrame(step);})(performance.now());},delay);});}
 function flip(list,mutate){const items=$$('.job-wrap',list);const first=new Map(items.map(el=>[el,el.getBoundingClientRect().top]));mutate();
 items.forEach(el=>{const dy=(first.get(el)||0)-el.getBoundingClientRect().top;if(Math.abs(dy)>1){el.style.transition='none';el.style.transform='translateY('+dy+'px)';el.getBoundingClientRect();el.style.transition='transform .5s cubic-bezier(.3,1.4,.4,1)';el.style.transform='';setTimeout(()=>{el.style.transition='';el.style.transform='';},300);}});}
-/* ---------- apply / confirm / filters / sort ---------- */
 on('#joblist','click',e=>{const applyB=e.target.closest('[data-apply]');if(applyB){handleApply(+applyB.dataset.apply,applyB);return;}
 const viewB=e.target.closest('[data-view]');if(viewB){openJob(+viewB.dataset.view);return;}
 const detB=e.target.closest('[data-details]');if(detB){openJob(+detB.dataset.details);return;}
@@ -1028,7 +995,7 @@ function handleApply(id,btn){if(state.applied.has(id)||(btn&&btn.hasAttribute('d
 const h=state.healthAtContinue;if(h!=null&&h<70&&state.penalty){openConfirm(id,btn);return;}doApply(id,btn);}
 function openConfirm(id,btn){state.pendingApply={id,btn};const j=jobById(id);
  $('#cfTitle').textContent='Apply to '+j.company+' at '+state.healthAtContinue+'/100 résumé health?';
- $('#cfBody').innerHTML=(state.scenario&&state.scenario.applyRisk?esc(state.scenario.applyRisk)+' ':'')+'Matches were already docked −'+state.penalty+' pts. Fix first and re-send stronger — or send it as-is, your call.';
+ $('#cfBody').innerHTML=(state.scenario&&state.scenario.applyRisk?esc(state.scenario.applyRisk)+' ':'')+'Matches were already docked −'+state.penalty+' pts. Fix first and re-send stronger - or send it as-is, your call.';
  $('#cfScrim').classList.add('on');$('#cfModal').classList.add('on');}
 function closeConfirm(){$('#cfScrim').classList.remove('on');$('#cfModal').classList.remove('on');state.pendingApply=null;}
 on('#cfScrim','click',closeConfirm);
@@ -1039,7 +1006,7 @@ const tok=state.runToken;await sleep(800);if(tok!==state.runToken)return;
 const j=jobById(id);if(!j)return;j.subNo=state.subNo++;state.subNos[id]=j.subNo;state.applied.add(id);
 if(state.curRun){state.curRun.applied.push({company:j.company,subNo:j.subNo});saveHist();}
 const w=wrapById(id);if(w){const act=$('.act',w);
-act.innerHTML='<button class="applied-pill" data-view="'+j.id+'"><md-icon>check_circle</md-icon>Applied — view submission</button>'+(j.fitRank===1?'<span class="hint">tap to open the submission</span>':'');
+act.innerHTML='<button class="applied-pill" data-view="'+j.id+'"><md-icon>check_circle</md-icon>Applied - view submission</button>'+(j.fitRank===1?'<span class="hint">tap to open the submission</span>':'');
 act.classList.add('flash');act.addEventListener('animationend',()=>act.classList.remove('flash'),{once:true});animateScores();}
 updateAppliedChip();updateCount();feed(5,'applied → '+j.company.toLowerCase()+' · submission HF-'+j.subNo,'ok');
 toast('send','Applied to '+j.title+' at '+j.company+' with tailored materials.','View submission',()=>openJob(id));
@@ -1062,15 +1029,14 @@ const shown=$$('#joblist .job-wrap').filter(w=>!w.classList.contains('off')).len
 function updateAppliedChip(){const n=state.applied.size,el=$('#appliedChip');el.hidden=n===0;
  $('#appliedCount').textContent=n+(n===1?' role applied':' roles applied');}
 on('#appliedChip','click',()=>{const last=[...state.applied].pop();if(last)openJob(last);});
-/* ---------- job analysis dialog ---------- */
 function openJob(id){const j=jobById(id);if(!j)return;state.openJobId=id;
- $('#mEyebrow').textContent='Match analysis — rank '+String(j.fitRank).padStart(2,'0')+' · submission-ready';
+ $('#mEyebrow').textContent='Match analysis - rank '+String(j.fitRank).padStart(2,'0')+' · submission-ready';
  $('#mTitle').textContent=j.title;
  $('#mMeta').textContent=j.company+' · '+j.location+' · '+j.type+' · '+j.salary+' · '+j.posted+' · '+j.applicants;
  $('#mScore').textContent=j.shown+'%';const tr=$('#mTrue');
 if(state.penalty){tr.hidden=false;tr.textContent='true read ~'+j.score+'% · docked for résumé health';}else tr.hidden=true;
  $('#mBars').innerHTML=Object.entries(j.breakdown).map(([k,v])=>'<div class="brow"><span>'+k+'</span><div class="btrack"><i data-w="'+v+'"></i></div><b>'+v+'</b></div>').join('');
-const caveat=state.penalty?'<b style="color:var(--amber)">Scored as-is at '+state.healthAtContinue+'/100 health — fix &amp; re-run for the true read.</b> ':'';
+const caveat=state.penalty?'<b style="color:var(--amber)">Scored as-is at '+state.healthAtContinue+'/100 health - fix &amp; re-run for the true read.</b> ':'';
  $('#mTake').innerHTML=caveat+esc(j.agentTake);
  $('#mWatch').innerHTML=(state.penalty&&state.scenario&&state.scenario.applyRisk?'<div class="wrow"><md-icon>error</md-icon><span>'+esc(state.scenario.applyRisk)+'</span></div>':'')+j.watchOuts.map(w=>'<div class="wrow"><md-icon>error</md-icon><span>'+w+'</span></div>').join('');
  $('#mEvi').innerHTML=j.evidence.map(([req,ev])=>'<div class="erow"><span class="req">'+req+'</span><md-icon>arrow_forward</md-icon><span class="ev">'+ev+'</span></div>').join('');
@@ -1078,22 +1044,21 @@ const caveat=state.penalty?'<b style="color:var(--amber)">Scored as-is at '+stat
 syncDialogApply(id);$('#scrim').classList.add('on');$('#modal').classList.add('on');
 setTimeout(()=>$$('#mBars .btrack i').forEach(i=>i.style.width=i.dataset.w+'%'),60);}
 function syncDialogApply(id){const j=jobById(id),applied=state.applied.has(id);$('#mApplied').hidden=!applied;
-if(applied)$('#mAppliedTxt').textContent='Applied · HF-'+(state.subNos[id]||(j&&j.subNo)||'—');$('#mApply').style.display=applied?'none':'';}
+if(applied)$('#mAppliedTxt').textContent='Applied · HF-'+(state.subNos[id]||(j&&j.subNo)||'-');$('#mApply').style.display=applied?'none':'';}
 on('#mApply','click',()=>{const id=state.openJobId;const cardBtn=$('[data-apply="'+id+'"]')||$('.job-wrap[data-id="'+id+'"] .applybtn');handleApply(id,cardBtn||null);});
 function closeModal(){$('#scrim').classList.remove('on');$('#modal').classList.remove('on');state.openJobId=null;}
 on('#scrim','click',closeModal);on('#mClose','click',closeModal);on('#mClose2','click',closeModal);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('#prefModal').classList.contains('on'))prefsDismiss();closeConfirm();closeModal();$('#sortMenu').classList.remove('open');$('#scenMenu').classList.remove('open');}});
-/* ---------- preferences gate (two panes, one modal) ---------- */
 const WT_ORDER=['remote','onsite','hybrid','any'];
 let prefWt='any',prefLocs=[];
 function prefHome(){const p=state.scenario&&state.scenario.profile,l=p&&p.location;return l?String(l).split('·')[0].trim():'';}
 function prefAdd(v){v=(v||'').trim();if(!v)return;
 if(prefLocs.some(l=>l.toLowerCase()===v.toLowerCase())){toast('edit','Already on the list.');return;}
-if(prefLocs.length>=8){toast('edit','Eight locations max — remove one first.');return;}
+if(prefLocs.length>=8){toast('edit','Eight locations max - remove one first.');return;}
 prefLocs.push(v);renderPrefPane(1);}
 function prefUseGeo(){navigator.geolocation.getCurrentPosition(pos=>{const la=pos.coords.latitude,lo=pos.coords.longitude;
 prefAdd(Math.abs(la).toFixed(2)+'°'+(la>=0?'N':'S')+' · '+Math.abs(lo).toFixed(2)+'°'+(lo>=0?'E':'W'));},
-()=>{const g=$('#pfGeo');if(g)g.style.display='none';toast('location_off','Location unavailable — type one instead.');},{timeout:8000});}
+()=>{const g=$('#pfGeo');if(g)g.style.display='none';toast('location_off','Location unavailable - type one instead.');},{timeout:8000});}
 function renderPrefPane(pane){const b=$('#prefBody');if(!b)return;
 if(pane===0){b.innerHTML='<div class="pf-eyebrow">preferences · 1 of 2</div><div class="pf-q">What kind of work?</div>'+
 '<div class="pf-sub">The agent hard-filters every posting against this before it scores a thing.</div>'+
@@ -1103,9 +1068,9 @@ $$('.popt',b).forEach(p=>p.addEventListener('click',()=>{prefWt=p.dataset.wt;ren
 on('#pfSkip','click',prefsSkip);on('#pfNext','click',()=>renderPrefPane(1));return;}
 const home=prefHome();
 b.innerHTML='<div class="pf-eyebrow">preferences · 2 of 2</div><div class="pf-q">Where do you want to work?</div>'+
-'<div class="pf-sub">Want, not live — these shape the search story. Narrative only for now.</div>'+
+'<div class="pf-sub">Want, not live - these shape the search story. Narrative only for now.</div>'+
 (home?'<div class="pf-res"><md-icon>home</md-icon><span>Your résumé says you live in <b>'+esc(home)+'</b></span><md-text-button id="pfHome">add</md-text-button></div>':'')+
-'<div class="pf-geo"><input id="pfIn" placeholder="City, ST — or “Remote”" aria-label="Add a location"><md-filled-tonal-button id="pfAdd"><md-icon slot="icon">add</md-icon>Add</md-filled-tonal-button></div>'+
+'<div class="pf-geo"><input id="pfIn" placeholder="City, ST - or “Remote”" aria-label="Add a location"><md-filled-tonal-button id="pfAdd"><md-icon slot="icon">add</md-icon>Add</md-filled-tonal-button></div>'+
 '<div class="plocs">'+prefLocs.map((l,i)=>'<span class="ploc">'+esc(l)+'<button data-rm="'+i+'" aria-label="Remove '+esc(l)+'"><md-icon>close</md-icon></button></span>').join('')+'</div>'+
 (navigator.geolocation?'<div class="pf-geo"><md-text-button id="pfGeo"><md-icon slot="icon">my_location</md-icon>Use my current location</md-text-button></div>':'')+
 '<div class="pf-foot"><md-text-button class="pf-back" id="pfBack"><md-icon slot="icon">arrow_back</md-icon>Back</md-text-button><md-filled-button id="pfConfirm"><md-icon slot="icon">check</md-icon>Confirm</md-filled-button></div>';
@@ -1123,28 +1088,26 @@ function closePrefs(){$('#prefScrim').classList.remove('on');$('#prefModal').cla
 function prefsConfirm(){state.workType=prefWt;state.locations=[...prefLocs];state.prefsDone=true;savePrefs();updatePrefsChip();closePrefs();
 const tok=state.prefGate;state.prefGate=null;
 if(tok!=null){feed(2,'preferences confirmed · '+prefsFeedStr());continuePipeline(tok);}
-else toast('tune','Preferences saved — '+prefsSummary()+'.');}
+else toast('tune','Preferences saved - '+prefsSummary()+'.');}
 function prefsSkip(){prefWt='any';prefLocs=[];prefsConfirm();}
 function prefsDismiss(){if(state.prefGate!=null)prefsSkip();else closePrefs();}
 on('#prefScrim','click',prefsDismiss);
 on('#prefsChip','click',()=>{if(state.prefGate!=null){openPrefs();return;}
-if(state.running){toast('hourglass_top','The agent is mid-run — edit preferences once it finishes.');return;}
+if(state.running){toast('hourglass_top','The agent is mid-run - edit preferences once it finishes.');return;}
 openPrefs();});
-/* ---------- history ---------- */
 function renderHistory(){const list=$('#histList'),meta=$('#histMeta');if(!list)return;
 if(!state.history.length){list.innerHTML='';$('#histEmpty').hidden=false;meta.textContent='no runs yet';disarmHist();return;}
 $('#histEmpty').hidden=true;
 list.innerHTML=state.history.map(h=>'<div class="hcard"><div class="h-top"><span class="h-file">'+esc(h.file||'résumé')+'</span>'+(h.scenario?'<span class="h-scen">'+esc(h.scenario)+'</span>':'')+'<span class="h-time" title="'+new Date(h.ts).toLocaleString()+'">'+relTs(h.ts||Date.now())+'</span></div>'+
 '<div class="h-chips">'+((h.workType&&h.workType!=='any')?'<span class="hchip">'+WT_LABEL[h.workType]+'</span>':'')+(h.locations||[]).map(l=>'<span class="hchip">'+esc(l)+'</span>').join('')+(h.applied||[]).map(a=>'<span class="hchip">applied · '+esc(a.company)+' · HF-'+a.subNo+'</span>').join('')+'</div>'+
-'<div class="h-stats"><span>health <b>'+(h.health==null?'—':h.health)+'</b></span><span>matches <b>'+(h.matches||0)+'</b></span><span class="hap">applied <b>'+(h.applied||[]).length+'</b></span></div></div>').join('');
+'<div class="h-stats"><span>health <b>'+(h.health==null?'-':h.health)+'</b></span><span>matches <b>'+(h.matches||0)+'</b></span><span class="hap">applied <b>'+(h.applied||[]).length+'</b></span></div></div>').join('');
 meta.textContent=state.history.length+(state.history.length===1?' run':' runs')+' saved on this device';}
 let histArm=null;
 function disarmHist(){clearTimeout(histArm);const b=$('#histClear');if(b){b.classList.remove('armed');b.innerHTML='<md-icon>delete</md-icon>Clear history';}}
 on('#histClear','click',()=>{const b=$('#histClear');
 if(!b.classList.contains('armed')){b.classList.add('armed');b.innerHTML='<md-icon>delete_forever</md-icon>Really clear? Click again';
 clearTimeout(histArm);histArm=setTimeout(disarmHist,3500);return;}
-disarmHist();state.history=[];state.curRun=null;saveHist();renderHistory();toast('delete','History cleared — preferences untouched.');});
-/* ---------- toast / status / reset / boot ---------- */
+disarmHist();state.history=[];state.curRun=null;saveHist();renderHistory();toast('delete','History cleared - preferences untouched.');});
 let toastTimer=null;
 function toast(icon,text,actionLabel,onAction){const t=$('#toast');$('#toastIcon').textContent=icon;$('#toastText').textContent=text;
 const b=$('#toastAct');b.style.display=actionLabel?'':'none';
@@ -1170,8 +1133,7 @@ setTimeout(()=>{res.hidden=true;$('#joblist').innerHTML='';$('#riskBanner').hidd
 closeModal();closeConfirm();closePrefs();hideToast();
 showHero();refreshTabs();switchView('agent');
  if(msg&&!(opts&&opts.silent))toast('restart_alt',msg);}
-on('#resetBtn','click',()=>{resetAll('Session reset — saved preferences & history are kept.');});
-/* boot */
+on('#resetBtn','click',()=>{resetAll('Session reset - saved preferences & history are kept.');});
 state.history=loadHist();
 const savedPrefs=loadPrefs();if(savedPrefs){state.workType=savedPrefs.workType;state.locations=savedPrefs.locations;state.prefsEver=true;}
 updatePrefsChip();buildTimeline();buildScenMenu();setStatus('idle','Agent idle');switchView('agent');refreshTabs();renderHistory();

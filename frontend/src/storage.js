@@ -1,6 +1,3 @@
-// storage.js — browser localStorage for prefs + run history.
-// The backend is stateless; the seen-job set and run history live here, so
-// nothing sensitive is ever stored server-side.
 
 const PREFS_KEY = 'hireflow.prefs.v1';
 const HISTORY_KEY = 'hireflow.history.v1';
@@ -19,11 +16,9 @@ function safeSet(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    /* storage full/blocked — best effort */
   }
 }
 
-// --- prefs ---
 export function loadPrefs() {
   return safeGet(PREFS_KEY, { work_type: 'any', locations: [], target_roles: [] });
 }
@@ -32,7 +27,6 @@ export function savePrefs(prefs) {
   safeSet(PREFS_KEY, prefs);
 }
 
-// --- history ---
 export function loadHistory() {
   return safeGet(HISTORY_KEY, []);
 }
@@ -47,7 +41,6 @@ export function clearHistory() {
   localStorage.removeItem(HISTORY_KEY);
 }
 
-// --- seen jobs (cross-run dedup) ---
 export function loadSeen() {
   return safeGet(SEEN_KEY, []);
 }
@@ -60,7 +53,6 @@ export function markSeen(jobs) {
   return merged;
 }
 
-// --- active run (resume-after-refresh) ---
 const ACTIVE_RUN_KEY = 'hireflow.active_run.v1';
 
 export function saveActiveRun(info) {
@@ -75,6 +67,5 @@ export function clearActiveRun() {
   try {
     localStorage.removeItem(ACTIVE_RUN_KEY);
   } catch {
-    /* blocked — best effort */
   }
 }

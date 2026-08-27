@@ -31,12 +31,12 @@ _LOCATION_HINTS: dict[str, tuple[str, ...]] = {
 
 
 class WebDiscoverySource:
-    """Keyless web discovery layer — finds candidate job URLs, then webfetches.
+    """Keyless web discovery layer - finds candidate job URLs, then webfetches.
 
     Given a role + preferred locations, runs a keyless HTML search
-    (DuckDuckGo Lite — curl-verified 200 + parseable this session) and turns
+    (DuckDuckGo Lite - curl-verified 200 + parseable this session) and turns
     the organic result links into jobs via ``WebFetchSource``. Site hints are
-    per-location best-effort (e.g. ``site:jobstreet.com.my`` for MY) — there is
+    per-location best-effort (e.g. ``site:jobstreet.com.my`` for MY) - there is
     no global 50-domain whitelist, and an unknown location simply searches
     ``"{role} jobs {location}"``. An explicit per-run ``companies`` list is
     probed via ``WebFetchSource.webfetch_company``. Every step soft-fails:

@@ -56,8 +56,6 @@ export default function App() {
     setView('agent');
   }
 
-  // applyResult — turns a run's done payload into app state + history, then
-  // clears the stored active run (no more resume needed).
   function applyResult(res, p) {
     setResult(res);
     const m = res.matches || [];
@@ -67,7 +65,7 @@ export default function App() {
     clearActiveRun();
     if (res.status === 'cancelled') {
       setRunning(false);
-      showToast('Run cancelled — agent stopped');
+      showToast('Run cancelled - agent stopped');
       return;
     }
     markSeen(m);
@@ -83,14 +81,11 @@ export default function App() {
     if (res.status === 'error' || (res.errors && res.errors.length > 0)) {
       showToast((res.detail || (res.errors && res.errors[0])) || 'Run finished with errors', 'error', 6000);
     } else {
-      showToast(`Run complete — ${m.length} matches, ${a.length} applications`);
+      showToast(`Run complete - ${m.length} matches, ${a.length} applications`);
     }
     setRunning(false);
   }
 
-  // streamRun — attach to an existing run's SSE stream; picks up mid-run events
-  // via Last-Event-ID resume and finishes with applyResult. Every callback
-  // ignores the stream if a newer run has since taken over runRef.
   async function streamRun(runId, p) {
     runRef.current = runId;
     await streamEvents(runId, {
@@ -109,19 +104,13 @@ export default function App() {
     });
   }
 
-  // resumeRun — app mount path for a run that was started in a previous page
-  // load (saved to localStorage). If the backend still has the run it reattaches
-  // to the live stream; if it already finished it renders the full result; if
-  // the run is gone (instance restart/scale-to-zero) it just clears the marker.
   async function resumeRun(active) {
     let info = null;
     try {
       info = await fetchRunStatus(active.runId);
     } catch {
-      // Backend unreachable — keep the marker so a later refresh can re-attach;
-      // the backend task keeps running whether or not we are connected to it.
       setRunning(false);
-      showToast('Backend unreachable — run will resume when it is back', 'error', 6000);
+      showToast('Backend unreachable - run will resume when it is back', 'error', 6000);
       return;
     }
     if (!info || !info.exists) {
@@ -143,7 +132,7 @@ export default function App() {
 
   function handleUploaded(parsed) {
     setProfile(parsed);
-    showToast(`Résumé parsed — ${parsed.skills ? parsed.skills.length : 0} skills extracted`);
+    showToast(`Résumé parsed - ${parsed.skills ? parsed.skills.length : 0} skills extracted`);
     handleRun(parsed);
   }
 
@@ -267,7 +256,7 @@ export default function App() {
                     <span className="accent">running itself.</span>
                   </h1>
                   <p className="sub">
-                    Drop in a résumé and Hireflow takes it from there — parsing, auditing, searching,
+                    Drop in a résumé and Hireflow takes it from there - parsing, auditing, searching,
                     ranking and tailoring. You only approve.
                   </p>
                   <M3eButton

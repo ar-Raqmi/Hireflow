@@ -1,9 +1,6 @@
 import { M3eButton } from '@m3e/react/button';
 import M3eIcon from './M3eIcon.jsx';
 
-// HistoryTab — past runs from localStorage, with a Clear history button.
-// Each run stores the profile filename, prefs, timestamp and the result
-// payload (matches/applications/errors) from the last completed run.
 export default function HistoryTab({ history = [], onClear }) {
   return (
     <section className="results in">
@@ -25,7 +22,7 @@ export default function HistoryTab({ history = [], onClear }) {
         <div className="hempty">
           <M3eIcon name="history" size={34} />
           <b>Past runs will appear here</b>
-          Upload a résumé and run the agent — every completed run lands here, saved locally on this device.
+          Upload a résumé and run the agent - every completed run lands here, saved locally on this device.
         </div>
       ) : (
         <div>
@@ -49,7 +46,7 @@ export default function HistoryTab({ history = [], onClear }) {
               </div>
               {(run.result && run.result.errors && run.result.errors.length > 0) && (
                 <div className="errors-note">
-                  {run.result.errors.slice(0, 3).map((e, j) => <div key={j} className="fl err">— {e}</div>)}
+                  {run.result.errors.slice(0, 3).map((e, j) => <div key={j} className="fl err">- {e}</div>)}
                 </div>
               )}
             </div>

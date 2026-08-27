@@ -6,25 +6,25 @@ Everything Hireflow needs from GCP, step by step. Each step has a "why" and a
 **Project:** `hireflow-506207` · **Region:** `us-central1` · **Today:** 2026-08-23
 
 > **Verified against live Google Cloud docs:** 2026-08-23.
-> Re-verify URLs if they drift — Google renames products often. Current naming:
+> Re-verify URLs if they drift - Google renames products often. Current naming:
 > **Vertex AI** → **Gemini Enterprise Agent Platform**; **Vertex AI Search** →
 > **Agent Search** (console = **AI Applications**). The underlying service/API
 > IDs are unchanged.
 
-> 💡 **ARCHITECTURE NOTE — §3 is OPTIONAL. Don't block on it.**
+> 💡 **ARCHITECTURE NOTE - §3 is OPTIONAL. Don't block on it.**
 > Agent Search website indexing only works on domains **you can verify you own**
 > (or get the domain owner to approve). It is NOT a keyless way to index
 > third-party job boards like glassdoor/jobstreet/kalibrr. The core Hireflow
-> search pipeline does NOT depend on §3 at all — it pulls jobs directly from
+> search pipeline does NOT depend on §3 at all - it pulls jobs directly from
 > freehire, RemoteOK, Remotive, ATS boards (Greenhouse/Ashby), JSON-LD career
 > pages, and LinkedIn guest search. If you hit a billing or verification wall in
-> §3, **skip it and continue** — it's a nice-to-have supplement, not a blocker.
+> §3, **skip it and continue** - it's a nice-to-have supplement, not a blocker.
 
 ---
 
 ## 0. Preflight (I'm authenticated, project is right)
 
-`gcloud` is still the current CLI (now marketed as the "Google Cloud CLI" — the
+`gcloud` is still the current CLI (now marketed as the "Google Cloud CLI" - the
 command name is unchanged).
 
 ```bash
@@ -63,7 +63,7 @@ The app's pipeline calls Gemini/embeddings from Cloud Run **as itself** via the
 runtime SA. By default Cloud Run uses the project's Compute Engine default
 service account, which is `<projectNumber>-compute@developer.gserviceaccount.com`.
 It needs `roles/aiplatform.user` (shown as "Agent Platform User" in the console
-now — the role ID is unchanged) or every model/embedding call returns 401/403.
+now - the role ID is unchanged) or every model/embedding call returns 401/403.
 
 ```bash
 SA="$(gcloud projects describe hireflow-506207 --format='value(projectNumber)')-compute@developer.gserviceaccount.com"
@@ -73,15 +73,15 @@ gcloud projects add-iam-policy-binding hireflow-506207 \
 
 ✅ We'll verify implicitly in §4 and §5 (the `/health` plus a real run).
 - If the org was created after May 3 2024, the default SA may **not** be
-  auto-granted any role — this binding is what fixes that.
+  auto-granted any role - this binding is what fixes that.
 
 ---
 
-## 3. OPTIONAL — create a website-search data store (Agent Search)
+## 3. OPTIONAL - create a website-search data store (Agent Search)
 
 **Why it changed from the old note:** the retired Custom Search JSON API let you
 scope a search to up to ~50 sites keyless. Agent Search site search is NOT
-keyless for that — a website data store with **Advanced website indexing only
+keyless for that - a website data store with **Advanced website indexing only
 indexes domains you can verify** (Search Console ownership, or a domain-owner
 association request). It also requires **billing enabled**, and you must attach
 the data store to an app with **Enterprise Edition on** (extra cost). Indexed
@@ -99,13 +99,13 @@ If you want to try it, the current flow:
 4. Decide whether to turn on **Advanced website indexing**. Needed for
    summarization / follow-up answers; costs extra, requires domain
    verification, and **can't be turned off later**.
-5. In **Sites to include**, add one URL pattern per line, no protocol prefix —
+5. In **Sites to include**, add one URL pattern per line, no protocol prefix -
    e.g. `example.com/careers/*`. Add exclusions in **Sites to exclude** to stop
    dynamic-URL bloat (sitemap-discovery mode can grow the index + storage cost).
-6. **Data store location:** choose **global (Global)** — the sites must be
+6. **Data store location:** choose **global (Global)** - the sites must be
    public and global gives the best availability.
 7. Name it `hireflow-jobs` → **Create**. Copy the auto-generated **Data store
-   ID** (looks like `hireflow-jobs-...`) — the optional Agent Search ID. It is
+   ID** (looks like `hireflow-jobs-...`) - the optional Agent Search ID. It is
    **not read by the app code yet** (Agent Search stays optional/unwired).
 8. After create, **verify the domains** you listed (Data page → Website tab →
    **Verify**). Indexing only starts after verification, and large sites may
@@ -114,7 +114,7 @@ If you want to try it, the current flow:
 ✅ Check: it appears under `https://console.cloud.google.com/gen-app-builder/`
 → **Data Stores** with the ID visible.
 
-> If you can't verify a domain or don't want the cost — **skip this step.** The
+> If you can't verify a domain or don't want the cost - **skip this step.** The
 > core pipeline works without it.
 
 ---
@@ -174,7 +174,7 @@ gcloud run deploy hireflow-backend \
   secrets out).
 - **`--set-env-vars` gotcha:** it takes ONE comma-separated `KEY=VALUE` list
   with **no trailing commas and no spaces**. Keep it on a single line as above.
-- Cloud Run listens on **port 8080 by default** — the FastAPI app must bind 8080
+- Cloud Run listens on **port 8080 by default** - the FastAPI app must bind 8080
   (or pass `--port`).
 - If Chromium/Playwright is enabled later, bump to `--memory 2G --cpu 2`.
 
@@ -187,12 +187,12 @@ gcloud run deploy hireflow-backend \
 | Symptom | Fix |
 |---|---|
 | App boots, Gemini 401/403 | missing `roles/aiplatform.user` on the run SA (step 2) |
-| `agent_not_configured` | old build — redeploy (step 5) |
+| `agent_not_configured` | old build - redeploy (step 5) |
 | Embeddings 404 | model name env (`EMBEDDING_MODEL=text-embedding-005`) |
 | Pipeline times out | `--timeout 3600` not set → rerun step 5 |
-| Agent-search not matching | domain not verified — Advanced indexing only indexes domains you can verify; skip §3 (core search is unaffected) |
+| Agent-search not matching | domain not verified - Advanced indexing only indexes domains you can verify; skip §3 (core search is unaffected) |
 
 ---
 
 *Verified against live Google Cloud docs on 2026-08-23. URLs and product names
-drift — re-check before a demo. Bismillah.*
+drift - re-check before a demo. Bismillah.*

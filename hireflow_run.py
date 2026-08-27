@@ -1,9 +1,3 @@
-# hireflow_run.py - cross-platform thin client for the deployed Hireflow pipeline.
-# Shared by hireflow.sh (Linux/macOS) and hireflow.bat (Windows).
-# Usage:
-#   python hireflow_run.py <base_url> <resume_path> [work_type] [locations] [target_roles]
-# Prompts interactively when flags omitted; uploads, streams SSE live progress,
-# prints the final report. Nothing is computed locally.
 
 import json
 import os
@@ -227,7 +221,6 @@ def main() -> int:
     seen = [p.strip() for p in seen_raw.split(",") if p.strip()]
     locs = [p.strip() for p in locs_raw.split(",") if p.strip()]
 
-    # interactive if no explicit args were passed
     if len(sys.argv) <= 5 and not (work != "any" or locs_raw or target):
         print("\n=== Work type (your gate - hard filter) ===")
         work = _prompt_work_type()

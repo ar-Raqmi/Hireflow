@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# hireflow.sh — thin ONLINE client for the deployed Hireflow pipeline.
-# Prompts for resume + prefs, uploads to Cloud Run, runs the pipeline
-# server-side, prints the full report. Nothing is computed locally.
 
 set -euo pipefail
 
@@ -20,8 +17,6 @@ for t in curl python3; do
   command -v "$t" >/dev/null 2>&1 || { echo "missing required tool: $t"; exit 1; }
 done
 
-# Prefer the project venv python (has dotenv + hireflow deps) so the HTML/JSON
-# export works; fall back to system python3 if no venv exists.
 PY="python3"
 if [[ -x "$HERE/.venv/bin/python3" ]]; then
   PY="$HERE/.venv/bin/python3"
@@ -29,10 +24,9 @@ fi
 
 echo
 echo "  hireflow-cli · online · $BASE_URL"
-echo "  (the pipeline runs on Cloud Run — nothing is computed locally)"
+echo "  (the pipeline runs on Cloud Run - nothing is computed locally)"
 echo
 
-# --- 1. resume file ---
 RESUME=""
 ask_file() {
   local dir="${HOME}/Downloads" rel cand
@@ -40,7 +34,7 @@ ask_file() {
   while :; do
     printf 'Resume path [%s]: ' "$dir"
     read -r rel
-    [[ -z "$rel" ]] && { printf 'no file given — aborting\n' >&2; exit 1; }
+    [[ -z "$rel" ]] && { printf 'no file given - aborting\n' >&2; exit 1; }
     cand="$rel"
     [[ "$rel" == /* ]] || cand="${dir}/${rel}"
     if [[ -f "$cand" ]]; then RESUME="$cand"; return; fi
@@ -49,7 +43,6 @@ ask_file() {
 }
 ask_file
 
-# --- 2. work type (menu) ---
 WORK=""
 printf '\nWork type:\n'
 select w in "Remote" "Onsite" "Hybrid" "Anywhere (skip)"; do
@@ -63,7 +56,6 @@ select w in "Remote" "Onsite" "Hybrid" "Anywhere (skip)"; do
 done
 echo "work_type: ${WORK:-any}"
 
-# --- 3. locations ---
 LOCS=()
 printf '\nPreferred work locations (comma separated; blank = anywhere):\n'
 printf '> '
@@ -78,14 +70,12 @@ if [[ -n "$line" ]]; then
 fi
 [[ "${#LOCS[@]}" -gt 0 ]] && echo "locations: ${LOCS[*]} (${#LOCS[@]})" || echo "locations: stay"
 
-# --- 4. target roles (optional) ---
 TARGET=""
 printf '\nTarget roles (comma separated, blank = let the agent infer):\n'
 printf '> '
 IFS= read -r TARGET
 [[ -n "$TARGET" ]] && echo "target_roles: $TARGET" || echo "target_roles: (infer from resume)"
 
-# --- upload + run pipeline ---
 FIELDS=(-F "file=@${RESUME}")
 [[ -n "$WORK" ]] && FIELDS+=(-F "work_type=$WORK")
 if [[ "${#LOCS[@]}" -gt 0 ]]; then

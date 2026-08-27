@@ -32,13 +32,13 @@ from hireflow.tools.wantedly import WantedlySource
 
 
 class AtsSandbox:
-    """In-memory sandbox ATS — the demo's real submit destination.
+    """In-memory sandbox ATS - the demo's real submit destination.
 
     Records every approved submission with the exact payload a real ATS would
     receive (drafted CV + cover letter + job/profile) and returns a
     confirmation code. Kept in memory plus a best-effort JSON file on the
     instance's ephemeral disk (a redeploy starts empty). No real employer is
-    ever contacted — this is the honest "the agent sent the right info to the
+    ever contacted - this is the honest "the agent sent the right info to the
     right place" proof for the demo.
     """
 
@@ -213,7 +213,7 @@ def _build_default_agent() -> HireflowAgent:
 def create_app(
     storage: StorageFactory | None = None, agent: HireflowAgent | None = None
 ) -> FastAPI:
-    """App factory — injectable storage/agent; defaults to real ones."""
+    """App factory - injectable storage/agent; defaults to real ones."""
     api = FastAPI(title="Hireflow API", version="0.3.0")
     api.add_middleware(
         CORSMiddleware,
