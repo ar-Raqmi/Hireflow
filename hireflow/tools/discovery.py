@@ -83,6 +83,10 @@ class WebDiscoverySource:
         preferred = self._preferred_locations(location, locations)
         terms = [self._query(role, loc) for loc in preferred] or [self._query(role, "")]
         candidate_urls = await self._search_links(terms, limit=min(limit, self._max_links))
+
+        print(f"[WEB DEBUG] search terms: {terms}")
+        print(f"[WEB DEBUG] candidate URLs ({len(candidate_urls)}): {candidate_urls}")
+        
         jobs, seen = await self._collect(candidate_urls, role, seen=set())
         company_names = companies if companies is not None else self._companies
         jobs, seen = await self._collect(

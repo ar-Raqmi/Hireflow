@@ -104,7 +104,7 @@ def stealth_context_kwargs(locations: list[str] | None = None) -> dict[str, Any]
 
 def apply_stealth(page: Any) -> None:
     """Inject the anti-detection script into a freshly created page."""
-    page.add_init_script(STEALTH_INIT_SCRIPT)
+    await page.add_init_script(STEALTH_INIT_SCRIPT)
 
 
 @asynccontextmanager
