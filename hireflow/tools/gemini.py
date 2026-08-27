@@ -188,14 +188,7 @@ class GeminiClient:
         """
         from google.genai import types
 
-        tool = types.Tool(
-            google_search_retrieval=types.GoogleSearchRetrieval(
-                dynamic_retrieval_config=types.DynamicRetrievalConfig(
-                    mode=types.DynamicRetrievalConfigMode.MODE_DYNAMIC,
-                    dynamic_threshold=0.0,
-                )
-            )
-        )
+        tool = types.Tool(google_search=types.GoogleSearch())
         response = await self._async_client.models.generate_content(
             model=self._model,
             contents=query,
