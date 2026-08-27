@@ -18,13 +18,11 @@ from hireflow.config import JSONLD_COMPANY_URLS, SETTINGS
 from hireflow.domain import Application, ApplicationStatus, JobPosting, Profile
 from hireflow.storage.factory import StorageFactory
 from hireflow.tools.ats import AtsBoardSource
-from hireflow.tools.browser import PlaywrightSource
 from hireflow.tools.freehire import FreehireSource
 from hireflow.tools.gemini import GeminiClient
 from hireflow.tools.gemini_search import GeminiWebSearchSource
 from hireflow.tools.japan_dev import JapanDevSource
 from hireflow.tools.jsonld import JsonLdSource
-from hireflow.tools.jobstreet import JobStreetSource
 from hireflow.tools.linkedin import LinkedInSource
 from hireflow.tools.remoteok import RemoteOKSource
 from hireflow.tools.remotive import RemotiveSource
@@ -210,10 +208,6 @@ def _build_default_agent() -> HireflowAgent:
     if SETTINGS.use_unverified_sources:
         sources.append(WantedlySource())
         sources.append(JapanDevSource())
-    if SETTINGS.playwright_enabled:
-        sources.append(PlaywrightSource())
-        if SETTINGS.jobstreet_enabled:
-            sources.append(JobStreetSource())
     router = RouterAgent(sources=sources, gemini=gemini)
     return HireflowAgent(router=router)
 

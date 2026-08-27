@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any
 
 from hireflow.config import SETTINGS
@@ -17,8 +16,6 @@ class GeminiClient:
         self._model = model or SETTINGS.gemini_model
         use_vertex = SETTINGS.gemini_use_vertex and bool(SETTINGS.project_id)
         if use_vertex:
-            if SETTINGS.vertex_location == "global":
-                os.environ["GOOGLE_GENAI_USE_ENTERPRISE"] = "True"
             self._client = genai.Client(
                 vertexai=True,
                 project=SETTINGS.project_id,
@@ -181,7 +178,7 @@ class GeminiClient:
         """Google Search grounded retrieval - returns [{title, uri, domain}] for a query.
 
         Uses Vertex (or Gemini API) Google Search grounding via the
-        ``google_search_retrieval`` tool so the model returns real, current
+        ``google_search`` tool so the model returns real, current
         source URLs (no fragile scraping). Raises on failure so the caller can
         surface the reason; returns [] only if grounding genuinely returned no
         sources.

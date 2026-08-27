@@ -152,9 +152,10 @@ curl -X POST \
 
 ## 5. Redeploy Cloud Run (bigger instance + long timeout + new env)
 
-The pipeline now does Gemini + embeddings + (optionally) Agent Search + site
-search + Playwright rendering. It needs more memory and a long request timeout,
-and it must be public for `curl`/CLI e2e.
+The pipeline does Gemini + embeddings + (optionally) Agent Search + site search. It needs a
+long request timeout, and it must be public for `curl`/CLI e2e. (Chromium/Playwright was
+**removed** entirely 2026-08-27 - no browser in the image, so 1Gi is plenty and Cloud Build
+takes minutes, not ~20.)
 
 ```bash
 gcloud run deploy hireflow-backend \
@@ -167,16 +168,17 @@ gcloud run deploy hireflow-backend \
   --set-env-vars GCP_PROJECT_ID=hireflow-506207,GEMINI_USE_VERTEX=true,VERTEX_LOCATION=global,GEMINI_MODEL=gemini-3.5-flash,RESUME_PARSE_MODE=hybrid,QUERY_EXPANSION=true,JOB_RECENCY_DAYS=14,DIVERSITY_MAX_SAME_COMPANY=2
 ```
 
-- `--memory 1Gi` + `--timeout 3600` → needed for Chromium (Playwright) + long
-  async runs. (Default 300s WILL kill the ~7–10 min pipeline; we already hit
-  that.)
+- `--memory 1Gi` + `--timeout 3600` → long async runs (Chromium/Playwright was
+  **removed** from the image 2026-08-27, so 1Gi is plenty). (Default 300s WILL
+  kill the ~7–10 min pipeline; we already hit that.)
 - `--source .` builds the `Dockerfile` via Cloud Build (`.dockerignore` keeps
   secrets out).
 - **`--set-env-vars` gotcha:** it takes ONE comma-separated `KEY=VALUE` list
   with **no trailing commas and no spaces**. Keep it on a single line as above.
 - Cloud Run listens on **port 8080 by default** - the FastAPI app must bind 8080
   (or pass `--port`).
-- If Chromium/Playwright is enabled later, bump to `--memory 2G --cpu 2`.
+- Chromium/Playwright was **removed** (2026-08-27) - no browser belongs in the
+  image; do not re-add it. `--memory 1Gi` is plenty.
 
 ✅ Done: `curl -s https://hireflow-backend-296941301245.us-central1.run.app/health` → `{"status":"ok"}`
 

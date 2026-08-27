@@ -119,20 +119,6 @@ class Settings:
     embedding_model: str = field(
         default_factory=lambda: _env("EMBEDDING_MODEL", "gemini-embedding-001")
     )
-    playwright_enabled: bool = field(
-        default_factory=lambda: _env("HIREFLOW_PLAYWRIGHT", "").lower() in {"1", "true", "yes"}
-    )
-    playwright_spa_urls: list[str] = field(
-        default_factory=lambda: [
-            part.strip()
-            for part in os.getenv("PLAYWRIGHT_SPA_URLS", "").split(",")
-            if part.strip()
-        ]
-    )
-    jobstreet_enabled: bool = field(
-        default_factory=lambda: _env("JOBSTREET_ENABLED", "true").lower()
-        in {"1", "true", "yes"}
-    )
     sandbox_ats_file: str = field(
         default_factory=lambda: _env("SANDBOX_ATS_FILE", "sandbox_ats.json")
     )

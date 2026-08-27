@@ -76,7 +76,7 @@ The agent is **not a chatbot** - it is a **watcher**. The user uploads a resume 
 | Database/state | **No SQL**. Browser `localStorage` owns prefs + history; backend is stateless, in-memory only for a run |
 | Hosting | **Cloud Run** (scale-to-zero) |
 | Scheduling | **Cloud Scheduler** → `POST /pipeline/run` (job polling) - optional |
-| Job sources | **An AI search agent, not a keyword fetcher** - **IMPLEMENTED + LIVE (proven on the deployed Cloud Run 2026-08-27)**: Gemini query expansion (synonyms per role, deterministic fallback), multiple query variants per source for variation, then gate-then-cap (work-type + **location** + recency) before scoring, with cross-run seen-job dedup + per-company diversity. Backed by a **keyless global source registry** (freehire/RemoteOK/Remotive + JSON-LD + LinkedIn guest + ATS Greenhouse/Ashby + freehire `source=seek`/`mycareersfuture`), honest per-country paths. **Universal webfetch + Gemini grounded-search (replaces the rate-limited DuckDuckGo scrape) + embeddings re-rank: PRESENT (code; live proof pending redeploy)** - no 50-domain whitelist; **Agent Search is OPTIONAL** (replaces CSE; only indexes domains Zach can verify he owns - see `docs/GCP_SETUP.md` §3). Never "remote-only" nor "US-only" (details §10) |
+| Job sources | **An AI search agent, not a keyword fetcher** - **IMPLEMENTED + LIVE (proven on the deployed Cloud Run 2026-08-27)**: Gemini query expansion (synonyms per role, deterministic fallback), multiple query variants per source for variation, then gate-then-cap (work-type + **location** + recency) before scoring, with cross-run seen-job dedup + per-company diversity. Backed by a **keyless global source registry** (freehire/RemoteOK/Remotive + JSON-LD + LinkedIn guest + ATS Greenhouse/Ashby + freehire `source=seek`/`mycareersfuture`), honest per-country paths. **Universal webfetch + Gemini grounded-search (replaces the rate-limited DuckDuckGo scrape; uses the verified-correct `google_search` tool - live-verify via `GET /debug/grounded`) + embeddings re-rank: PRESENT (code)** - no 50-domain whitelist. **Playwright/Chromium removed entirely (2026-08-27)** - it never contributed jobs (Cloudflare-blocked, `0 new` every run) and was the deploy-cost hog (~20-min builds). **Agent Search is OPTIONAL** (replaces CSE; only indexes domains Zach can verify he owns - see `docs/GCP_SETUP.md` §3). Never "remote-only" nor "US-only" (details §10) |
 | Apply strategy | **Sandboxed job board (simple ATS)** in the demo; real-world = draft-for-approval. **Real submit to the sandbox ATS is LIVE** - `/approve` submits to `/sandbox/ats/apply` (`ApplicationStatus.SUBMITTED` + `ats_confirmation`), proven in the live e2e; in-memory + best-effort `sandbox_ats.json`, no DB |
 | Scoring | 5 dimensions: skills, experience, location, salary band, culture/keywords |
 | Human handoff | offers, salary talks, counter-offers → flag "needs human" |
@@ -131,17 +131,14 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
   - `hireflow/tools/` → **search intelligence** - **PRESENT (code; live proof pending redeploy)**,
     all grep-verified this pass: `QueryExpander` (`expander.py` - Gemini expansion + deterministic
     fallback), `WantedlySource` (`wantedly.py`, JP, flag-gated), `JapanDevSource` (`japan_dev.py`,
-    JP, flag-gated), **`JobStreetSource` (`jobstreet.py`, PLAYWRIGHT - the "PC-quality" source:
-    real Chromium renders `{cc}.jobstreet.com/{role}-jobs/in-{place}` (my/sg/id/ph/th/vn),
-    extracts per-card title/company/location/salary("RM 9,000 – RM 13,000 per month")/
-    work-type/listed-date from the DOM exactly as a real browser sees. Cloudflare 403s plain
-    httpx (live-verified), so this source is Playwright-only, gated `HIREFLOW_PLAYWRIGHT=1` +
-    `JOBSTREET_ENABLED=true`; cap ≤20 cards/run, ToS low-volume; soft-fail → `[]`)**. `LocationMapper` (`geo.py` - incl. `Johor → my`; the location gate lives in
+    JP, flag-gated). **No browser sources** - Playwright/Chromium was removed entirely
+    (2026-08-27; see the audit in §7). `LocationMapper` (`geo.py` - incl. `Johor → my`; the location gate lives in
     `SearchAgent._passes_location`).
   - `hireflow/tools/` → **PRESENT (code; live proof pending redeploy)**:
     `WebFetchSource` (`webfetch.py`), `GeminiWebSearchSource` (`gemini_search.py` - Google Search
-    grounding, name `gemini_web`), `EmbeddingRanker` (`embeddings.py`). All landed in the tree;
-    still need a redeploy + curl e2e to count.
+    grounding via the **`google_search` tool** - NOT `google_search_retrieval`, which Vertex 400s;
+    live-verify via `GET /debug/grounded`, name `gemini_web`), `EmbeddingRanker`
+    (`embeddings.py`). All landed in the tree; still need a redeploy + curl e2e to count.
 - Domain models in `hireflow/domain/` - plain typed classes, no framework imports:
   - `Profile` (incl. `residence`, `work_type`, preferred `locations`, `salary_floor`)
   - `JobPosting`, `Application` (+ `ApplicationStatus` - `MATCHED`/`ROUTED`/`DRAFTED`/`SUBMITTED`; `SUBMITTED` is the real-submit state)
@@ -199,8 +196,7 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 │   │                        #   incl. Johor → my), expander (QueryExpander), wantedly (JP),
 │   │                        #   japan_dev (JP, flag-gated), resume_parser, gemini.py (REAL
 │   │                        #   GeminiClient, incl. vision parse), linkedin.py (LinkedInSource),
-│   │                        #   jsonld.py (JsonLdSource), ats.py (AtsBoardSource), browser.py
-│   │                        #   (PlaywrightSource), jobstreet.py (Playwright JobStreet), +
+│   │                        #   jsonld.py (JsonLdSource), ats.py (AtsBoardSource), +
 │   │                        #   webfetch/gemini_search/embeddings (universal catch-all layer)
 │   └── api/app.py           # FastAPI: health, upload (text+vision parse), dashboard, jobs,
 │                            #   applications, approve (submits to sandbox ATS - PRESENT),
@@ -272,6 +268,7 @@ imports (Vertex/API access is handled by `google-genai`).
 **Ghosts of the tree - do NOT restore them as ground truth:**
 - `cli.py` - **was never committed** (only `.pyc` proved it existed). Now it IS committed: `hireflow/cli.py` (thin client of the deployed API) + `hireflow.sh` (bash driver).
 - `json_repository.py`, `openrouter.py`, `mock_gemini.py` - existed only as `.pyc`; do NOT take them as ground truth. Never rebuild a mock Gemini path.
+- `hireflow/tools/browser.py` (`PlaywrightSource`), `hireflow/tools/jobstreet.py` (`JobStreetSource`), `hireflow/tools/browser_launcher.py` - **REMOVED 2026-08-27** (Playwright/Chromium deleted entirely - see the audit below). Do NOT resurrect; no browser belongs in this stack.
 
 **Code audit - 2026-08-26 (dead code removed, do NOT resurrect):**
 The cleanup pass removed these - if you grep and find a reference to them, it is stale:
@@ -285,6 +282,36 @@ The cleanup pass removed these - if you grep and find a reference to them, it is
 - `ApplicationStatus` is now exactly `MATCHED`/`ROUTED`/`DRAFTED`/`SUBMITTED`.
 - The per-file `_USER_AGENT` literals were consolidated into one `USER_AGENT` constant in `hireflow/tools/job_source.py` - import it from there.
 - `HireflowAgent` (`adk_router.py`) is the **LIVE ADK orchestrator**: an `LlmAgent` + `Runner` + in-memory session service expose `RouterAgent` as a single `FunctionTool`, injected deterministically via `before_model_callback` (no wasted LLM round-trip). This satisfies the RULES §6 Google Agent Framework mandate - do NOT delete it.
+
+**Code audit - 2026-08-27 (late): Playwright/Chromium removed entirely, do NOT resurrect.**
+Why: (a) it never contributed jobs - `playwright: 0 new` / `jobstreet: 0 new` every live run
+(Cloudflare blocks headless browsers), (b) it was the sole cause of ~20-minute Cloud Build
+deploys (the ~150-200MB Chromium download at build time), (c) the product's discovery core
+is now Gemini Google Search grounding (`gemini_web`), which needs no browser.
+- Files deleted: `hireflow/tools/browser.py` (`PlaywrightSource`), `hireflow/tools/jobstreet.py`
+  (`JobStreetSource`), `hireflow/tools/browser_launcher.py` (stealth helpers).
+- `requirements.txt`: `playwright==1.44.0` removed. `Dockerfile`: Chromium install + browser
+  apt-libs removed - the image is now plain `python:3.11-slim` + pip deps; builds drop from
+  ~20 min to a few minutes.
+- `config.py` knobs removed: `playwright_enabled` (`HIREFLOW_PLAYWRIGHT`), `playwright_spa_urls`
+  (`PLAYWRIGHT_SPA_URLS`), `jobstreet_enabled` (`JOBSTREET_ENABLED`) - also gone from
+  `.env`/`.env.example`.
+- `api/app.py`: the Playwright imports + source-registration block removed.
+- Bonus dead code removed in `hireflow/tools/gemini.py`: the `GOOGLE_GENAI_USE_ENTERPRISE` env
+  write (the installed google-genai 2.19.0 SDK reads it only when the `vertexai` argument is
+  None - verified against `_api_client.py`).
+- **Grounding fix (verified):** `GeminiClient.grounded_search` now uses the **`google_search`
+  tool** (`types.Tool(google_search=types.GoogleSearch())`), NOT `google_search_retrieval`.
+  Evidence: the live Vertex endpoint returned `400 INVALID_ARGUMENT: google_search_retrieval is
+  not supported; please use google_search field instead` (captured via `GET /debug/grounded` on
+  the deployed Cloud Run), and google-genai 2.19.0's own test suite marks `google_search_retrieval`
+  on Vertex as expecting exactly that 400 (`exception_if_vertex='400'`) while `google_search`
+  succeeds on both surfaces. Grounding results still read
+  `grounding_metadata.grounding_chunks[].web.{uri,title,domain}`; a fallback parses URLs from the
+  grounded response text if no chunks return.
+- **New debug endpoint:** `GET /debug/grounded?q=…` → `{query, count, results}` or `{query, error}`
+  - runs `GeminiClient.grounded_search` directly; this is how grounding is live-verified without a
+  full pipeline run (temporary debug aid; fine to keep).
 
 ---
 
@@ -343,6 +370,10 @@ The cleanup pass removed these - if you grep and find a reference to them, it is
   `task.cancel()`); `_execute_run` catches `CancelledError` and finishes the runlog as
   `status:"cancelled"` so the SSE stream closes cleanly. In-memory `run_tasks` registry
   on `api.state` (`create_app`) is popped by a done callback.
+- `GET /debug/grounded?q=…` - **debug aid (temporary; fine to keep)**: runs
+  `GeminiClient.grounded_search` directly → `{query, count, results}` or `{query, error}`. The
+  live-verify path for Google Search grounding without a full pipeline run (it is how the
+  `google_search`-tool fix was verified - the pre-fix build returned the Vertex 400 here).
 - `GET /dashboard` - live counts + by-status breakdown.
 - `GET /jobs` / `GET /applications` - list repository contents (persisted from
   the background run's `jobs` / `application_records`).
@@ -368,7 +399,7 @@ curl proof.
 
 ## 9. Current state of the repo (the honest truth - verified by me, do not trust the old AGENTS claims)
 
-> **2026-08-27 LIVE-PROVEN.** The Cloud Run backend is fully deployed and the full pipeline ran end-to-end on the `.run.app` URL this session: `parse → audit → search → match → career → research → prepare → approve`, returned **10 matches with drafts**, submitted via `/approve` (sandbox ATS `SUBMITTED`). **The old "PRESENT (code; live proof pending redeploy)" / "answers `agent_not_configured` until the new build is redeployed" claims are STALE - the redeploy + live curl e2e are DONE.** What remains genuinely unproven is flagged below (Layer II Playwright/jobstreet curl row, some regional passes) - do not overclaim those. The product identity is now the **watcher model** (§1): come back anytime → see NEW jobs since last check → re-ranked on top → you decide.
+> **2026-08-27 LIVE-PROVEN.** The Cloud Run backend is fully deployed and the full pipeline ran end-to-end on the `.run.app` URL this session: `parse → audit → search → match → career → research → prepare → approve`, returned **10 matches with drafts**, submitted via `/approve` (sandbox ATS `SUBMITTED`). **The old "PRESENT (code; live proof pending redeploy)" / "answers `agent_not_configured` until the new build is redeployed" claims are STALE - the redeploy + live curl e2e are DONE.** What remains genuinely unproven is flagged below (some regional passes; the `google_search` grounding fix - live-verify via `GET /debug/grounded`) - do not overclaim those. The product identity is now the **watcher model** (§1): come back anytime → see NEW jobs since last check → re-ranked on top → you decide.
 
 - **Import tree is unblocked.** `ResumeFinding` + `WorkTypeClassifier` are in
   `hireflow/domain/__init__.py` and `hireflow.tools.gemini` imports cleanly.
@@ -419,7 +450,9 @@ curl proof.
 - **Universal webfetch + discovery + embeddings + real-submit sandbox ATS - PRESENT (code):**
   `webfetch.py` (`WebFetchSource` - any URL → JSON-LD/ATS/HTML),
   `gemini_search.py` (`GeminiWebSearchSource` - **Google Search grounding** via
-  `GeminiClient.grounded_search`, name `gemini_web`, replaces the rate-limited DDG scrape),
+  `GeminiClient.grounded_search` using the **`google_search` tool** - NOT `google_search_retrieval`,
+  which Vertex 400s (verified live via `/debug/grounded`), name `gemini_web`, replaces the
+  rate-limited DDG scrape),
   `embeddings.py` (`EmbeddingRanker`, `gemini-embedding-001`, gated `SEMANTIC_SEARCH`),
   `/sandbox/ats/apply` + `ApplicationStatus.SUBMITTED` + `/approve` → real submit
   (in-memory + best-effort `sandbox_ats.json`). All landed in the tree.
@@ -435,8 +468,9 @@ curl proof.
   retired as the reference prototype. **Live e2e against the deployed `.run.app` URL is DONE (2026-08-27):**
   the browser watcher run exercised upload audit → "Run anyway" → SSE timeline → Results → draft view →
   History. Agent Search is optional + not set up (only
-  indexes domains Zach can verify he owns - `docs/GCP_SETUP.md` §3). Layer II Playwright
-  **is enabled** (`HIREFLOW_PLAYWRIGHT=1` + Chromium installed in the `Dockerfile`).
+  indexes domains Zach can verify he owns - `docs/GCP_SETUP.md` §3). **Playwright/Chromium
+  removed entirely (2026-08-27)** - it never contributed jobs (`playwright: 0 new` /
+  `jobstreet: 0 new` every run; Cloudflare-blocked) and was the deploy-cost hog (~20-min builds).
 
 **The old AGENTS.md claimed Phases "1 & 1.5 done": that was FALSE at the time**
 (import was broken, no live pipeline). Today the code paths exist, are green, and
@@ -464,9 +498,8 @@ Columns: **Srv-recency** = server-side recency filter the agent applies · **Loc
 | Lever (ATS) | `GET https://api.lever.co/v0/postings/{board}?mode=json` | I | **404** on all boards tested | 0 | no | yes | yes | endpoint retired/unreliable - **not enabled**, `ats.py` supports it, no live row |
 | Workable (ATS) | `GET https://apply.workable.com/api/v1/widget/accounts/{account}` | I | **200 but 0 jobs** (tokopedia/wayfair/pearson/…) | 0 | no | yes | no | API up but empty `jobs[]` for tested accounts - **not enabled**, `coded` only |
 | JSON-LD career pages | `GET https://www.greenhouse.io/careers` → `application/ld+json` → `@type=JobPosting` | 0 | **200** | **1 JobPosting** | no | yes | yes | real schema.org `JobPosting`; registry = 1 URL (`JSONLD_COMPANY_URLS`); Atlassian/Shopify/Nike have **no** JobPosting ld+json |
-| Playwright Layer II | env-gated `HIREFLOW_PLAYWRIGHT=1` + Chromium in image | II | not run | n/a | no | n/a | n/a | **IMPLEMENTED (code):** `browser.py`/`jobstreet.py` share the `browser_launcher.py` stealth helpers; Chromium IS installed in the `Dockerfile`; needs a live curl row once deployed |
 
-**In-tree sources NOT yet in the matrix (code present, no curl row this session - verify, then add a row):** `freehire:seek` + `freehire:mycareersfuture` (`FreehireRegionalSource` in `api/app.py`, registered by default), `wantedly` + `japan_dev` (flag-gated behind `USE_UNVERIFIED_SOURCES=1`; Wantedly docstring claims live 200, JapanDev degrades to `[]`). The universal webfetch/Gemini grounded-search layer IS in the tree (`webfetch.py`/`gemini_search.py`) - needs a live curl row once deployed.
+**In-tree sources NOT yet in the matrix (code present, no curl row this session - verify, then add a row):** `freehire:seek` + `freehire:mycareersfuture` (`FreehireRegionalSource` in `api/app.py`, registered by default), `wantedly` + `japan_dev` (flag-gated behind `USE_UNVERIFIED_SOURCES=1`; Wantedly docstring claims live 200, JapanDev degrades to `[]`). The universal webfetch/Gemini grounded-search layer IS in the tree (`webfetch.py`/`gemini_search.py`) - live-verify via `GET /debug/grounded?q=…`.
 
 ### Search intelligence (how the agent actually searches - an AI agent, NOT a keyword fetcher)
 
@@ -539,12 +572,15 @@ careers page contributes 0 + a source note in `errors`, never a 500. This is a
 
 **Layer 0 - Universal catch-all (every country, everyone):**
 - **Universal webfetch + Gemini grounded-search layer** (`webfetch.py`/`gemini_search.py`) - **PRESENT
-  (code; live proof pending redeploy)**, the replacement for the retired CSE 50-site whitelist:
+  (code)**, the replacement for the retired CSE 50-site whitelist:
   the rate-limited keyless DDG scrape was dropped; `GeminiWebSearchSource` (`gemini_web`) uses Google
-  Search grounding (`google_search_retrieval` tool, `MODE_DYNAMIC`) via `GeminiClient.grounded_search`
+  Search grounding (the **`google_search` tool** - NOT `google_search_retrieval`, which Vertex 400s
+  with `INVALID_ARGUMENT`; the verified-correct tool per the live 400 error + the google-genai
+  2.19.0 SDK test suite) via `GeminiClient.grounded_search`
   to get real source URLs, each turned into JobPostings via `WebFetchSource.fetch_url`, then
   domain-discovery from the sources we already fetch, no
-  50-domain whitelist. Needs Vertex AI + a live run after redeploy (may require `location=global`).
+  50-domain whitelist. **Live-verify path: `GET /debug/grounded?q=…`** (runs `grounded_search`
+  directly → `{query, count, results}` or `{query, error}`) - no full pipeline run needed.
   Grep before trusting.
 - **Agent Search (formerly CSE)** - **OPTIONAL, NOT set up.** Google's Custom Search JSON API is
   retired; Agent Search website indexing only works on domains **you can verify you own** (or get
@@ -558,10 +594,13 @@ careers page contributes 0 + a source note in `errors`, never a 500. This is a
 - **RemoteOK, Remotive** - remote-only, good EU/US.
 - **ATS boards** - ✅ **IMPLEMENTED + partially verified** (`hireflow/tools/ats.py`, `AtsBoardSource`). Unified keyless endpoint for Greenhouse/Ashby/Lever/Workable. **Greenhouse (gitlab 204) + Ashby (notion 128) verified live and ENABLED in `ATS_BOARDS`.** Lever 404s and Workable returns 0 jobs on all boards tested - coded but **disabled/no registry rows** until a live-verified board is found. `source="ats:{board}"`.
 
-**Layer II - browser automation (last resort, officially supported, still no VPS):**
-- **Playwright + headless Chromium inside the Cloud Run container** - ✅ **IMPLEMENTED (code; live proof pending redeploy)** (`hireflow/tools/browser.py` `PlaywrightSource`, `jobstreet.py` `JobStreetSource`; both share the `browser_launcher.py` stealth helpers; Chromium IS installed in the `Dockerfile`). Documented by Google ("Browser and OS automation in Cloud Run"). Use ONLY for JS-heavy SPA career pages with no JSON-LD and no API (e.g. Kalibrr, MyCareersFuture, anti-bot pages).
-- **Cost caveat:** headless Chrome needs a bigger instance (more RAM, CPU stays billed during the request, slower cold start) - keep it a scoped last-resort layer, never the default per-source path. Enabled only when `HIREFLOW_PLAYWRIGHT=1`.
-- A **full desktop OS via VNC streaming** (WebSockets) is also documented for complex interaction - not needed for the demo.
+**Layer II - browser automation - REMOVED (2026-08-27), do NOT resurrect.**
+Playwright/Chromium was deleted entirely: it never contributed jobs (`playwright: 0 new` /
+`jobstreet: 0 new` every live run - Cloudflare blocks headless browsers), and the ~150-200MB
+Chromium download was the sole cause of ~20-minute Cloud Build deploys. SPA-only career pages
+are covered by the universal webfetch / Gemini grounded-search catch-all above - no browser in
+the stack (and still no VPS). Files deleted: `browser.py`, `jobstreet.py`, `browser_launcher.py`;
+config knobs `HIREFLOW_PLAYWRIGHT` / `PLAYWRIGHT_SPA_URLS` / `JOBSTREET_ENABLED` are gone.
 
 **C - Regions, current HONEST status (do NOT trust the aspirational list that used to live here):**
 
@@ -571,19 +610,19 @@ careers page contributes 0 + a source note in `errors`, never a 500. This is a
 > keyless**. K-Worknet needs a key and its endpoint currently 404s - **do not claim it**. The honest APAC
 > path is **keyless through freehire** (`source=seek` → JobStreet engine for MY/ID/SG/AU/NZ;
 > `source=mycareersfuture` → SG - both **IMPLEMENTED + LIVE (2026-08-27)** via
-> `FreehireRegionalSource`) and/or the present universal webfetch catch-all / optional Agent Search /
-> Layer II browser for SPA-only career pages.
+> `FreehireRegionalSource`) and/or the present universal webfetch catch-all / optional Agent Search
+> for SPA-only career pages (no browser layer - Playwright was removed entirely 2026-08-27).
 
 - **MY**: freehire(`countries=my`) · freehire `source=seek` (JobStreet engine - MY/ID/SG/AU/NZ) - **IMPLEMENTED + LIVE (2026-08-27)** via `FreehireRegionalSource`. Direct JobStreet/Maukerja APIs are **blocked**.
-- **ID**: freehire(`countries=id`) · freehire `source=seek`. Kalibrr is SPA/anti-bot → **present universal webfetch catch-all**, else **Layer II** Playwright. **coded/opt-in - verify live.**
-- **JP**: freehire(`countries=jp`) · LinkedIn(guest) verified Tokyo · **Wantedly (JP JSON) / JapanDev (JP)** - **PRESENT (code, flag-gated** behind `USE_UNVERIFIED_SOURCES=1`**)**: `wantedly.py` (docstring claims live 200 on 2026-08-23) and `japan_dev.py` (best-effort JSON-LD walk, currently degrades to `[]` - its SSR does not carry `JobPosting` nodes). **Verify with your own curl before trusting.** SPA/anti-bot sites (Kalibrr-class) → present universal webfetch / optional Agent Search scoped to jp career pages, else **Layer II** Playwright. K-Worknet needs a key + its endpoint currently 404s - **not usable**.
+- **ID**: freehire(`countries=id`) · freehire `source=seek`. Kalibrr is SPA/anti-bot → **present universal webfetch catch-all** / optional Agent Search. **coded/opt-in - verify live.**
+- **JP**: freehire(`countries=jp`) · LinkedIn(guest) verified Tokyo · **Wantedly (JP JSON) / JapanDev (JP)** - **PRESENT (code, flag-gated** behind `USE_UNVERIFIED_SOURCES=1`**)**: `wantedly.py` (docstring claims live 200 on 2026-08-23) and `japan_dev.py` (best-effort JSON-LD walk, currently degrades to `[]` - its SSR does not carry `JobPosting` nodes). **Verify with your own curl before trusting.** SPA/anti-bot sites (Kalibrr-class) → present universal webfetch / optional Agent Search scoped to jp career pages (no browser layer - Playwright was removed). K-Worknet needs a key + its endpoint currently 404s - **not usable**.
 - **KR**: K-Worknet is **needs-key + currently 404** - **NOT implemented, do not claim**. Use freehire(`countries=kr`) / global catch-all.
-- **SG**: freehire(`countries=sg`) · LinkedIn(guest) verified · freehire `source=mycareersfuture` (**SG keyless path - IMPLEMENTED + LIVE (2026-08-27)**). MyCareersFuture direct is SPA - only via the freehire relay, the present universal webfetch, optional Agent Search, or **Layer II** Playwright.
+- **SG**: freehire(`countries=sg`) · LinkedIn(guest) verified · freehire `source=mycareersfuture` (**SG keyless path - IMPLEMENTED + LIVE (2026-08-27)**). MyCareersFuture direct is SPA - only via the freehire relay, the present universal webfetch, or optional Agent Search.
 - **EU/NA**: freehire + RemoteOK/Remotive + **ATS boards (Greenhouse-GitLab, Ashby-Notion verified live)** · more ATS boards to add as they are curl-verified.
 
 **D - verification rule (REQUIREMENT):** Before any country/source is "supported", run a real `curl` and post the HTTP code + job count in the PR/commit. No `curl` = not supported. Update this section each time we verify a new one.
 
-**The golden rule:** never scrape a site with a brute-force bot or pretend a job board is something it isn't. Job boards are public APIs; career pages are JSON-LD or ATS-APIs; the only sanctioned browser path is **Layer II** (Playwright + Chromium on Cloud Run) for SPA-only career pages. Everything runs on Cloud Run (no VPS).
+**The golden rule:** never scrape a site with a brute-force bot or pretend a job board is something it isn't. Job boards are public APIs; career pages are JSON-LD or ATS-APIs; SPA-only career pages go through the universal webfetch / Gemini grounded-search catch-all (browser automation is gone - Playwright/Chromium removed entirely 2026-08-27). Everything runs on Cloud Run (no VPS).
 
 ---
 
@@ -618,7 +657,7 @@ careers page contributes 0 + a source note in `errors`, never a 500. This is a
 8. **Global job-source registry** - ✅ **IMPLEMENTED + curl-verified (2026-08-23)**: `LinkedInSource` (guest API), `JsonLdSource` (schema.org career pages), `AtsBoardSource` (Greenhouse+Ashby). Registered in `_build_default_agent()` after RemoteOK/Remotive/Freehire. Lever (404) and Workable (0 jobs) are coded but **disabled** - add rows only once curl-verified. **Still pending: redeploy + live curl e2e** against the `.run.app` URL to prove this on the live deploy.
 9. **APAC keyless relays - LIVE (2026-08-27):** freehire `source=seek` (JobStreet engine → MY/ID/SG/AU/NZ) + `source=mycareersfuture` (SG) via `FreehireRegionalSource` (in `api/app.py`), registered by default through `SETTINGS.freehire_sources` - the honest keyless APAC path since JobStreet/Kalibrr/Maukerja/Indeed direct APIs are **blocked**. Wantedly/JapanDev (JP) are **in the tree but flag-gated** behind `USE_UNVERIFIED_SOURCES=1` until live-proven (still no dedicated curl row).
 9b. **Career-page company sourcing - LIVE (2026-08-27):** `CareerSourceAgent` probes the top matched companies' `/careers` pages + ATS boards via `WebFetchSource.webfetch_company` and merges the new jobs (deduped by id) back for scoring/prepare. Knobs `CAREER_SOURCE_ENABLED` / `CAREER_SOURCE_MAX_COMPANIES` / `CAREER_SOURCE_MAX_PER_COMPANY` in `config.py`; emits a `career` SSE stage (ran live in the e2e).
-10. **Universal webfetch + Gemini grounded-search + embeddings re-rank + real-submit sandbox ATS** - the parallel code-agent pass, **DONE (code)**: `webfetch.py`/`gemini_search.py`/`embeddings.py`, `/sandbox/ats/apply`, and `ApplicationStatus.SUBMITTED` are **in this tree** (the rate-limited DDG scrape was dropped; `GeminiWebSearchSource` uses Google Search grounding). **Real-submit sandbox ATS is LIVE-PROVEN (2026-08-27, `/approve` → `SUBMITTED`)**; the universal webfetch/Gemini grounded-search/embeddings layers are present but a dedicated live row for the grounded-search/embedding re-rank path is still pending - do not overclaim. **Agent Search (formerly CSE) is OPTIONAL + NOT set up** (only indexes domains Zach can verify he owns - `docs/GCP_SETUP.md` §3). **Layer II** Playwright/Chromium is **coded** (`browser.py`/`jobstreet.py` + `browser_launcher.py` stealth; Chromium in the `Dockerfile`) - still needs a live curl row.
+10. **Universal webfetch + Gemini grounded-search + embeddings re-rank + real-submit sandbox ATS** - the parallel code-agent pass, **DONE (code)**: `webfetch.py`/`gemini_search.py`/`embeddings.py`, `/sandbox/ats/apply`, and `ApplicationStatus.SUBMITTED` are **in this tree** (the rate-limited DDG scrape was dropped; `GeminiWebSearchSource` uses Google Search grounding). **Real-submit sandbox ATS is LIVE-PROVEN (2026-08-27, `/approve` → `SUBMITTED`)**; the universal webfetch/Gemini grounded-search/embeddings layers are present but a dedicated live row for the grounded-search/embedding re-rank path is still pending - do not overclaim. **Agent Search (formerly CSE) is OPTIONAL + NOT set up** (only indexes domains Zach can verify he owns - `docs/GCP_SETUP.md` §3). **Layer II Playwright/Chromium was REMOVED entirely (2026-08-27)** - it never contributed jobs (Cloudflare-blocked; `0 new` every run) and made Cloud Build ~20 min; the image is now plain `python:3.11-slim` and builds in minutes.
 11. **Build the Vite + React app** (`frontend/`) - **DONE + LIVE (2026-08-25/27)**: `npm install && npm run build` passes. Wired to the live backend via `fetch` (upload, SSE agent timeline, ranked matches, approve → sandbox ATS); prefs + run history in `localStorage`; base URL via `VITE_HIREFLOW_API` (dev proxy in `vite.config.js`). `hireflow-frontend.html` is retired as the reference prototype. **Live e2e against the deployed `.run.app` URL is DONE (2026-08-27)** (npm run dev → upload audit → "Run anyway" → SSE timeline → Results → draft view → History).
 12. **Demo & docs (remaining submission TODOs)**: clean architecture diagram image (README currently has ASCII), README spin-up, ≤4-min unedited video showing Cloud Run console + Vertex AI logs + live `.run` calls. Email `testing@devpost.com` / `cloudhackathons@google.com` access. **Follow-up emails + Cloud Scheduler are NOT built - keep honest.**
 
@@ -631,7 +670,6 @@ careers page contributes 0 + a source note in `errors`, never a 500. This is a
 - Rules: `RULES.md` is the full official text - trust it over any summary.
 - Google ADK: `google.github.io/adk-docs`, `github.com/google/adk-python`
 - Gemini: `ai.google.dev` (API key), Vertex AI docs
-- Cloud Run browser automation (Playwright/Chromium, VNC): `cloud.google.com/run/docs/browser-automation`
 - Inspo sources - ideas only, NOT code:
   - `github.com/MadsLorentzen/ai-job-search` - fits the query-by-function search, gates-before-scoring, seen-job adoption; **their runtime is local (Claude Code) - we are Cloud Run**.
   - `github.com/strelov1/freehire` - freehire.me is MIT open-source backend (Go+Postgres+Meilisearch); `FREEHIRE_API_URL` env-swap is our one-line failover.
@@ -653,7 +691,7 @@ careers page contributes 0 + a source note in `errors`, never a 500. This is a
 1. ~~Re-deploy to Cloud Run + live curl e2e~~ - **DONE (2026-08-27)**: the deployed `.run.app` runs the full pipeline live end-to-end (upload → run → SSE → jobs → approve, 10 matches with drafts). **Remaining verification (not yet captured this session):** prove the upload gate's `not_a_resume` (non-CV) + `parsed_and_stored` (healthy CV) paths via curl, and the adaptive gather's rerun-with-same-`?seen=` still reaching ≥ `PIPELINE_MIN_MATCHES` - the browser run covered `needs_improvement` → "Run anyway" and the main auto-run. Frontend: results cards show a **research excerpt** (not the full markdown essay) + compact reasons.
 2. **Watch for the in-flight parallel pass** (§10/§12): universal webfetch (`webfetch.py`) + Gemini grounded-search (`gemini_search.py`), embeddings re-rank (`embeddings.py`, `gemini-embedding-001`), real-submit sandbox ATS (`/sandbox/ats/apply`, `ApplicationStatus.SUBMITTED`, `/approve` submits). Grep the tree each session - mark done ONLY when each is present + redeployed + curl-e2e'd. Agent Search stays OPTIONAL (domain-verify, `docs/GCP_SETUP.md` §3).
 3. **Vite + React app** (`frontend/`) is **built + verified live** (2026-08-25): components for resume upload, prefs modal, SSE agent timeline (animates from the real streamed events), ranked matches + approve, applications, history (localStorage). Wired to the live backend via `fetch`; builds clean with `npm install && npm run build`. **Live e2e against the deployed `.run.app` URL is DONE (2026-08-27)** (npm run dev → upload audit → "Run anyway" → SSE timeline → Results → draft view → History). **Resume-after-refresh + Cancel are IMPLEMENTED (2026-08-26, code; on the live build):** run start persists `{run_id, profile}` to `localStorage` (`hireflow.active_run.v1`); on mount the app calls `GET /pipeline/run/{run_id}` and either re-attaches the live SSE stream (`Last-Event-ID` resume) or renders the finished result; a Cancel button in the timeline header calls `POST /pipeline/run/{run_id}/cancel` to stop the run. A refreshed run only continues while the same in-memory instance lives; a missing run clears the marker gracefully.
-4. **Layer II Playwright/Chromium** is **coded + enabled** in the `Dockerfile` (`HIREFLOW_PLAYWRIGHT=1`); still needs a live curl row.
+4. ~~Layer II Playwright/Chromium~~ - **REMOVED entirely (2026-08-27)**: never contributed jobs (`0 new` every run; Cloudflare-blocked) and was the deploy-cost hog (~20-min builds). Do NOT resurrect.
 5. Demo & docs: clean diagram image, ≤4-min video with Cloud Run console + Vertex logs, grant repo access to `testing@devpost.com` / `cloudhackathons@google.com`.
 6. Optional: Cloud Scheduler → POST `/pipeline/run` hourly.
 
@@ -671,7 +709,7 @@ careers page contributes 0 + a source note in `errors`, never a 500. This is a
 7. **Agent Search (formerly CSE) is OPTIONAL** - `docs/GCP_SETUP.md` §3. NOT a keyless catch-all: it only indexes domains you can verify you own. Skip it if blocked; it does not block the core pipeline. Do not ask for a CSE key - that API is retired.
 
 **Later:**
-8. Deploy the `Dockerfile` to **Cloud Run** → return the `.run.app` URL (needed for end-of-video proof). Use the big-instance runbook in `docs/GCP_SETUP.md` §5 (`--memory 1Gi --timeout 3600`, bump to `--memory 2G --cpu 2` if Playwright/Chromium is enabled) and pass the new knobs: `QUERY_EXPANSION=true,JOB_RECENCY_DAYS=14,DIVERSITY_MAX_SAME_COMPANY=2,RESUME_AUDIT_ENABLED=true,RESUME_HEALTH_BLOCK=60`.
+8. Deploy the `Dockerfile` to **Cloud Run** → return the `.run.app` URL (needed for end-of-video proof). Use the big-instance runbook in `docs/GCP_SETUP.md` §5 (`--memory 1Gi --timeout 3600`; Chromium/Playwright was removed from the image 2026-08-27, so 1Gi is plenty) and pass the new knobs: `QUERY_EXPANSION=true,JOB_RECENCY_DAYS=14,DIVERSITY_MAX_SAME_COMPANY=2,RESUME_AUDIT_ENABLED=true,RESUME_HEALTH_BLOCK=60`.
 9. Optional: Cloud Scheduler → POST `/pipeline/run` hourly.
 10. Capture Cloud Run console + Vertex AI logs for the video.
 

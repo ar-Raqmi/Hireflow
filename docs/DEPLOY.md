@@ -35,11 +35,11 @@ gcloud run deploy hireflow-backend --region us-central1 --source . \
 - `--source .` builds the `Dockerfile` via Cloud Build. `.dockerignore`
   excludes `.env`, `API.md`, `*-credential.json`, `.venv`, etc. from the build
   context.
-- `--memory 1Gi --timeout 3600` - Chromium (Playwright) is installed in the
-  image, and the pipeline streams SSE progress from a background task; the
-  request must stay open while the client drains `/events`, so give it room
-  (Cloud Run max is 3600s). Bump to `--memory 2G --cpu 2` under heavy Playwright
-  load.
+- `--memory 1Gi --timeout 3600` - the image no longer contains Chromium (Playwright was
+  removed entirely 2026-08-27: it never contributed jobs and its ~150-200MB download made
+  Cloud Build take ~20 min - builds are now minutes), but the pipeline still streams SSE
+  progress from a background task; the request must stay open while the client drains
+  `/events`, so give it room (Cloud Run max is 3600s).
 - `RESUME_PARSE_MODE` - `hybrid` (default): Gemini text parse, upgraded to
   Gemini **vision** page-images when the PDF's extracted text is thin;
   `vision`: always render PDF pages + Gemini vision; `text`: text-only parse.
@@ -53,6 +53,15 @@ gcloud run deploy hireflow-backend --region us-central1 --source . \
 ```bash
 curl -s https://hireflow-backend-296941301245.us-central1.run.app/health
 # {"status":"ok"}
+```
+
+Then verify **Google Search grounding** works on this build (the `google_search` tool fix -
+`google_search_retrieval` is rejected on Vertex with a 400):
+
+```bash
+curl -s "https://hireflow-backend-296941301245.us-central1.run.app/debug/grounded?q=machine+learning+engineer+jobs"
+# expect {"query":"...","count":N,"results":[...]} - proves grounding works.
+# {"query":"...","error":...} → the grounded-search fix is not on this build yet - redeploy.
 ```
 
 Then verify the **watcher body-path** is live (added 2026-08-27 - the frontend
