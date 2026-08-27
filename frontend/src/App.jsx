@@ -5,7 +5,7 @@ import { health, startPipeline, streamEvents, fetchRunStatus, cancelPipeline } f
 import {
   loadPrefs, savePrefs, loadPrefsUnset, loadHistory, pushHistory, clearHistory, loadSeen, markSeen,
   saveActiveRun, loadActiveRun, clearActiveRun,
-  loadPool, savePool, loadLastView, saveLastView, MAX_POOL,
+  loadPool, savePool, clearPool, loadLastView, saveLastView, MAX_POOL,
   loadProfile, saveProfile, clearProfile, shouldAutoCheck, loadLastCheck, saveLastCheck,
   loadDrafts, saveDrafts, mergeDrafts,
 } from './storage.js';
@@ -45,7 +45,7 @@ function mergePool(pool, incoming) {
 export default function App() {
   const [prefs, setPrefs] = useState(() => loadPrefs());
   const [prefsOpen, setPrefsOpen] = useState(() => loadPrefsUnset());
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState(() => loadProfile());
   const [running, setRunning] = useState(false);
   const [events, setEvents] = useState([]);
   const [result, setResult] = useState(null);
@@ -239,6 +239,19 @@ export default function App() {
     handleRun();
   }
 
+  function handleNewResume() {
+    setAudit(null);
+    setProfile(null);
+    clearProfile();
+    clearPool();
+    setMatches([]);
+    setNewCount(0);
+    setApplications([]);
+    setResult(null);
+    setView('agent');
+    showToast('Résumé cleared - upload a new one to start');
+  }
+
   function handlePrefsSave(p) {
     setPrefs(p);
     savePrefs(p);
@@ -409,6 +422,9 @@ export default function App() {
                 {profile.target_roles && profile.target_roles.length > 0 && (
                   <span className="hchip">{profile.target_roles.slice(0, 3).join(', ')}</span>
                 )}
+                <M3eButton variant="text" className="newresume" onClick={handleNewResume}>
+                  <M3eIcon name="note_add" size={16} /> New résumé
+                </M3eButton>
               </div>
             )}
             <AgentTimeline events={events} running={running} onCancel={running ? handleCancel : undefined} />

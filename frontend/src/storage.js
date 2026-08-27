@@ -90,6 +90,13 @@ export function savePool(pool) {
   safeSet(POOL_KEY, pool.slice(0, MAX_POOL));
 }
 
+export function clearPool() {
+  try {
+    localStorage.removeItem(POOL_KEY);
+  } catch {
+  }
+}
+
 export function loadDrafts() {
   return safeGet(DRAFTS_KEY, {});
 }

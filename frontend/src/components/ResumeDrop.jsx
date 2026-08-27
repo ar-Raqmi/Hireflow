@@ -16,6 +16,7 @@ export default function ResumeDrop({ onUploaded, onRejected, onError, prefs }) {
   async function handleFile(f) {
     if (!f) return;
     setFile(f);
+    setProfile(null);
     setBusy(true);
     const controller = new AbortController();
     abortRef.current = controller;
