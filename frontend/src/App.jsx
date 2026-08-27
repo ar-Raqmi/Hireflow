@@ -50,7 +50,6 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [result, setResult] = useState(null);
   const [matches, setMatches] = useState([]);
-  const [newCount, setNewCount] = useState(0);
   const [applications, setApplications] = useState([]);
   const [history, setHistory] = useState(() => loadHistory());
   const [toast, setToast] = useState(null);
@@ -100,7 +99,6 @@ export default function App() {
     if (pool && pool.length > 0) {
       setResult({ status: 'completed', matches: pool, drafts });
       setMatches(pool);
-      setNewCount(pool.filter((m) => m.isNew).length);
       setApplications((pool[0] && pool[0]._applications) || []);
     }
   }
@@ -118,7 +116,6 @@ export default function App() {
     setEvents([]);
     setResult(null);
     setMatches([]);
-    setNewCount(0);
     setApplications([]);
     setView('agent');
   }
@@ -134,7 +131,6 @@ export default function App() {
     const merged = mergePool(loadPool(), res.matches || []);
     const tagged = merged.map((m) => ({ ...m, _applications: a }));
     setMatches(tagged);
-    setNewCount(fresh);
     setApplications(a);
     savePool(tagged);
     mergeDrafts(res.drafts);
@@ -150,7 +146,6 @@ export default function App() {
       filename: (p && p.filename) || 'resume',
       prefs,
       status: res.status || 'completed',
-      new_matches: fresh,
       result: res,
     };
     pushHistory(historyEntry);
@@ -245,7 +240,6 @@ export default function App() {
     clearProfile();
     clearPool();
     setMatches([]);
-    setNewCount(0);
     setApplications([]);
     setResult(null);
     setView('agent');
@@ -342,7 +336,6 @@ export default function App() {
     const tagged = (res.matches || []).map((m) => ({ ...m, isNew: Boolean(m.isNew) }));
     setResult({ ...res, drafts: res.drafts || loadDrafts() });
     setMatches(pool.length > 0 ? pool : tagged);
-    setNewCount((pool.length > 0 ? pool : tagged).filter((m) => m.isNew).length);
     setApplications(res.applications || res.application_records || []);
     setRunning(false);
     setView('results');
@@ -361,7 +354,7 @@ export default function App() {
 
       <M3eTabs variant="secondary" className="wrap viewtabs" onChange={(e) => handleViewTab(e.target?.selectedTab?.getAttribute('data-view') || view)}>
         {VIEWS.map((v) => {
-          const badge = v.key === 'results' ? (newCount > 0 ? newCount : matchCount) : 0;
+          const badge = v.key === 'results' ? matchCount : 0;
           return (
             <M3eTab
               key={v.key}
@@ -454,11 +447,11 @@ export default function App() {
                 <div>
                   <h2>Results</h2>
                   <div className="res-meta">
-                    {running ? 'agent still running…' : matchCount === 0 ? 'run the agent to see matches' : newCount > 0 ? `${newCount} new since your last check · ${matchCount} saved matches` : `${matchCount} saved matches (top ${MAX_POOL})`}
+                    {running ? 'agent still running…' : matchCount === 0 ? 'run the agent to see matches' : `${matchCount} saved matches (top ${MAX_POOL})`}
                   </div>
                 </div>
               </div>
-              <MatchesList matches={matches} applications={applications} drafts={result?.drafts || {}} newCount={newCount} onError={(e) => showToast(e.message, 'error', 6000)} />
+              <MatchesList matches={matches} applications={applications} drafts={result?.drafts || {}} onError={(e) => showToast(e.message, 'error', 6000)} />
             </section>
           </div>
         </main>

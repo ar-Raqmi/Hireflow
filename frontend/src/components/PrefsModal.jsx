@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { M3eButton } from '@m3e/react/button';
+import { M3eButtonGroup } from '@m3e/react/button-group';
 import { M3eDialog } from '@m3e/react/dialog';
 import { M3eInputChip, M3eInputChipSet } from '@m3e/react/chips';
-import { M3eSegmentedButton, M3eButtonSegment } from '@m3e/react/segmented-button';
 import M3eIcon from './M3eIcon';
 
 const WORK_OPTIONS = [
@@ -19,6 +19,7 @@ export default function PrefsModal({ open, initial, onSave, onSkip, onClose }) {
   const [roles, setRoles] = useState((initial && initial.target_roles) || []);
   const [roleInput, setRoleInput] = useState('');
   const dlgRef = useRef(null);
+  const workRef = useRef(null);
 
   // M3E's native <dialog> needs to be connected to the document before
   // showModal() can run. Set `open` in an effect (post-mount) rather than as a
@@ -27,9 +28,23 @@ export default function PrefsModal({ open, initial, onSave, onSkip, onClose }) {
     if (dlgRef.current) dlgRef.current.open = Boolean(open);
   }, [open]);
 
+  useEffect(() => {
+    const group = workRef.current;
+    if (!group) return;
+    const buttons = [...(group.querySelectorAll('m3e-button') || [])];
+    for (const btn of buttons) btn.selected = btn.getAttribute('data-key') === workType;
+  }, [workType]);
+
+  function handleWorkType(key) {
+    setWorkType(key);
+    const group = workRef.current;
+    if (!group) return;
+    const buttons = [...(group.querySelectorAll('m3e-button') || [])];
+    for (const btn of buttons) btn.selected = btn.getAttribute('data-key') === key;
+  }
+
   function addChip(list, setList, value) {
-    const v = value.trim();
-    if (v && !list.includes(v)) setList([...list, v]);
+    const v = value.trim();    if (v && !list.includes(v)) setList([...list, v]);
   }
 
   return (
@@ -41,20 +56,22 @@ export default function PrefsModal({ open, initial, onSave, onSkip, onClose }) {
       </p>
 
       <div className="pf-q">Work type</div>
-      <M3eSegmentedButton
-        onChange={(e) => {
-          const seg = e.target && e.target.selected && e.target.selected[0];
-          if (seg && seg.value) setWorkType(seg.value);
-        }}
-        className="pfopts"
-      >
+      <M3eButtonGroup ref={workRef} variant="connected" className="pfopts">
         {WORK_OPTIONS.map((opt) => (
-          <M3eButtonSegment key={opt.value} value={opt.value} checked={workType === opt.value}>
+          <M3eButton
+            key={opt.value}
+            data-key={opt.value}
+            variant="tonal"
+            shape="square"
+            toggle
+            selected={workType === opt.value}
+            onClick={() => handleWorkType(opt.value)}
+          >
             <M3eIcon slot="icon" name={opt.icon} />
             {opt.label}
-          </M3eButtonSegment>
+          </M3eButton>
         ))}
-      </M3eSegmentedButton>
+      </M3eButtonGroup>
 
       <div className="pf-q">Preferred locations</div>
       <M3eInputChipSet className="plocs">

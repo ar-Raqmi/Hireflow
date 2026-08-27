@@ -1,9 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { M3eButton } from '@m3e/react/button';
+import { M3eButtonGroup } from '@m3e/react/button-group';
 import { M3eCircularProgressIndicator } from '@m3e/react/progress-indicator';
-import { M3eSelect } from '@m3e/react/select';
-import { M3eOption } from '@m3e/react/option';
-import { M3eFilterChip } from '@m3e/react/chips';
 import M3eIcon from './M3eIcon.jsx';
 import { mdToHtml } from '../lib/md.js';
 
@@ -30,6 +28,11 @@ function formatDate(value) {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+function decodeEntities(value) {
+  const doc = new DOMParser().parseFromString(String(value || ''), 'text/html');
+  return doc.documentElement.textContent || String(value || '');
+}
+
 function sortMatches(matches, sort) {
   const out = [...matches];
   const dateOf = (m) => (m.posted_at ? new Date(m.posted_at).getTime() : 0);
@@ -47,11 +50,26 @@ function sortMatches(matches, sort) {
   }
 }
 
-export default function MatchesList({ matches = [], applications = [], drafts = {}, onError, newCount = 0 }) {
+export default function MatchesList({ matches = [], applications = [], drafts = {}, onError }) {
   const [sort, setSort] = useState('best');
-  const [draftsOnly, setDraftsOnly] = useState(false);
-  const [newOnly, setNewOnly] = useState(false);
   const [expanded, setExpanded] = useState({}); // job_id -> { detail, draft }
+  const sortRef = useRef(null);
+
+  function syncSort(key) {
+    const group = sortRef.current;
+    if (!group) return;
+    const buttons = [...(group.querySelectorAll('m3e-button') || [])];
+    for (const btn of buttons) btn.selected = btn.getAttribute('data-key') === key;
+  }
+
+  function handleSort(key) {
+    setSort(key);
+    syncSort(key);
+  }
+
+  useEffect(() => {
+    syncSort(sort);
+  }, [sort]);
 
   const appByJob = useMemo(() => {
     const map = {};
@@ -65,16 +83,9 @@ export default function MatchesList({ matches = [], applications = [], drafts = 
   };
 
   const shown = useMemo(() => {
-    const filtered = matches.filter(
-      (m) => (!draftsOnly || hasDraft(m)) && (!newOnly || m.isNew),
-    );
-    const sorted = sortMatches(filtered, sort);
-    if (sort === 'best' && !newOnly) {
-      return [...sorted.filter((m) => m.isNew), ...sorted.filter((m) => !m.isNew)];
-    }
-    return sorted;
+    return sortMatches(matches, sort);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matches, sort, draftsOnly, newOnly, drafts]);
+  }, [matches, sort, drafts]);
 
   function toggleExpand(id, key) {
     const willOpen = !(expanded[id] && expanded[id][key]);
@@ -102,44 +113,25 @@ export default function MatchesList({ matches = [], applications = [], drafts = 
       <div className="filters">
         <div className="fgroup">
           <span className="flabel">Sort</span>
-          <M3eSelect
-            className="fsort"
-            onChange={(e) => setSort(e.target.value || 'best')}
-          >
+          <M3eButtonGroup ref={sortRef} variant="connected" className="fsort">
             {SORTS.map((s) => (
-              <M3eOption key={s.key} value={s.key} selected={sort === s.key}>{s.label}</M3eOption>
+              <M3eButton
+                key={s.key}
+                data-key={s.key}
+                variant="tonal"
+                shape="square"
+                toggle
+                selected={sort === s.key}
+                onClick={() => handleSort(s.key)}
+              >
+                {s.label}
+              </M3eButton>
             ))}
-          </M3eSelect>
+          </M3eButtonGroup>
         </div>
-
-        <M3eFilterChip
-          className="fdraft"
-          value="drafts"
-          selected={draftsOnly}
-          onClick={() => setDraftsOnly((v) => !v)}
-        >
-          Has draft
-        </M3eFilterChip>
-
-        {newCount > 0 && (
-          <M3eFilterChip
-            className="fnew"
-            value="new"
-            selected={newOnly}
-            onClick={() => setNewOnly((v) => !v)}
-          >
-            New since last check ({newCount})
-          </M3eFilterChip>
-        )}
       </div>
 
       <div className="joblist">
-        {newCount > 0 && !newOnly && (
-          <div className="newbanner">
-            <M3eIcon name="auto_awesome" size={18} />
-            <span><b>{newCount} new role{newCount === 1 ? '' : 's'}</b> since your last check - ranked on top. You decide which to apply to.</span>
-          </div>
-        )}
         {shown.map((m, i) => {
           const rank = m.rank ?? i + 1;
           const score = Number(m.score) || 0;
@@ -152,7 +144,7 @@ export default function MatchesList({ matches = [], applications = [], drafts = 
               {m.reasons && m.reasons.length > 0 && (
                 <div className="jtake">
                   {m.reasons.map((r, j) => (
-                    <div key={j}>- {r}</div>
+                    <div key={j}>- {decodeEntities(r)}</div>
                   ))}
                 </div>
               )}
@@ -178,13 +170,12 @@ export default function MatchesList({ matches = [], applications = [], drafts = 
                 <div className="main">
                   <div className="eyebrow-sm">
                     rank {rank}
-                    {m.isNew && <span className="new-badge"><M3eIcon name="new_releases" size={13} /> new</span>}
                     {submitted && <span className="sub-badge"><M3eIcon name="check_circle" size={13} /> submitted</span>}
                     {hasDraft(m) && <span className="dr-badge"><M3eIcon name="description" size={13} /> drafted</span>}
                   </div>
-                  <h3>{m.title || 'Untitled role'}</h3>
+                  <h3>{decodeEntities(m.title) || 'Untitled role'}</h3>
                   <div className="meta">
-                    {m.company || '-'} {m.location ? `· ${m.location}` : ''}
+                    {decodeEntities(m.company) || '-'} {m.location ? `· ${decodeEntities(m.location)}` : ''}
                   </div>
                   <div className="jmeta">
                     {m.posted_at && <span><M3eIcon name="schedule" size={16} /> {formatDate(m.posted_at)}</span>}

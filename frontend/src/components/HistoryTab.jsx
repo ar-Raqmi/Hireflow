@@ -46,9 +46,6 @@ export default function HistoryTab({ history = [], onClear, onRestore }) {
               </div>
               <div className="h-stats">
                 <span><b>{(run.result && run.result.matches ? run.result.matches.length : 0)}</b> matches</span>
-                {(run.new_matches > 0 || (run.result && run.result.matches && run.result.matches.some((m) => m.isNew))) && (
-                  <span className="hap-new"><b>{run.new_matches || (run.result && run.result.matches ? run.result.matches.filter((m) => m.isNew).length : 0)}</b> new</span>
-                )}
                 <span><b>{(run.result && run.result.applications ? run.result.applications.length : 0)}</b> applications</span>
                 {(run.result && run.result.errors && run.result.errors.length > 0) && (
                   <span className="hap"><b>{run.result.errors.length}</b> errors</span>
