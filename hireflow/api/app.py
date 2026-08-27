@@ -249,6 +249,15 @@ def create_app(
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @api.get("/debug/grounded")
+    async def debug_grounded(q: str = "machine learning engineer jobs") -> dict:
+        gemini = api.state.agent.gemini
+        try:
+            results = await gemini.grounded_search(q)
+            return {"query": q, "count": len(results), "results": results}
+        except Exception as exc:
+            return {"query": q, "error": f"{type(exc).__name__}: {str(exc)[:400]}"}
+
     @api.post("/upload")
     async def upload_resume(
         file: UploadFile = File(...),

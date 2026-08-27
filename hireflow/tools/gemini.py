@@ -182,29 +182,28 @@ class GeminiClient:
 
         Uses Vertex (or Gemini API) Google Search grounding via the
         ``google_search_retrieval`` tool so the model returns real, current
-        source URLs (no fragile scraping). Never fakes: any failure returns [].
+        source URLs (no fragile scraping). Raises on failure so the caller can
+        surface the reason; returns [] only if grounding genuinely returned no
+        sources.
         """
         from google.genai import types
 
-        try:
-            tool = types.Tool(
-                google_search_retrieval=types.GoogleSearchRetrieval(
-                    dynamic_retrieval_config=types.DynamicRetrievalConfig(
-                        mode=types.DynamicRetrievalConfigMode.MODE_DYNAMIC,
-                        dynamic_threshold=0.0,
-                    )
+        tool = types.Tool(
+            google_search_retrieval=types.GoogleSearchRetrieval(
+                dynamic_retrieval_config=types.DynamicRetrievalConfig(
+                    mode=types.DynamicRetrievalConfigMode.MODE_DYNAMIC,
+                    dynamic_threshold=0.0,
                 )
             )
-            response = await self._async_client.models.generate_content(
-                model=self._model,
-                contents=query,
-                config=types.GenerateContentConfig(tools=[tool]),
-            )
-            candidate = response.candidates[0] if response.candidates else None
-            metadata = candidate.grounding_metadata if candidate else None
-            chunks = metadata.grounding_chunks if metadata else None
-        except Exception:
-            return []
+        )
+        response = await self._async_client.models.generate_content(
+            model=self._model,
+            contents=query,
+            config=types.GenerateContentConfig(tools=[tool]),
+        )
+        candidate = response.candidates[0] if response.candidates else None
+        metadata = candidate.grounding_metadata if candidate else None
+        chunks = metadata.grounding_chunks if metadata else None
         results: list[dict[str, str]] = []
         for chunk in chunks or []:
             web = chunk.web
@@ -216,7 +215,23 @@ class GeminiClient:
                         "domain": web.domain or "",
                     }
                 )
+        if not results and response.text:
+            results = self._extract_urls(response.text)
         return results
+
+    @staticmethod
+    def _extract_urls(text: str) -> list[dict[str, str]]:
+        import re
+
+        found: list[dict[str, str]] = []
+        seen: set[str] = set()
+        for m in re.finditer(r"https?://[^\s)\]>\"']+", text or ""):
+            url = m.group(0).rstrip(".,;")
+            if url in seen:
+                continue
+            seen.add(url)
+            found.append({"title": "", "uri": url, "domain": ""})
+        return found
 
     async def expand_query(self, roles: list[str], skills: list[str] | None = None) -> list[str]:
         if not roles:
