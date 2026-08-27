@@ -248,9 +248,9 @@ def create_app(
         gemini = api.state.agent.gemini
         try:
             results = await gemini.grounded_search(q)
-            return {"query": q, "count": len(results), "results": results}
+            return {"query": q, "tool": "google_search", "count": len(results), "results": results}
         except Exception as exc:
-            return {"query": q, "error": f"{type(exc).__name__}: {str(exc)[:400]}"}
+            return {"query": q, "tool": "google_search", "error": f"{type(exc).__name__}: {str(exc)[:400]}"}
 
     @api.post("/upload")
     async def upload_resume(
