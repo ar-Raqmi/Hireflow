@@ -105,6 +105,43 @@ class GeminiClient:
         except (TypeError, ValueError):
             return 0
 
+    async def assess_resume(self, text: str) -> dict[str, Any]:
+        """Classify whether the uploaded text is actually a professional résumé.
+
+        The resume parser only checks file extensions, so a random PDF, notes
+        file, or article could otherwise sail through to the pipeline. This
+        asks the model whether the content looks like a CV. The default is
+        conservative: on any LLM failure (or low confidence) we assume it IS a
+        resume so a real upload is never blocked by a flaky call.
+        """
+        if not text or not "".join(text.split()).strip():
+            return {"is_resume": False, "confidence": 0.0, "reason": "Empty document - no text to read."}
+        prompt = (
+            "Decide whether the text below is a professional resume/CV. A resume/CV "
+            "represents a person's professional identity: it typically lists a name, "
+            "contact info (email/phone), work experience, education, skills, and/or "
+            "projects. It is NOT an article, email, chat log, notes, essay, recipe, "
+            "contract, invoice, or some other random document. "
+            'Return ONLY JSON: {"is_resume": bool, "confidence": float (0-1), "reason": str}\n'
+            f"TEXT:\n{text[:8000]}"
+        )
+        try:
+            payload = await self._generate_json(prompt)
+        except Exception:
+            return {"is_resume": True, "confidence": 0.5, "reason": "could not verify - assuming résumé"}
+        is_resume = bool(payload.get("is_resume", True))
+        try:
+            confidence = float(payload.get("confidence", 0.5) or 0.5)
+        except (TypeError, ValueError):
+            confidence = 0.5
+        if not is_resume and confidence < 0.6:
+            is_resume = True
+        return {
+            "is_resume": is_resume,
+            "confidence": confidence,
+            "reason": str(payload.get("reason", "") or ""),
+        }
+
     async def embed(
         self, texts: list[str], model: str | None = None
     ) -> list[list[float]] | None:

@@ -5,7 +5,7 @@ import { M3eLoadingIndicator } from '@m3e/react/loading-indicator';
 import { uploadResume } from '../api.js';
 import M3eIcon from './M3eIcon.jsx';
 
-export default function ResumeDrop({ onUploaded, onError, prefs }) {
+export default function ResumeDrop({ onUploaded, onRejected, onError, prefs }) {
   const inputRef = useRef(null);
   const abortRef = useRef(null);
   const [dragging, setDragging] = useState(false);
@@ -27,6 +27,12 @@ export default function ResumeDrop({ onUploaded, onError, prefs }) {
         target_roles: (prefs && prefs.target_roles) || [],
         signal: controller.signal,
       });
+      if (parsed && parsed.status === 'not_a_resume') {
+        setFile(null);
+        setProfile(null);
+        onRejected?.(parsed);
+        return;
+      }
       setProfile(parsed);
       onUploaded?.(parsed);
     } catch (err) {

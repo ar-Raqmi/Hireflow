@@ -52,6 +52,13 @@ class Settings:
     resume_parse_mode: str = field(
         default_factory=lambda: _env("RESUME_PARSE_MODE", "hybrid").strip().lower()
     )
+    resume_audit_enabled: bool = field(
+        default_factory=lambda: _env("RESUME_AUDIT_ENABLED", "true").lower()
+        in {"1", "true", "yes"}
+    )
+    resume_health_block: int = field(
+        default_factory=lambda: _int_env("RESUME_HEALTH_BLOCK", 60)
+    )
     query_expansion: bool = field(
         default_factory=lambda: _env("QUERY_EXPANSION", "true").lower() in {"1", "true", "yes"}
     )

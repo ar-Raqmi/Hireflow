@@ -284,11 +284,24 @@ def create_app(
         profile.culture_keywords = parsed.get("culture_keywords", [])
         profile.residence = str(parsed.get("residence", "") or "")
         profile.parsed_at = datetime.now()
-        await api.state.storage.profiles().put(profile)
+
+        assessment = await _assess_resume_upload(api.state.agent.gemini, profile)
+        if not assessment["is_resume"]:
+            return {
+                "filename": file.filename,
+                "status": "not_a_resume",
+                "reason": assessment["reason"],
+                "parse_errors": parse_errors,
+            }
+
+        if profile.resume_text:
+            await api.state.storage.profiles().put(profile)
+
+        needs_improvement = assessment["needs_improvement"]
         return {
             "id": profile.id,
             "filename": file.filename,
-            "status": "parsed_and_stored",
+            "status": "needs_improvement" if needs_improvement else "parsed_and_stored",
             "pages": pages,
             "work_type": profile.work_type,
             "locations": profile.locations,
@@ -299,6 +312,7 @@ def create_app(
             "residence": profile.residence,
             "culture_keywords": profile.culture_keywords,
             "parse_errors": parse_errors,
+            "audit": assessment["audit"],
         }
 
     @api.get("/dashboard")
@@ -464,6 +478,45 @@ async def _enrich_profile(
                 errors.append(f"text parse: {type(exc).__name__}: {str(exc)[:200]}")
                 parsed = {}
     return parsed, errors
+
+
+async def _assess_resume_upload(gemini: GeminiClient, profile: Profile) -> dict:
+    """Classify the upload and audit its ATS health at upload time.
+
+    Returns an assessment dict: ``is_resume`` (False blocks the run),
+    ``reason`` (why it failed classification), ``needs_improvement`` (the
+    resume is incomplete / can be improved and should be confirmed before the
+    pipeline runs), and ``audit`` (health + findings). Always degrades to a
+    usable state - never a 500.
+    """
+    is_resume = True
+    reason = ""
+    try:
+        classification = await gemini.assess_resume(profile.resume_text)
+        is_resume = bool(classification.get("is_resume", True))
+        reason = str(classification.get("reason", "") or "")
+    except Exception as exc:
+        reason = f"resume check: {type(exc).__name__}: {str(exc)[:200]}"
+
+    audit: dict = {"health": 100, "findings": [], "error": None}
+    if not SETTINGS.resume_audit_enabled:
+        return {"is_resume": is_resume, "reason": reason, "needs_improvement": False, "audit": audit}
+
+    if profile.resume_text:
+        try:
+            result = await gemini.audit_resume(profile.resume_text, profile)
+            audit["health"] = int(result.get("health", 100) or 100)
+            audit["findings"] = [
+                finding.to_mapping() if hasattr(finding, "to_mapping") else finding
+                for finding in result.get("findings", [])
+            ]
+        except Exception as exc:
+            audit["error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+
+    health = int(audit.get("health", 100) or 100)
+    has_errors = any(str(f.get("sev", "")) == "error" for f in audit.get("findings", []))
+    needs_improvement = health < SETTINGS.resume_health_block or has_errors
+    return {"is_resume": is_resume, "reason": reason, "needs_improvement": needs_improvement, "audit": audit}
 
 
 def _parse_salary_floor(value: str) -> int | None:

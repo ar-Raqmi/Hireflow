@@ -8,6 +8,7 @@ import {
 } from './storage.js';
 import ResumeDrop from './components/ResumeDrop.jsx';
 import PrefsModal from './components/PrefsModal.jsx';
+import ResumeAuditModal from './components/ResumeAuditModal.jsx';
 import AgentTimeline from './components/AgentTimeline.jsx';
 import MatchesList from './components/MatchesList.jsx';
 import HistoryTab from './components/HistoryTab.jsx';
@@ -32,6 +33,7 @@ export default function App() {
   const [history, setHistory] = useState(() => loadHistory());
   const [toast, setToast] = useState(null);
   const [view, setView] = useState('agent');
+  const [audit, setAudit] = useState(null);
   const runRef = useRef(null);
 
   useEffect(() => {
@@ -132,8 +134,29 @@ export default function App() {
 
   function handleUploaded(parsed) {
     setProfile(parsed);
+    setAudit(null);
+    if (parsed && parsed.status === 'needs_improvement') {
+      setAudit(parsed.audit || { health: 0, findings: [] });
+      showToast('Résumé parsed, but it could be improved before the run', 'warn', 7000);
+      return;
+    }
     showToast(`Résumé parsed - ${parsed.skills ? parsed.skills.length : 0} skills extracted`);
     handleRun(parsed);
+  }
+
+  function handleUploadRejected(parsed) {
+    setProfile(null);
+    setAudit(null);
+    showToast(
+      parsed && parsed.reason ? `Not a résumé: ${parsed.reason}` : 'That file does not look like a résumé',
+      'error',
+      8000,
+    );
+  }
+
+  function handleRunAnyway() {
+    setAudit(null);
+    handleRun();
   }
 
   function handlePrefsSave(p) {
@@ -270,7 +293,7 @@ export default function App() {
                     {running ? 'Running…' : profile ? 'Run the agent' : 'Upload a résumé to start'}
                   </M3eButton>
                 </div>
-                <ResumeDrop onUploaded={handleUploaded} onError={(e) => showToast(`Upload failed: ${e.message}`, 'error', 6000)} prefs={prefs} />
+                <ResumeDrop onUploaded={handleUploaded} onRejected={handleUploadRejected} onError={(e) => showToast(`Upload failed: ${e.message}`, 'error', 6000)} prefs={prefs} />
               </div>
             </section>
             {profile && (
@@ -329,6 +352,7 @@ export default function App() {
       </footer>
 
       <PrefsModal open={prefsOpen} initial={prefs} onSave={handlePrefsSave} onSkip={handlePrefsSkip} onClose={() => setPrefsOpen(false)} />
+      <ResumeAuditModal open={!!audit} audit={audit} onRun={handleRunAnyway} onClose={() => setAudit(null)} />
       <Toast toast={toast} />
     </div>
   );

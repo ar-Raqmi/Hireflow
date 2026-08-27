@@ -123,6 +123,10 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
   - `hireflow/agents/` → `BaseAgent` (ABC): `SearchAgent`, `MatchAgent`, `ResearchAgent`, `PrepareAgent`, `CareerSourceAgent`, `RouterAgent` - **these are the LIVE pipeline** (RouterAgent orchestrates them; every one uses `GeminiClient`; `CareerSourceAgent` also uses `WebFetchSource`)
   - `hireflow/tools/` → `JobSource` (ABC): `RemoteOKSource`, `RemotiveSource`, `FreehireSource` (+ any new global sources)
   - `hireflow/tools/` → `GeminiClient` - THE only LLM entry point. No alternative/fallback LLM path, no stub.
+    Methods: `parse_resume`/`parse_resume_vision` (profile), **`assess_resume`** (is this text a CV?
+    used by the `/upload` gate - conservative fallback assumes "yes" on failure so a real CV is never
+    blocked), `audit_resume` (ATS health, returns `ResumeFinding[]` - now also run at upload time),
+    `expand_query`, `score_fit`, `research_company`, `draft/review/revise_application`, `embed`.
   - `hireflow/tools/` → **search intelligence** - **PRESENT (code; live proof pending redeploy)**,
     all grep-verified this pass: `QueryExpander` (`expander.py` - Gemini expansion + deterministic
     fallback), `WantedlySource` (`wantedly.py`, JP, flag-gated), `JapanDevSource` (`japan_dev.py`,
@@ -171,7 +175,8 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 │                             #   (no ZACH_SETUP.md yet - if the code agent adds one, list it here)
 ├── hireflow/
 │   ├── config.py            # Settings (project id, model, vertex/api-key flags, thresholds 80/60,
-│   │                        #   caps, RESUME_PARSE_MODE, QUERY_EXPANSION(+terms), JOB_RECENCY_DAYS,
+│   │                        #   caps, RESUME_PARSE_MODE, RESUME_AUDIT_ENABLED, RESUME_HEALTH_BLOCK,
+│   │                        #   QUERY_EXPANSION(+terms), JOB_RECENCY_DAYS,
 │   │                        #   DIVERSITY_MAX_SAME_COMPANY, USE_UNVERIFIED_SOURCES, FREEHIRE_SOURCES)
 │   ├── cli.py               # `python -m hireflow.cli` - thin client of the deployed API (streams SSE)
 │   ├── export_html.py       # HtmlExporter - full result → self-contained result-demo.html (+ .json)
@@ -228,8 +233,10 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
                              #   `fetchDashboard`/`approveApplication`), dead CSS (`.gate`/`.hint`/
                              #   `.dz-note`/`.po-sub`/`.paused`), and deduped the dropzone markup.
                              #   Components:
-                             #   M3eIcon, ResumeDrop, PrefsModal, AgentTimeline, MatchesList,
-                             #   HistoryTab, Toast; lib/md.js (marked), api.js (fetch layer),
+                             #   M3eIcon, ResumeDrop, PrefsModal, ResumeAuditModal (upload-time
+                             #   "needs_improvement" confirm dialog with ATS health + findings +
+                             #   "Run anyway"), AgentTimeline, MatchesList, HistoryTab, Toast;
+                             #   lib/md.js (marked), api.js (fetch layer),
                              #   storage.js (localStorage). timeline animates from the real stream
                              #   (verified); live e2e on the deployed .run.app still pending.
 ```
@@ -276,7 +283,20 @@ The cleanup pass removed these - if you grep and find a reference to them, it is
   PyMuPDF when the PDF text is thin / `RESUME_PARSE_MODE=vision`) to populate
   `skills`, `years_experience`, `culture_keywords`, `residence` and inferred
   `target_roles`. Parse failure degrades to text-only + `parse_errors`, never a
-  500. Returns `status: "parsed_and_stored"` + pages + enriched fields.
+  500. **Upload gate (2026-08-27, code; live proof pending redeploy):** after
+  parsing, `/upload` calls `GeminiClient.assess_resume` (is this actually a CV?)
+  + `GeminiClient.audit_resume` (ATS health) at upload time and returns one of
+  three statuses:
+  - `not_a_resume` (with a `reason`) - the file is NOT a CV (receipt/article/
+    notes/etc.); the profile is **NOT stored** and the pipeline does NOT run.
+  - `needs_improvement` (with an `audit` object `{health, findings[]}`) - a real
+    CV but the ATS health is `< RESUME_HEALTH_BLOCK` (default 60) OR it has any
+    `sev:error` finding; the profile IS stored, but the frontend shows a
+    confirm dialog and does NOT auto-run until the user clicks "Run anyway".
+  - `parsed_and_stored` - healthy CV; auto-run proceeds as before.
+  The gate is controlled by `RESUME_AUDIT_ENABLED` (default on) and
+  `RESUME_HEALTH_BLOCK` (default 60). This is what stops a non-resume or a thin
+  resume from triggering a full (paid) pipeline run.
 - `POST /pipeline/run?profile_id=…&seed=…&seen=…` - **async + SSE**: creates a `run_id`,
   runs the real **RouterAgent pipeline** (`SearchAgent → MatchAgent →
   **CareerSourceAgent** → ResearchAgent → PrepareAgent`, orchestrated by
@@ -341,12 +361,23 @@ new build is the acceptance target. See `docs/DEPLOY.md` for the redeploy and
   `mycareersfuture` regional passes), RemoteOK/Remotive, LinkedIn, JSON-LD, and
   ATS boards, orchestrated by `RouterAgent`) in a background asyncio task
   writing to an in-memory `RunLog`
-  (`hireflow/agents/runlog.py`), and `GET /pipeline/run/{run_id}/events` streams
+  (  `hireflow/agents/runlog.py`), and `GET /pipeline/run/{run_id}/events` streams
   `parse → audit → search → match → career → research → prepare → approve` events then a
   final `done` payload. `/upload` now runs a real Gemini parse (text, or vision
   via PyMuPDF page-images when the PDF text is thin) so `skills` /
   `years_experience` are populated. **The pipeline + SSE stream run live end-to-end -
   the frontend's agent timeline animates from the real streamed events.**
+- **Upload gate is IMPLEMENTED (2026-08-27, code; live proof pending redeploy):**
+  `/upload` now calls `GeminiClient.assess_resume` (is this a CV? - conservative
+  fallback assumes "yes") + `GeminiClient.audit_resume` (ATS health) at upload
+  time and returns `not_a_resume` (not stored, no run) / `needs_improvement`
+  (stored, frontend confirm dialog, no auto-run until "Run anyway") /
+  `parsed_and_stored` (healthy, auto-run). Knobs `RESUME_AUDIT_ENABLED` +
+  `RESUME_HEALTH_BLOCK` in `config.py`. The frontend surfaces these via
+  `ResumeDrop.onRejected` (toast) + `ResumeAuditModal` (health + findings +
+  "Run anyway") - the app does NOT auto-run on a bad or thin upload. Proof
+  pending: redeploy + curl e2e (upload a non-CV → `not_a_resume`, a thin CV →
+  `needs_improvement`).
 - **Live Cloud Run** (`https://hireflow-backend-296941301245.us-central1.run.app`)
   is ALIVE and returns `{"status":"ok"}` (verified Aug 22). The deployed build
   still answers `agent_not_configured` on `/pipeline/run` until Zach's redeploy lands.
@@ -446,7 +477,8 @@ behaviors below are live code in `SearchAgent` (`hireflow/agents/router.py`) +
 **Config knobs - all present in `config.py`:** `QUERY_EXPANSION` (on/off, default on),
 `QUERY_EXPANSION_TERMS` (6), `JOB_RECENCY_DAYS` (14), `DIVERSITY_MAX_SAME_COMPANY` (2),
 `USE_UNVERIFIED_SOURCES` (off - only Wantedly/JapanDev come in when on), `FREEHIRE_SOURCES`
-(default `seek,mycareersfuture` - the regional freehire passes registered in `_build_default_agent()`).
+(default `seek,mycareersfuture` - the regional freehire passes registered in `_build_default_agent()`),
+`RESUME_AUDIT_ENABLED` (on - upload-time classify + ATS audit), `RESUME_HEALTH_BLOCK` (60).
 
 **Known bug - FIXED in code:** the old `LocationMapper` dropped `"Johor"` (no MY city entry, no
 `johor` country), so the `countries`/`regions` params were empty and freehire ran a **global onsite**
@@ -518,7 +550,7 @@ curl e2e (SSE `career` stage must show companies + new jobs) to count.**
 
 ## 11. Backend API surface (target, FastAPI)
 
-- `POST /upload` - resume (txt/pdf/docx) + preferences → store → **parse/audit** (real Gemini, text+vision)
+- `POST /upload` - resume (txt/pdf/docx) + preferences → store → **parse/audit/assess** (real Gemini, text+vision) → returns `not_a_resume` / `needs_improvement` / `parsed_and_stored`
 - `GET /dashboard` - live pipeline status
 - `GET /jobs` / `GET /applications` - read
 - `POST /approve` - human approval gate (**real submit to the sandbox ATS - PRESENT**: flips to `SUBMITTED`, records `ats_confirmation` + `submitted_at` via `/sandbox/ats/apply`)
@@ -579,7 +611,7 @@ curl e2e (SSE `career` stage must show companies + new jobs) to count.**
 
 ## 14. Next session: where to pick up
 
-1. Re-deploy to Cloud Run (`docs/DEPLOY.md`) → curl `/health`, then the live curl e2e with a real `.pdf` (`docs/CURL_E2E.md`): upload → run (`?seed=` + `?seen=`) → SSE events → jobs → approve. **This proves the phase - not the offline green.** The SSE `search` stage must show **expanded query terms** + per-source counts, the `career` stage must show **companies probed + new jobs**, and a Johor-style location must NOT widen to a global search (search intelligence + career-page sourcing are now in the tree - prove them live).
+1. Re-deploy to Cloud Run (`docs/DEPLOY.md`) → curl `/health`, then the live curl e2e with a real `.pdf` (`docs/CURL_E2E.md`): upload → run (`?seed=` + `?seen=`) → SSE events → jobs → approve. **This proves the phase - not the offline green.** The SSE `search` stage must show **expanded query terms** + per-source counts, the `career` stage must show **companies probed + new jobs**, and a Johor-style location must NOT widen to a global search (search intelligence + career-page sourcing are now in the tree - prove them live). **Also prove the upload gate (§8/§9):** upload a non-CV (receipt/notes) → `not_a_resume` + no run; upload a thin CV → `needs_improvement` + frontend confirm before "Run anyway"; healthy CV → `parsed_and_stored` auto-run.
 2. **Watch for the in-flight parallel pass** (§10/§12): universal webfetch (`webfetch.py`) + discovery (`discovery.py`), embeddings re-rank (`embeddings.py`, `gemini-embedding-001`), real-submit sandbox ATS (`/sandbox/ats/apply`, `ApplicationStatus.SUBMITTED`, `/approve` submits). Grep the tree each session - mark done ONLY when each is present + redeployed + curl-e2e'd. Agent Search stays OPTIONAL (domain-verify, `docs/GCP_SETUP.md` §3).
 3. **Vite + React app** (`frontend/`) is **built + verified live** (2026-08-25): components for resume upload, prefs modal, SSE agent timeline (animates from the real streamed events), ranked matches + approve, applications, history (localStorage). Wired to the live backend via `fetch`; builds clean with `npm install && npm run build`. **Remaining acceptance: prove the same run against the deployed `.run.app` URL** (needs the redeploy so `/pipeline/run` answers the RouterAgent pipeline, not `agent_not_configured`). **Resume-after-refresh + Cancel are IMPLEMENTED (2026-08-26, code; live proof pending redeploy):** run start persists `{run_id, profile}` to `localStorage` (`hireflow.active_run.v1`); on mount the app calls `GET /pipeline/run/{run_id}` and either re-attaches the live SSE stream (`Last-Event-ID` resume) or renders the finished result; a Cancel button in the timeline header calls `POST /pipeline/run/{run_id}/cancel` to stop the background task. A refreshed run only continues while the same in-memory instance lives; a missing run clears the marker gracefully.
 4. **Layer II Playwright/Chromium** is **coded + enabled** in the `Dockerfile` (`HIREFLOW_PLAYWRIGHT=1`); needs the redeploy + a live curl row.
@@ -600,7 +632,7 @@ curl e2e (SSE `career` stage must show companies + new jobs) to count.**
 7. **Agent Search (formerly CSE) is OPTIONAL** - `docs/GCP_SETUP.md` §3. NOT a keyless catch-all: it only indexes domains you can verify you own. Skip it if blocked; it does not block the core pipeline. Do not ask for a CSE key - that API is retired.
 
 **Later:**
-8. Deploy the `Dockerfile` to **Cloud Run** → return the `.run.app` URL (needed for end-of-video proof). Use the big-instance runbook in `docs/GCP_SETUP.md` §5 (`--memory 1Gi --timeout 3600`, bump to `--memory 2G --cpu 2` if Playwright/Chromium is enabled) and pass the new knobs: `QUERY_EXPANSION=true,JOB_RECENCY_DAYS=14,DIVERSITY_MAX_SAME_COMPANY=2`.
+8. Deploy the `Dockerfile` to **Cloud Run** → return the `.run.app` URL (needed for end-of-video proof). Use the big-instance runbook in `docs/GCP_SETUP.md` §5 (`--memory 1Gi --timeout 3600`, bump to `--memory 2G --cpu 2` if Playwright/Chromium is enabled) and pass the new knobs: `QUERY_EXPANSION=true,JOB_RECENCY_DAYS=14,DIVERSITY_MAX_SAME_COMPANY=2,RESUME_AUDIT_ENABLED=true,RESUME_HEALTH_BLOCK=60`.
 9. Optional: Cloud Scheduler → POST `/pipeline/run` hourly.
 10. Capture Cloud Run console + Vertex AI logs for the video.
 
