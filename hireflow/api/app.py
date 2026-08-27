@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from hireflow.agents.adk_router import HireflowAgent
 from hireflow.agents.router import RouterAgent
 from hireflow.agents.runlog import RunLog
-from hireflow.config import JSONLD_COMPANY_URLS, SETTINGS
+from hireflow.config import SETTINGS
 from hireflow.domain import Application, ApplicationStatus, JobPosting, Profile
 from hireflow.storage.factory import StorageFactory
 from hireflow.tools.ats import AtsBoardSource
@@ -22,7 +22,6 @@ from hireflow.tools.freehire import FreehireSource
 from hireflow.tools.gemini import GeminiClient
 from hireflow.tools.gemini_search import GeminiWebSearchSource
 from hireflow.tools.japan_dev import JapanDevSource
-from hireflow.tools.jsonld import JsonLdSource
 from hireflow.tools.linkedin import LinkedInSource
 from hireflow.tools.remoteok import RemoteOKSource
 from hireflow.tools.remotive import RemotiveSource
@@ -198,7 +197,6 @@ def _build_default_agent() -> HireflowAgent:
         *[FreehireRegionalSource(source) for source in SETTINGS.freehire_sources],
         RemoteOKSource(),
         RemotiveSource(),
-        JsonLdSource(urls=JSONLD_COMPANY_URLS),
         AtsBoardSource(),
     ]
     if SETTINGS.web_discovery_enabled:

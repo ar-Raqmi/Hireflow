@@ -129,9 +129,5 @@ ATS_BOARDS: dict[str, list[str]] = {
     "ashby": ["notion"],
 }
 
-JSONLD_COMPANY_URLS: list[str] = [
-    "https://www.greenhouse.io/careers",
-]
-
 
 SETTINGS = Settings()
