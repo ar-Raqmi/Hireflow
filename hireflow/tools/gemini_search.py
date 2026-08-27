@@ -73,6 +73,7 @@ class GeminiWebSearchSource:
             return None
         company = str(row.get("company") or "").strip()
         location = str(row.get("location") or "").strip()
+        description = str(row.get("description") or "").strip()
         digest = hashlib.sha1(f"{url}|{title}|{company}".encode()).hexdigest()[:12]
         return JobPosting(
             id=f"{title.lower().replace(' ', '-')}-{digest}",
@@ -81,7 +82,7 @@ class GeminiWebSearchSource:
             company=company,
             location=location,
             post_url=url,
-            raw_data={"gemini_web": True},
+            raw_data={"gemini_web": True, "description": description},
         )
 
     @classmethod

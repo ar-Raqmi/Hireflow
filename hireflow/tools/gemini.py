@@ -238,10 +238,13 @@ class GeminiClient:
             "From the search results, extract the real job postings you can see. "
             "Only include postings that actually appear in the search results - "
             "never invent a job. For each one return the exact posting/listing "
-            "URL from the results, the job title, the hiring company, and the "
-            "location if shown. Maximum 10 postings, most relevant first.\n"
+            "URL from the results, the job title, the hiring company, the "
+            "location if shown, and a short description (1-3 sentences) "
+            "summarizing what the search result snippet says about the role, "
+            "its requirements or responsibilities. Maximum 10 postings, most "
+            "relevant first.\n"
             'Return ONLY a JSON array: [{"title": str, "company": str, '
-            '"location": str, "url": str}]'
+            '"location": str, "url": str, "description": str}]'
         )
         tool = types.Tool(google_search=types.GoogleSearch())
         response = await self._async_client.models.generate_content(
@@ -287,10 +290,13 @@ class GeminiClient:
         return terms or list(roles)
 
     async def score_fit(self, job: JobPosting, profile: Profile) -> tuple[int, list[str]]:
+        raw = job.raw_data if isinstance(job.raw_data, dict) else {}
+        description = str(raw.get("description") or "").strip()[:1200]
         prompt = (
             "Score fit (0-100) between this job and this profile across "
             "five dimensions: skills, experience, location, salary, culture.\n"
             f"JOB: {job.title} @ {job.company} ({job.location})\n"
+            f"JOB DESCRIPTION: {description or 'not available - judge from the title'}\n"
             f"PROFILE SKILLS: {profile.skills}\n"
             f"PROFILE EXPERIENCE (years): {profile.years_experience}\n"
             f"PROFILE PREFERRED LOCATIONS: {profile.locations or 'any'}\n"
@@ -307,9 +313,12 @@ class GeminiClient:
         return {"company": company, "summary": text}
 
     async def draft_application(self, profile: Profile, job: JobPosting) -> dict[str, str]:
+        raw = job.raw_data if isinstance(job.raw_data, dict) else {}
+        description = str(raw.get("description") or "").strip()[:1200]
         prompt = (
             f"Draft a tailored CV summary + cover letter for this job using ONLY the profile.\n"
-            f"JOB: {job.title} @ {job.company}\n"
+            f"JOB: {job.title} @ {job.company} ({job.location})\n"
+            f"JOB DESCRIPTION: {description or 'not available - tailor from the title'}\n"
             f"PROFILE: {profile.resume_text}\n"
             f"Return JSON: {{\"cv\": str, \"cover_letter\": str}}"
         )

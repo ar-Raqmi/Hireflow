@@ -39,11 +39,24 @@ class LinkedInSource(JobSource):
 
     name = "linkedin"
     _url = _LINKEDIN_SEARCH_URL
+    _COOLDOWN_SECONDS = 180.0
 
     def __init__(self, limit: int = 10, detail: bool = True) -> None:
         super().__init__()
         self._cap = max(1, min(limit, 15))
         self._fetch_detail = detail
+        self._cooldown_until = 0.0
+
+    def _cooling_down(self) -> bool:
+        return asyncio.get_event_loop().time() < self._cooldown_until
+
+    def _trip_cooldown(self) -> None:
+        self._cooldown_until = asyncio.get_event_loop().time() + self._COOLDOWN_SECONDS
+
+    def _blocked_status(self, exc: httpx.HTTPError) -> bool:
+        response = getattr(exc, "response", None)
+        status = getattr(response, "status_code", 0)
+        return status in {403, 429, 999}
 
     def _parse_row(self, row: dict) -> JobPosting:
         return JobPosting(
@@ -64,9 +77,17 @@ class LinkedInSource(JobSource):
         work_type: str = "any",
         locations: list[str] | None = None,
     ) -> list[JobPosting]:
+        if self._cooling_down():
+            self._last_error = "linkedin: cooling down after recent rate-limit"
+            return []
         try:
             params = self._params(query, location, work_type=work_type, locations=locations)
             html = await self._fetch_html(self._url, params)
+        except httpx.HTTPStatusError as exc:
+            self._last_error = f"{type(exc).__name__}: {str(exc)[:300]}"
+            if self._blocked_status(exc):
+                self._trip_cooldown()
+            return []
         except (httpx.HTTPError, ValueError) as exc:
             self._last_error = f"{type(exc).__name__}: {str(exc)[:300]}"
             return []
@@ -74,6 +95,8 @@ class LinkedInSource(JobSource):
         jobs = [job for job in jobs if job.id and self._matches(job, query, "")]
         if self._fetch_detail:
             for job in jobs[: self._cap]:
+                if self._cooling_down():
+                    break
                 await self._attach_description(job)
         return jobs[: min(limit, self._cap)]
 
@@ -116,6 +139,11 @@ class LinkedInSource(JobSource):
     async def _attach_description(self, job: JobPosting) -> None:
         try:
             html = await self._fetch_html(_LINKEDIN_DETAIL_URL.format(job_id=job.id), {})
+        except httpx.HTTPStatusError as exc:
+            self._last_error = f"detail {job.id}: {type(exc).__name__}: {str(exc)[:200]}"
+            if self._blocked_status(exc):
+                self._trip_cooldown()
+            return
         except (httpx.HTTPError, ValueError) as exc:
             self._last_error = f"detail {job.id}: {type(exc).__name__}: {str(exc)[:200]}"
             return
