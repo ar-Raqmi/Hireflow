@@ -1,4 +1,4 @@
-import { M3eCircularProgressIndicator, M3eLinearProgressIndicator } from '@m3e/react/progress-indicator';
+import { M3eCircularProgressIndicator } from '@m3e/react/progress-indicator';
 import { M3eButton } from '@m3e/react/button';
 import M3eIcon from './M3eIcon.jsx';
 
@@ -46,8 +46,6 @@ export default function AgentTimeline({ events = [], running = false, onCancel }
           />
         ))}
       </div>
-      {running && <M3eLinearProgressIndicator className="con-progress" mode="indeterminate" variant="wavy" />}
-
       <ol className="tl">
         {stages.map((s, i) => {
           const meta = STAGE_META[s];

@@ -121,7 +121,6 @@ m3e-icon { vertical-align: middle; }
 }
 .phase-chip.live { border-color: var(--ember); color: var(--ember); }
 .tl-cancel { margin-left: auto; }
-.con-progress { width: 100%; display: block; padding: 0 24px; margin-bottom: 4px; --m3e-progress-indicator-color: var(--md-sys-color-primary); --m3e-progress-indicator-track-color: var(--track); }
 .filechip {
   display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line);
   background: var(--surface-low); border-radius: 999px; padding: 6px 12px;
@@ -312,5 +311,5 @@ footer { margin-top: auto; max-width: 1140px; margin: auto auto 26px auto; paddi
 
 @media (max-width: 960px) { .hero-grid { grid-template-columns: 1fr; } .dz { min-height: 220px; } }
 @media (max-width: 760px) { .job { grid-template-columns: auto 1fr; } .act { grid-column: 1/-1; flex-direction: row; align-items: center; gap: 14px; width: 100%; } }
-@media (max-width: 560px) { .ck { grid-template-columns: 38px 1fr; column-gap: 12px; } .ck-node { width: 38px; height: 38px; border-radius: 13px; } .tl { padding: 6px 16px 16px; } .segbar { padding: 2px 16px 12px; } .con-progress { padding: 0 16px; } .ck-title { font-size: 16px; } }
+@media (max-width: 560px) { .ck { grid-template-columns: 38px 1fr; column-gap: 12px; } .ck-node { width: 38px; height: 38px; border-radius: 13px; } .tl { padding: 6px 16px 16px; } .segbar { padding: 2px 16px 12px; } .ck-title { font-size: 16px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; } }
