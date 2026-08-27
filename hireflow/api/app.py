@@ -110,8 +110,11 @@ class FreehireRegionalSource(FreehireSource):
         location: str,
         work_type: str = "any",
         locations: list[str] | None = None,
+        offset: int = 0,
     ) -> dict[str, str]:
-        params = super()._params(query, location, work_type=work_type, locations=locations)
+        params = super()._params(
+            query, location, work_type=work_type, locations=locations, offset=offset
+        )
         if self._region_source:
             params["source"] = self._region_source
             if self._region_source == "seek":
@@ -202,7 +205,7 @@ def _build_default_agent() -> HireflowAgent:
         sources.append(
             GeminiWebSearchSource(
                 gemini=gemini,
-                max_links=SETTINGS.web_discovery_max_links,
+                max_jobs=SETTINGS.web_discovery_max_links,
             )
         )
     if SETTINGS.use_unverified_sources:

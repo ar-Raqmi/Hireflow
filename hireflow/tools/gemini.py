@@ -223,6 +223,42 @@ class GeminiClient:
             found.append({"title": "", "uri": url, "domain": ""})
         return found
 
+    async def grounded_jobs(self, query: str) -> list[dict[str, Any]]:
+        """Grounded job extraction - Gemini searches Google and returns real jobs.
+
+        One grounded generate_content: the model searches Google for the query
+        and extracts the actual job postings it can see in the results into
+        structured JSON (title, company, location, url). Raises on failure so
+        the caller can surface the reason.
+        """
+        from google.genai import types
+
+        prompt = (
+            f"Search the web for currently-open job openings matching: {query}. "
+            "From the search results, extract the real job postings you can see. "
+            "Only include postings that actually appear in the search results - "
+            "never invent a job. For each one return the exact posting/listing "
+            "URL from the results, the job title, the hiring company, and the "
+            "location if shown. Maximum 10 postings, most relevant first.\n"
+            'Return ONLY a JSON array: [{"title": str, "company": str, '
+            '"location": str, "url": str}]'
+        )
+        tool = types.Tool(google_search=types.GoogleSearch())
+        response = await self._async_client.models.generate_content(
+            model=self._model,
+            contents=prompt,
+            config=types.GenerateContentConfig(tools=[tool], temperature=1.0),
+        )
+        text = response.text or ""
+        start, end = text.find("["), text.rfind("]")
+        if start == -1 or end == -1 or end <= start:
+            return []
+        try:
+            payload = json.loads(text[start : end + 1])
+        except (ValueError, json.JSONDecodeError):
+            return []
+        return [row for row in payload if isinstance(row, dict) and row.get("title")]
+
     async def expand_query(self, roles: list[str], skills: list[str] | None = None) -> list[str]:
         if not roles:
             return []
