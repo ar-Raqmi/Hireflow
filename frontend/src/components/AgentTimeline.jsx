@@ -1,4 +1,4 @@
-import { M3eLinearProgressIndicator } from '@m3e/react/progress-indicator';
+import { M3eCircularProgressIndicator, M3eLinearProgressIndicator } from '@m3e/react/progress-indicator';
 import { M3eButton } from '@m3e/react/button';
 import M3eIcon from './M3eIcon.jsx';
 
@@ -66,6 +66,7 @@ export default function AgentTimeline({ events = [], running = false, onCancel }
             >
               <div className="ck-rail">
                 <div className="ck-node">
+                  {isActive && <M3eCircularProgressIndicator className="ck-node-progress" variant="wavy" indeterminate />}
                   <M3eIcon name={meta.icon} size={20} />
                 </div>
                 <div className="ck-line"><i /></div>

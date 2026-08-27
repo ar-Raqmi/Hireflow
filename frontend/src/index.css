@@ -139,14 +139,16 @@ m3e-icon { vertical-align: middle; }
 .ck-node {
   width: 44px; height: 44px; border-radius: 15px; border: 1.5px solid var(--line);
   display: grid; place-items: center; color: var(--ghost); background: var(--surface); flex: none;
+  position: relative;
   transition: background 0.3s, border-color 0.3s, color 0.3s;
 }
-.ck[data-state='active'] .ck-node { border-color: var(--md-sys-color-primary); color: var(--md-sys-color-primary); position: relative; }
-.ck[data-state='active'] .ck-node::after {
-  content: ''; position: absolute; inset: -6px; border-radius: 19px; border: 1.5px solid currentColor;
-  animation: ring 1.6s ease-out infinite;
+.ck-node m3e-icon { position: relative; z-index: 1; }
+.ck-node .ck-node-progress {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: grid; place-items: center;
+  --m3e-progress-indicator-color: var(--md-sys-color-primary);
 }
-@keyframes ring { 0% { transform: scale(0.82); opacity: 0.9; } 70% { transform: scale(1.22); opacity: 0; } 100% { opacity: 0; } }
+.ck-node .ck-node-progress m3e-circular-progress-indicator { width: 44px; height: 44px; }
+.ck[data-state='active'] .ck-node { border-color: transparent; color: var(--md-sys-color-primary); position: relative; }
 .ck[data-state='failed'] .ck-node { background: var(--red-container); border-color: var(--red); color: var(--red); }
 .ck[data-state='done'] .ck-node { background: var(--md-sys-color-primary); border-color: var(--md-sys-color-primary); color: #fff; }
 .ck[data-state='done'] .ck-node m3e-icon { --_icon-fill: 1; }
