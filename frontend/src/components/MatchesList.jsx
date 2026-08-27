@@ -24,6 +24,12 @@ function excerpt(text, max = 220) {
   return plain.length > max ? `${plain.slice(0, max).trim()}…` : plain;
 }
 
+function formatDate(value) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value || '');
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 function sortMatches(matches, sort) {
   const out = [...matches];
   const dateOf = (m) => (m.posted_at ? new Date(m.posted_at).getTime() : 0);
@@ -168,13 +174,7 @@ export default function MatchesList({ matches = [], applications = [], drafts = 
                     {m.company || '-'} {m.location ? `· ${m.location}` : ''}
                   </div>
                   <div className="jmeta">
-                    {m.post_url && (
-                      <span>
-                        <M3eIcon name="link" size={16} />
-                        <a href={m.post_url} target="_blank" rel="noreferrer">posting</a>
-                      </span>
-                    )}
-                    {m.posted_at && <span>· {m.posted_at}</span>}
+                    {m.posted_at && <span><M3eIcon name="schedule" size={16} /> {formatDate(m.posted_at)}</span>}
                   </div>
 
                   <div className={`detail ${exp.detail ? 'open' : ''}`}>
