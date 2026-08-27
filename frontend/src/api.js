@@ -44,10 +44,18 @@ export async function uploadResume({ file, work_type, locations, target_roles, s
   return jsonRequest(res, 'resume upload');
 }
 
-export async function startPipeline(profileId, { seed = 0, seen = [] } = {}) {
-  const qs = new URLSearchParams({ profile_id: profileId, seed: String(seed) });
+export async function startPipeline(profileId, { seed = 0, seen = [], profile = null } = {}) {
+  const qs = new URLSearchParams();
+  if (profileId) qs.set('profile_id', profileId);
+  qs.set('seed', String(seed));
   if (seen && seen.length) qs.set('seen', seen.join(','));
-  const res = await fetch(`${BASE}/pipeline/run?${qs.toString()}`, { method: 'POST' });
+  const opts = { method: 'POST' };
+  if (profile) {
+    opts.headers = { 'Content-Type': 'application/json' };
+    opts.body = JSON.stringify({ profile });
+  }
+  const qsStr = qs.toString();
+  const res = await fetch(`${BASE}/pipeline/run${qsStr ? `?${qsStr}` : ''}`, opts);
   return jsonRequest(res, 'start pipeline');
 }
 

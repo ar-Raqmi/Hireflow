@@ -55,6 +55,19 @@ curl -s https://hireflow-backend-296941301245.us-central1.run.app/health
 # {"status":"ok"}
 ```
 
+Then verify the **watcher body-path** is live (added 2026-08-27 - the frontend
+auto-check depends on it). This must return a `run_id` (not a 422 / `missing
+profile_id`):
+
+```bash
+curl -s -X POST https://hireflow-backend-296941301245.us-central1.run.app/pipeline/run \
+  -H "Content-Type: application/json" \
+  -d '{"profile":{"work_type":"any","target_roles":["Engineer"],"resume_text":"demo"}}'
+```
+
+The one-command redeploy in §1 (with `--source .`) picks up the code change -
+no new flags are needed.
+
 Then run the full acceptance sequence in `docs/CURL_E2E.md`
 (upload → pipeline/run → jobs → applications → approve). Watch the service logs
 for Vertex calls:

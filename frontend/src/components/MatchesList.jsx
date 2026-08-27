@@ -3,7 +3,7 @@ import { M3eButton } from '@m3e/react/button';
 import { M3eCircularProgressIndicator } from '@m3e/react/progress-indicator';
 import { M3eSelect } from '@m3e/react/select';
 import { M3eOption } from '@m3e/react/option';
-import { M3eFilterChip, M3eFilterChipSet } from '@m3e/react/chips';
+import { M3eFilterChip } from '@m3e/react/chips';
 import M3eIcon from './M3eIcon.jsx';
 import { mdToHtml } from '../lib/md.js';
 
@@ -41,10 +41,10 @@ function sortMatches(matches, sort) {
   }
 }
 
-export default function MatchesList({ matches = [], applications = [], drafts = {}, onError }) {
+export default function MatchesList({ matches = [], applications = [], drafts = {}, onError, newCount = 0 }) {
   const [sort, setSort] = useState('best');
-  const [sources, setSources] = useState(null); // null = all
   const [draftsOnly, setDraftsOnly] = useState(false);
+  const [newOnly, setNewOnly] = useState(false);
   const [expanded, setExpanded] = useState({}); // job_id -> { detail, draft }
 
   const appByJob = useMemo(() => {
@@ -53,32 +53,22 @@ export default function MatchesList({ matches = [], applications = [], drafts = 
     return map;
   }, [applications]);
 
-  const allSources = useMemo(
-    () => Array.from(new Set(matches.map((m) => m.source).filter(Boolean))).sort(),
-    [matches],
-  );
-
   const hasDraft = (m) => {
     const d = drafts[m.job_id];
     return Boolean(d && (d.cv || d.cover_letter));
   };
 
   const shown = useMemo(() => {
-    return sortMatches(
-      matches.filter((m) => (!sources || sources.has(m.source)) && (!draftsOnly || hasDraft(m))),
-      sort,
+    const filtered = matches.filter(
+      (m) => (!draftsOnly || hasDraft(m)) && (!newOnly || m.isNew),
     );
+    const sorted = sortMatches(filtered, sort);
+    if (sort === 'best' && !newOnly) {
+      return [...sorted.filter((m) => m.isNew), ...sorted.filter((m) => !m.isNew)];
+    }
+    return sorted;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matches, sort, sources, draftsOnly, drafts]);
-
-  function toggleSource(src) {
-    setSources((prev) => {
-      const next = new Set(prev || allSources);
-      if (next.has(src)) next.delete(src);
-      else next.add(src);
-      return next.size === allSources.length ? null : next;
-    });
-  }
+  }, [matches, sort, draftsOnly, newOnly, drafts]);
 
   function toggleExpand(id, key) {
     setExpanded((prev) => ({ ...prev, [id]: { ...prev[id], [key]: !(prev[id] && prev[id][key]) } }));
@@ -103,21 +93,6 @@ export default function MatchesList({ matches = [], applications = [], drafts = 
           </M3eSelect>
         </div>
 
-        {allSources.length > 1 && (
-          <M3eFilterChipSet className="fsrc">
-            {allSources.map((src) => (
-              <M3eFilterChip
-                key={src}
-                value={src}
-                selected={!sources || sources.has(src)}
-                onClick={() => toggleSource(src)}
-              >
-                {src}
-              </M3eFilterChip>
-            ))}
-          </M3eFilterChipSet>
-        )}
-
         <M3eFilterChip
           className="fdraft"
           value="drafts"
@@ -126,9 +101,26 @@ export default function MatchesList({ matches = [], applications = [], drafts = 
         >
           Has draft
         </M3eFilterChip>
+
+        {newCount > 0 && (
+          <M3eFilterChip
+            className="fnew"
+            value="new"
+            selected={newOnly}
+            onClick={() => setNewOnly((v) => !v)}
+          >
+            New since last check ({newCount})
+          </M3eFilterChip>
+        )}
       </div>
 
       <div className="joblist">
+        {newCount > 0 && !newOnly && (
+          <div className="newbanner">
+            <M3eIcon name="auto_awesome" size={18} />
+            <span><b>{newCount} new role{newCount === 1 ? '' : 's'}</b> since your last check - ranked on top. You decide which to apply to.</span>
+          </div>
+        )}
         {shown.map((m, i) => {
           const rank = m.rank ?? i + 1;
           const score = Number(m.score) || 0;
@@ -167,6 +159,7 @@ export default function MatchesList({ matches = [], applications = [], drafts = 
                 <div className="main">
                   <div className="eyebrow-sm">
                     rank {rank}
+                    {m.isNew && <span className="new-badge"><M3eIcon name="new_releases" size={13} /> new</span>}
                     {submitted && <span className="sub-badge"><M3eIcon name="check_circle" size={13} /> submitted</span>}
                     {hasDraft(m) && <span className="dr-badge"><M3eIcon name="description" size={13} /> drafted</span>}
                   </div>

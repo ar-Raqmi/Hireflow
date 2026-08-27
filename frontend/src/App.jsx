@@ -3,8 +3,10 @@ import { M3eButton } from '@m3e/react/button';
 import { M3eTabs, M3eTab } from '@m3e/react/tabs';
 import { health, startPipeline, streamEvents, fetchRunStatus, cancelPipeline } from './api.js';
 import {
-  loadPrefs, savePrefs, loadHistory, pushHistory, clearHistory, loadSeen, markSeen,
+  loadPrefs, savePrefs, loadPrefsUnset, loadHistory, pushHistory, clearHistory, loadSeen, markSeen,
   saveActiveRun, loadActiveRun, clearActiveRun,
+  loadPool, savePool, loadLastView, saveLastView, MAX_POOL,
+  loadProfile, saveProfile, clearProfile, shouldAutoCheck, loadLastCheck, saveLastCheck,
 } from './storage.js';
 import ResumeDrop from './components/ResumeDrop.jsx';
 import PrefsModal from './components/PrefsModal.jsx';
@@ -12,6 +14,7 @@ import ResumeAuditModal from './components/ResumeAuditModal.jsx';
 import AgentTimeline from './components/AgentTimeline.jsx';
 import MatchesList from './components/MatchesList.jsx';
 import HistoryTab from './components/HistoryTab.jsx';
+import NewJobsModal from './components/NewJobsModal.jsx';
 import Toast from './components/Toast.jsx';
 import M3eIcon from './components/M3eIcon.jsx';
 
@@ -21,19 +24,38 @@ const VIEWS = [
   { key: 'history', label: 'History', icon: 'history' },
 ];
 
+function mergePool(pool, incoming) {
+  const byId = new Map();
+  for (const m of pool) {
+    const id = String((m && (m.job_id || m.id)) || '');
+    if (id) byId.set(id, { ...m, isNew: false });
+  }
+  const prevSeen = new Set(pool.map((m) => String((m && (m.job_id || m.id)) || '')).filter(Boolean));
+  for (const m of incoming) {
+    const id = String((m && (m.job_id || m.id)) || '');
+    if (!id) continue;
+    byId.set(id, { ...m, isNew: !prevSeen.has(id) });
+  }
+  return [...byId.values()]
+    .sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0))
+    .slice(0, MAX_POOL);
+}
+
 export default function App() {
   const [prefs, setPrefs] = useState(() => loadPrefs());
-  const [prefsOpen, setPrefsOpen] = useState(true);
+  const [prefsOpen, setPrefsOpen] = useState(() => loadPrefsUnset());
   const [profile, setProfile] = useState(null);
   const [running, setRunning] = useState(false);
   const [events, setEvents] = useState([]);
   const [result, setResult] = useState(null);
   const [matches, setMatches] = useState([]);
+  const [newCount, setNewCount] = useState(0);
   const [applications, setApplications] = useState([]);
   const [history, setHistory] = useState(() => loadHistory());
   const [toast, setToast] = useState(null);
-  const [view, setView] = useState('agent');
+  const [view, setView] = useState(() => loadLastView());
   const [audit, setAudit] = useState(null);
+  const [newJobsNotice, setNewJobsNotice] = useState(null);
   const runRef = useRef(null);
 
   useEffect(() => {
@@ -41,9 +63,43 @@ export default function App() {
       showToast(`Backend unreachable: ${e.message}`, 'error');
     });
     const active = loadActiveRun();
-    if (active && active.runId) resumeRun(active);
+    if (active && active.runId) {
+      resumeRun(active);
+      return;
+    }
+    if (shouldAutoCheck()) {
+      const p = loadProfile();
+      if (p) {
+        restoreCachedPool();
+        handleRun({ ...p, isAuto: true });
+        return;
+      }
+    }
+    restoreCachedPool();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function restoreCachedPool() {
+    let pool = loadPool();
+    if (!pool || pool.length === 0) {
+      const h = loadHistory();
+      const last = h[0];
+      if (last && last.result && last.result.matches && last.result.matches.length > 0) {
+        pool = last.result.matches.map((m) => ({ ...m, isNew: Boolean(m.isNew) }));
+        savePool(pool);
+      }
+    }
+    if (pool && pool.length > 0) {
+      setResult({ status: 'completed', matches: pool });
+      setMatches(pool);
+      setNewCount(pool.filter((m) => m.isNew).length);
+      setApplications((pool[0] && pool[0]._applications) || []);
+    }
+  }
+
+  useEffect(() => {
+    saveLastView(view);
+  }, [view]);
 
   function showToast(message, kind = 'info', ms) {
     setToast({ message, kind, ms, ts: Date.now() });
@@ -54,36 +110,51 @@ export default function App() {
     setEvents([]);
     setResult(null);
     setMatches([]);
+    setNewCount(0);
     setApplications([]);
     setView('agent');
   }
 
   function applyResult(res, p) {
     setResult(res);
-    const m = res.matches || [];
+    const prevSeen = new Set(loadSeen().map(String));
     const a = res.applications || res.application_records || [];
-    setMatches(m);
+    const fresh = (res.matches || []).filter((m) => {
+      const id = String((m && (m.job_id || m.id)) || '');
+      return id !== '' && !prevSeen.has(id);
+    }).length;
+    const merged = mergePool(loadPool(), res.matches || []);
+    const tagged = merged.map((m) => ({ ...m, _applications: a }));
+    setMatches(tagged);
+    setNewCount(fresh);
     setApplications(a);
+    savePool(tagged);
     clearActiveRun();
     if (res.status === 'cancelled') {
       setRunning(false);
       showToast('Run cancelled - agent stopped');
       return;
     }
-    markSeen(m);
+    markSeen(res.matches || []);
     const historyEntry = {
       ts: Date.now(),
       filename: (p && p.filename) || 'resume',
       prefs,
       status: res.status || 'completed',
+      new_matches: fresh,
       result: res,
     };
     pushHistory(historyEntry);
     setHistory(loadHistory());
     if (res.status === 'error' || (res.errors && res.errors.length > 0)) {
       showToast((res.detail || (res.errors && res.errors[0])) || 'Run finished with errors', 'error', 6000);
+    } else if (fresh > 0) {
+      showToast(`Run complete - ${fresh} new since your last check, ${a.length} applications`);
+      if (p && p.isAuto) {
+        setNewJobsNotice({ count: fresh, matches: tagged });
+      }
     } else {
-      showToast(`Run complete - ${m.length} matches, ${a.length} applications`);
+      showToast(`No new jobs since your last check - ${merged.length} saved matches`, 'info');
     }
     setRunning(false);
   }
@@ -136,10 +207,12 @@ export default function App() {
     setProfile(parsed);
     setAudit(null);
     if (parsed && parsed.status === 'needs_improvement') {
+      saveProfile(parsed);
       setAudit(parsed.audit || { health: 0, findings: [] });
       showToast('Résumé parsed, but it could be improved before the run', 'warn', 7000);
       return;
     }
+    saveProfile(parsed);
     showToast(`Résumé parsed - ${parsed.skills ? parsed.skills.length : 0} skills extracted`);
     handleRun(parsed);
   }
@@ -196,7 +269,11 @@ export default function App() {
     let runId = null;
     try {
       const seen = loadSeen();
-      const started = await startPipeline(p.id, { seed: Math.floor(Math.random() * 1000), seen });
+      const started = await startPipeline(p.id, {
+        seed: Math.floor(Math.random() * 1000),
+        seen,
+        profile: p,
+      });
       runId = started.run_id;
       if (!runId) throw new Error('Pipeline did not return a run_id');
       runRef.current = runId;
@@ -204,8 +281,9 @@ export default function App() {
         runId,
         profile: { id: p.id, filename: p.filename, target_roles: p.target_roles },
       });
-      showToast('Agent run started');
+      showToast(p.isAuto ? 'Checking for new jobs since your last visit…' : 'Agent run started');
       await streamRun(runId, p);
+      saveLastCheck();
     } catch (err) {
       showToast(`Failed to start run: ${err.message}`, 'error', 6000);
       setRunning(false);
@@ -232,6 +310,25 @@ export default function App() {
     showToast('History cleared');
   }
 
+  function handleNewJobsView() {
+    const notice = newJobsNotice;
+    setNewJobsNotice(null);
+    setView('results');
+  }
+
+  function restoreRun(run) {
+    const pool = loadPool();
+    const res = run.result || { status: 'completed', matches: [], applications: [] };
+    const tagged = (res.matches || []).map((m) => ({ ...m, isNew: Boolean(m.isNew) }));
+    setResult(res);
+    setMatches(pool.length > 0 ? pool : tagged);
+    setNewCount((pool.length > 0 ? pool : tagged).filter((m) => m.isNew).length);
+    setApplications(res.applications || res.application_records || []);
+    setRunning(false);
+    setView('results');
+    showToast(`Restored run from ${new Date(run.ts || Date.now()).toLocaleString()}`);
+  }
+
   const matchCount = matches.length;
 
   return (
@@ -244,7 +341,7 @@ export default function App() {
 
       <M3eTabs variant="secondary" className="wrap viewtabs" onChange={(e) => handleViewTab(e.target?.selectedTab?.getAttribute('data-view') || view)}>
         {VIEWS.map((v) => {
-          const badge = v.key === 'results' ? matchCount : 0;
+          const badge = v.key === 'results' ? (newCount > 0 ? newCount : matchCount) : 0;
           return (
             <M3eTab
               key={v.key}
@@ -279,8 +376,8 @@ export default function App() {
                     <span className="accent">running itself.</span>
                   </h1>
                   <p className="sub">
-                    Drop in a résumé and Hireflow takes it from there - parsing, auditing, searching,
-                    ranking and tailoring. You only approve.
+                    Drop in a résumé and Hireflow watches from there - parsing, auditing, searching,
+                    researching and tailoring. Come back any time to see what's new. You only approve.
                   </p>
                   <M3eButton
                     variant="filled"
@@ -290,7 +387,7 @@ export default function App() {
                   >
                     {running && <M3eIcon name="progress_activity" size={18} className="spin" />}
                     {!running && <M3eIcon name="play_arrow" size={18} />}
-                    {running ? 'Running…' : profile ? 'Run the agent' : 'Upload a résumé to start'}
+                    {running ? 'Running…' : profile ? (matchCount > 0 ? 'Check for new jobs' : 'Run the agent') : 'Upload a résumé to start'}
                   </M3eButton>
                 </div>
                 <ResumeDrop onUploaded={handleUploaded} onRejected={handleUploadRejected} onError={(e) => showToast(`Upload failed: ${e.message}`, 'error', 6000)} prefs={prefs} />
@@ -329,11 +426,11 @@ export default function App() {
                 <div>
                   <h2>Results</h2>
                   <div className="res-meta">
-                    {running ? 'agent still running…' : matchCount === 0 ? 'run the agent to see matches' : `${matchCount} matches from the live pipeline`}
+                    {running ? 'agent still running…' : matchCount === 0 ? 'run the agent to see matches' : newCount > 0 ? `${newCount} new since your last check · ${matchCount} saved matches` : `${matchCount} saved matches (top ${MAX_POOL})`}
                   </div>
                 </div>
               </div>
-              <MatchesList matches={matches} applications={applications} drafts={result?.drafts || {}} onError={(e) => showToast(e.message, 'error', 6000)} />
+              <MatchesList matches={matches} applications={applications} drafts={result?.drafts || {}} newCount={newCount} onError={(e) => showToast(e.message, 'error', 6000)} />
             </section>
           </div>
         </main>
@@ -342,7 +439,7 @@ export default function App() {
       {view === 'history' && (
         <main>
           <div className="wrap">
-            <HistoryTab history={history} onClear={handleClearHistory} />
+            <HistoryTab history={history} onClear={handleClearHistory} onRestore={restoreRun} />
           </div>
         </main>
       )}
@@ -353,6 +450,7 @@ export default function App() {
 
       <PrefsModal open={prefsOpen} initial={prefs} onSave={handlePrefsSave} onSkip={handlePrefsSkip} onClose={() => setPrefsOpen(false)} />
       <ResumeAuditModal open={!!audit} audit={audit} onRun={handleRunAnyway} onClose={() => setAudit(null)} />
+      <NewJobsModal open={!!newJobsNotice} notice={newJobsNotice} onView={handleNewJobsView} onClose={() => setNewJobsNotice(null)} />
       <Toast toast={toast} />
     </div>
   );

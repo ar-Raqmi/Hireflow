@@ -1,7 +1,7 @@
 import { M3eButton } from '@m3e/react/button';
 import M3eIcon from './M3eIcon.jsx';
 
-export default function HistoryTab({ history = [], onClear }) {
+export default function HistoryTab({ history = [], onClear, onRestore }) {
   return (
     <section className="results in">
       <div className="results-head">
@@ -32,6 +32,13 @@ export default function HistoryTab({ history = [], onClear }) {
                 <span className="h-file">{run.filename || 'resume'}</span>
                 <span className="h-time">{new Date(run.ts).toLocaleString()}</span>
               </div>
+              {onRestore && run.result && run.result.matches && run.result.matches.length > 0 && (
+                <div className="h-actions">
+                  <M3eButton variant="tonal" className="hopen" onClick={() => onRestore(run)}>
+                    <M3eIcon name="visibility" />View {run.result.matches.length} results
+                  </M3eButton>
+                </div>
+              )}
               <div className="h-chips">
                 {run.prefs && run.prefs.work_type && <span className="hchip">work: {run.prefs.work_type}</span>}
                 {(run.prefs && run.prefs.locations && run.prefs.locations.length > 0) && <span className="hchip">{run.prefs.locations.join(', ')}</span>}
@@ -39,6 +46,9 @@ export default function HistoryTab({ history = [], onClear }) {
               </div>
               <div className="h-stats">
                 <span><b>{(run.result && run.result.matches ? run.result.matches.length : 0)}</b> matches</span>
+                {(run.new_matches > 0 || (run.result && run.result.matches && run.result.matches.some((m) => m.isNew))) && (
+                  <span className="hap-new"><b>{run.new_matches || (run.result && run.result.matches ? run.result.matches.filter((m) => m.isNew).length : 0)}</b> new</span>
+                )}
                 <span><b>{(run.result && run.result.applications ? run.result.applications.length : 0)}</b> applications</span>
                 {(run.result && run.result.errors && run.result.errors.length > 0) && (
                   <span className="hap"><b>{run.result.errors.length}</b> errors</span>

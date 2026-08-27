@@ -2,6 +2,13 @@
 const PREFS_KEY = 'hireflow.prefs.v1';
 const HISTORY_KEY = 'hireflow.history.v1';
 const SEEN_KEY = 'hireflow.seen.v1';
+const POOL_KEY = 'hireflow.pool.v1';
+const VIEW_KEY = 'hireflow.view.v1';
+const PROFILE_KEY = 'hireflow.profile.v1';
+const LAST_CHECK_KEY = 'hireflow.last_check.v1';
+export const MAX_POOL = 50;
+export const AUTO_CHECK_MINUTES = 24 * 60;
+export const AUTO_CHECK_MAX_MINUTES = 48 * 60;
 
 function safeGet(key, fallback) {
   try {
@@ -21,6 +28,10 @@ function safeSet(key, value) {
 
 export function loadPrefs() {
   return safeGet(PREFS_KEY, { work_type: 'any', locations: [], target_roles: [] });
+}
+
+export function loadPrefsUnset() {
+  return localStorage.getItem(PREFS_KEY) === null;
 }
 
 export function savePrefs(prefs) {
@@ -68,4 +79,53 @@ export function clearActiveRun() {
     localStorage.removeItem(ACTIVE_RUN_KEY);
   } catch {
   }
+}
+
+export function loadPool() {
+  return safeGet(POOL_KEY, []);
+}
+
+export function savePool(pool) {
+  safeSet(POOL_KEY, pool.slice(0, MAX_POOL));
+}
+
+export function loadLastView() {
+  return safeGet(VIEW_KEY, 'agent');
+}
+
+export function saveLastView(view) {
+  safeSet(VIEW_KEY, view);
+}
+
+export function loadProfile() {
+  return safeGet(PROFILE_KEY, null);
+}
+
+export function saveProfile(profile) {
+  safeSet(PROFILE_KEY, profile);
+}
+
+export function clearProfile() {
+  try {
+    localStorage.removeItem(PROFILE_KEY);
+  } catch {
+  }
+}
+
+export function loadLastCheck() {
+  const v = safeGet(LAST_CHECK_KEY, 0);
+  return Number(v) || 0;
+}
+
+export function saveLastCheck(ts = Date.now()) {
+  safeSet(LAST_CHECK_KEY, ts);
+}
+
+export function shouldAutoCheck() {
+  const profile = loadProfile();
+  if (!profile) return false;
+  const elapsed = Date.now() - loadLastCheck();
+  if (elapsed < AUTO_CHECK_MINUTES * 60 * 1000) return false;
+  if (elapsed > AUTO_CHECK_MAX_MINUTES * 60 * 1000) return false;
+  return true;
 }

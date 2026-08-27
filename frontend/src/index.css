@@ -223,6 +223,16 @@ m3e-icon { vertical-align: middle; }
 .eyebrow-sm { font: 500 11px/1.4 var(--fm); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .eyebrow-sm .sub-badge { display: inline-flex; align-items: center; gap: 4px; text-transform: none; letter-spacing: 0; color: var(--leaf-deep); background: var(--leaf-container); border-radius: 999px; padding: 2px 9px; font: 600 10.5px/1.4 var(--fu); }
 .eyebrow-sm .dr-badge { display: inline-flex; align-items: center; gap: 4px; text-transform: none; letter-spacing: 0; color: var(--md-sys-color-primary); background: var(--line); border-radius: 999px; padding: 2px 9px; font: 600 10.5px/1.4 var(--fu); }
+.eyebrow-sm .new-badge { display: inline-flex; align-items: center; gap: 4px; text-transform: none; letter-spacing: 0; color: var(--amber); background: var(--amber-container); border-radius: 999px; padding: 2px 9px; font: 700 10.5px/1.4 var(--fu); }
+.newbanner {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: linear-gradient(90deg, var(--amber-container), #fff7ea); border: 1.5px solid #f0d39a;
+  border-radius: 18px; padding: 13px 18px; margin-bottom: 16px;
+  font: 400 13px/1.6 var(--fu); color: #6e5b28;
+}
+.newbanner > m3e-icon { color: var(--amber); flex: none; }
+.newbanner b { color: #4a3b12; }
+.fnew[selected] { --m3e-filter-chip-outline-color: var(--amber); }
 .job h3 { font: 600 18.5px/1.2 var(--fd); letter-spacing: -0.015em; }
 .job.featured h3 { font-size: clamp(22px, 2.6vw, 27px); }
 .job .meta { font: 400 12.5px/1.5 var(--fm); color: var(--ink-soft); margin-top: 7px; }
@@ -291,6 +301,9 @@ m3e-icon { vertical-align: middle; }
 .h-stats { display: flex; flex-wrap: wrap; gap: 8px 18px; font: 400 12.5px/1.6 var(--fu); color: var(--ink-soft); }
 .h-stats b { color: var(--ink); font-family: var(--fm); font-weight: 500; }
 .h-stats .hap b { color: var(--leaf-deep); background: var(--leaf-container); border-radius: 6px; padding: 1px 7px; }
+.h-stats .hap-new b { color: var(--amber); background: var(--amber-container); border-radius: 6px; padding: 1px 7px; }
+.h-actions { display: flex; align-items: center; gap: 10px; }
+.hopen { --m3e-button-font-size: 12px; }
 .hempty { border: 1.5px dashed var(--line); border-radius: 20px; padding: 46px 24px; text-align: center; color: var(--ink-soft); font: 400 13.5px/1.6 var(--fu); margin-top: 14px; }
 .hempty b { display: block; font: 600 16px/1.4 var(--fu); color: var(--ink); margin: 10px 0 4px; }
 .errors-note { display: grid; gap: 4px; }

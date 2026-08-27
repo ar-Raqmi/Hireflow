@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from hireflow.agents.adk_router import HireflowAgent
 from hireflow.agents.router import RouterAgent
@@ -29,6 +30,14 @@ from hireflow.tools.remoteok import RemoteOKSource
 from hireflow.tools.remotive import RemotiveSource
 from hireflow.tools.resume_parser import ResumeParser
 from hireflow.tools.wantedly import WantedlySource
+
+
+class RunRequest(BaseModel):
+    """Optional body for /pipeline/run - lets the browser re-run with a full
+    profile so the watcher survives Cloud Run's scale-to-zero (no stored
+    profile_id needed)."""
+
+    profile: dict | None = None
 
 
 class AtsSandbox:
@@ -381,8 +390,17 @@ def create_app(
         return api.state.ats.list_all()
 
     @api.post("/pipeline/run")
-    async def run_pipeline(profile_id: str, seed: int = 0, seen: str = "") -> dict:
-        profile = await api.state.storage.profiles().get(profile_id)
+    async def run_pipeline(
+        profile_id: str = "",
+        seed: int = 0,
+        seen: str = "",
+        body: RunRequest | None = None,
+    ) -> dict:
+        profile = None
+        if profile_id:
+            profile = await api.state.storage.profiles().get(profile_id)
+        if profile is None and body is not None and body.profile:
+            profile = Profile.from_mapping(body.profile)
         if profile is None:
             return {"profile_id": profile_id, "status": "profile_not_found"}
         run_id = str(uuid.uuid4())
@@ -400,7 +418,7 @@ def create_app(
         )
         api.state.run_tasks[run_id] = task
         task.add_done_callback(lambda t: api.state.run_tasks.pop(run_id, None))
-        return {"run_id": run_id, "profile_id": profile_id, "status": "started"}
+        return {"run_id": run_id, "profile_id": profile_id or (profile.id if profile else ""), "status": "started"}
 
     @api.get("/pipeline/run/{run_id}")
     async def pipeline_status(run_id: str) -> dict:
