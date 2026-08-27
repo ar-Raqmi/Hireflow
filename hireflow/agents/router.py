@@ -58,6 +58,7 @@ class SearchAgent(BaseAgent):
         profile: Profile = context["profile"]
         errors: list[str] = context["errors"]
         seed = int(context.get("seed", 0) or 0)
+        offset = int(context.get("offset", 0) or 0)
         seen: set[str] = set(context.get("seen_jobs") or [])
 
         base = self._build_query(profile)
@@ -72,48 +73,71 @@ class SearchAgent(BaseAgent):
         )
 
         per_source = self._per_source_cap()
-        gathered: list[JobPosting] = []
-        sources = self._rotate(self._sources, seed)
-        for source in sources:
+        fresh: list[JobPosting] = []
+        repeat: list[JobPosting] = []
+        for source in self._rotate(self._sources, seed):
             variants = queries if source.name in _GEO_CAPABLE else queries[:1]
-            raw: list[JobPosting] = []
+            source_jobs: list[JobPosting] = []
             for query in variants:
-                try:
-                    found = await source.search(
-                        query=query,
-                        limit=per_source,
-                        work_type=profile.work_type,
-                        locations=profile.locations,
-                    )
-                except Exception as exc:
-                    errors.append(f"{source.name}: {type(exc).__name__}: {str(exc)[:200]}")
-                    found = []
-                if source.last_error:
-                    errors.append(f"{source.name}: {source.last_error}")
-                for job in found:
-                    if not job.id or job.id in seen:
-                        continue
-                    if not self._passes_work_gate(job, profile.work_type):
-                        continue
-                    if not self._passes_location(job, profile):
-                        continue
-                    if self._is_stale(job):
-                        continue
-                    seen.add(job.id)
-                    raw.append(job)
-            raw = self._dedupe(raw)
-            raw = self._cap_company(raw, SETTINGS.diversity_max_same_company)
-            label = self._source_label(source, profile)
+                source_jobs.extend(
+                    await self._collect(source, query, per_source, profile, offset, errors)
+                )
+            source_jobs = self._dedupe(
+                self._cap_company(source_jobs, SETTINGS.diversity_max_same_company)
+            )
+            kept = [job for job in source_jobs if job.id not in seen]
+            fresh.extend(kept)
+            repeat.extend([job for job in source_jobs if job.id in seen])
             summary = getattr(source, "last_summary", "")
-            detail = f"{label}: {len(raw)} new" if not summary else f"{source.name}: {summary}"
+            label = self._source_label(source, profile)
+            if summary:
+                detail = f"{source.name}: {summary}"
+            else:
+                detail = f"{label}: {len(kept)} new · {len(source_jobs) - len(kept)} seen"
             await self._emit("search", detail)
-            gathered.extend(raw)
 
-        jobs = self._dedupe(gathered)
-        jobs = self._cap_company(jobs, SETTINGS.diversity_max_same_company)
-        jobs = self._rotate(jobs, seed)
-        jobs = jobs[: self._caps["max_jobs"]]
-        return {"jobs": [job.to_mapping() for job in jobs], "new_jobs": len(jobs)}
+        fresh = self._dedupe(self._cap_company(fresh, SETTINGS.diversity_max_same_company))
+        repeat = self._dedupe(self._cap_company(repeat, SETTINGS.diversity_max_same_company))
+        jobs = fresh + repeat
+        jobs = self._rotate(jobs, seed)[: self._caps["max_jobs"]]
+        return {
+            "jobs": [job.to_mapping() for job in jobs],
+            "fresh": len(fresh),
+            "new_jobs": len(jobs),
+        }
+
+    async def _collect(
+        self,
+        source: JobSource,
+        query: str,
+        limit: int,
+        profile: Profile,
+        offset: int,
+        errors: list[str],
+    ) -> list[JobPosting]:
+        kwargs = {
+            "query": query,
+            "limit": limit,
+            "work_type": profile.work_type,
+            "locations": profile.locations,
+        }
+        if source.name in _GEO_CAPABLE:
+            kwargs["offset"] = offset
+        try:
+            found = await source.search(**kwargs)
+        except Exception as exc:
+            errors.append(f"{source.name}: {type(exc).__name__}: {str(exc)[:200]}")
+            found = []
+        if source.last_error:
+            errors.append(f"{source.name}: {source.last_error}")
+        return [
+            job
+            for job in found
+            if job.id
+            and self._passes_work_gate(job, profile.work_type)
+            and self._passes_location(job, profile)
+            and not self._is_stale(job)
+        ]
 
     def _build_query(self, profile: Profile) -> list[str]:
         roles = [role for role in profile.target_roles if role]
@@ -460,10 +484,9 @@ class RouterAgent(BaseAgent):
         )
         await self._audit(profile, errors)
 
-        search = await self._search.run(context)
-        context["jobs"] = search["jobs"]
-        match = await self._match.run(context)
-        context["matches"] = match["matches"]
+        jobs, matches = await self._discover(context, profile, seed, errors)
+        context["jobs"] = jobs
+        context["matches"] = matches
 
         career = await self._career.run(context)
         career_jobs = career["jobs"]
@@ -489,6 +512,60 @@ class RouterAgent(BaseAgent):
     async def _emit(self, stage: str, detail: str) -> None:
         if self._progress is not None:
             await self._progress(stage, detail)
+
+    async def _discover(
+        self,
+        context: dict[str, Any],
+        profile: Profile,
+        seed: int,
+        errors: list[str],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        min_matches = SETTINGS.pipeline_min_matches
+        batch = SETTINGS.pipeline_score_batch
+        sweeps = SETTINGS.pipeline_max_search_sweeps
+        jobs: list[dict[str, Any]] = []
+        scored: list[dict[str, Any]] = []
+        known: set[str] = set()
+
+        for sweep in range(sweeps):
+            search_ctx = dict(context)
+            search_ctx["offset"] = sweep * batch
+            search_ctx.pop("jobs", None)
+            search_ctx.pop("matches", None)
+            result = await self._search.run(search_ctx)
+            pool = [job for job in result["jobs"] if job.get("id") and job["id"] not in known]
+            if not pool:
+                break
+            for job in pool:
+                known.add(job["id"])
+            jobs.extend(pool)
+            remaining = pool
+            while remaining and len(scored) < min_matches:
+                match_ctx = dict(context)
+                match_ctx["jobs"] = remaining[:batch]
+                match_ctx.pop("matches", None)
+                remaining = remaining[batch:]
+                scored.extend((await self._match.run(match_ctx))["matches"])
+            if len(scored) >= min_matches:
+                break
+
+        scored = self._dedupe_matches(scored)
+        scored.sort(key=lambda match: int(match.get("score", 0) or 0), reverse=True)
+        return jobs, scored
+
+    @staticmethod
+    def _dedupe_matches(matches: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        by_id: dict[str, dict[str, Any]] = {}
+        for match in matches:
+            job = match.get("job")
+            job_id = str(job.get("id", "") or "") if isinstance(job, dict) else ""
+            if not job_id:
+                by_id[f"__noid__{id(match)}"] = match
+                continue
+            current = by_id.get(job_id)
+            if current is None or int(match.get("score", 0) or 0) > int(current.get("score", 0) or 0):
+                by_id[job_id] = match
+        return list(by_id.values())
 
     async def _audit(self, profile: Profile, errors: list[str]) -> None:
         if not profile.resume_text:
@@ -568,7 +645,7 @@ class RouterAgent(BaseAgent):
     ) -> dict[str, Any]:
         needs_human: list[dict[str, Any]] = []
         ranked: list[dict[str, Any]] = []
-        for index, match in enumerate(matches[: self._caps["max_score"]], start=1):
+        for index, match in enumerate(matches, start=1):
             job = JobPosting.from_mapping(match["job"])
             ranked.append(
                 {

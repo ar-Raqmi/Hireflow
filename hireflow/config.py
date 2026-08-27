@@ -40,11 +40,20 @@ class Settings:
     base_url: str = field(default_factory=lambda: _env("HIREFLOW_BASE_URL", DEFAULT_BASE_URL))
     approve_threshold_auto: int = 80
     approve_threshold_draft: int = 60
-    pipeline_max_jobs: int = field(default_factory=lambda: _int_env("PIPELINE_MAX_JOBS", 25))
-    pipeline_max_score: int = field(default_factory=lambda: _int_env("PIPELINE_MAX_SCORE", 10))
+    pipeline_max_jobs: int = field(default_factory=lambda: _int_env("PIPELINE_MAX_JOBS", 60))
+    pipeline_max_score: int = field(default_factory=lambda: _int_env("PIPELINE_MAX_SCORE", 60))
     pipeline_max_prep: int = field(default_factory=lambda: _int_env("PIPELINE_MAX_PREP", 5))
     pipeline_max_research: int = field(
-        default_factory=lambda: _int_env("PIPELINE_MAX_RESEARCH", 8)
+        default_factory=lambda: _int_env("PIPELINE_MAX_RESEARCH", 10)
+    )
+    pipeline_min_matches: int = field(
+        default_factory=lambda: _int_env("PIPELINE_MIN_MATCHES", 10)
+    )
+    pipeline_score_batch: int = field(
+        default_factory=lambda: _int_env("PIPELINE_SCORE_BATCH", 10)
+    )
+    pipeline_max_search_sweeps: int = field(
+        default_factory=lambda: _int_env("PIPELINE_MAX_SEARCH_SWEEPS", 3)
     )
     freehire_posted_within_days: int = field(
         default_factory=lambda: _int_env("FREEHIRE_POSTED_WITHIN_DAYS", 14)

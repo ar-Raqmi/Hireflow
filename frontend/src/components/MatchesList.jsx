@@ -15,6 +15,15 @@ const SORTS = [
   { key: 'date-old', label: 'Oldest first' },
 ];
 
+function excerpt(text, max = 220) {
+  if (!text) return '';
+  const plain = String(text)
+    .replace(/[#>*_`~\-\[\]()!]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return plain.length > max ? `${plain.slice(0, max).trim()}…` : plain;
+}
+
 function sortMatches(matches, sort) {
   const out = [...matches];
   const dateOf = (m) => (m.posted_at ? new Date(m.posted_at).getTime() : 0);
@@ -139,7 +148,7 @@ export default function MatchesList({ matches = [], applications = [], drafts = 
               {m.research && m.research.summary && (
                 <div className="research">
                   <M3eIcon name="account_balance" size={15} />
-                  <span dangerouslySetInnerHTML={{ __html: mdToHtml(m.research.summary) }} />
+                  <span>{excerpt(m.research.summary)}</span>
                 </div>
               )}
             </>

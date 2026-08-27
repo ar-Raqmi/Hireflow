@@ -44,8 +44,9 @@ gcloud run deploy hireflow-backend --region us-central1 --source . \
   Gemini **vision** page-images when the PDF's extracted text is thin;
   `vision`: always render PDF pages + Gemini vision; `text`: text-only parse.
 - Optional tuning (defaults are fine for the demo):
-  `PIPELINE_MAX_JOBS=25`, `PIPELINE_MAX_SCORE=10`, `PIPELINE_MAX_PREP=5`,
-  `PIPELINE_MAX_RESEARCH=8`, `FREEHIRE_POSTED_WITHIN_DAYS=14`.
+  `PIPELINE_MAX_JOBS=60`, `PIPELINE_MAX_SCORE=60`, `PIPELINE_MAX_PREP=5`,
+  `PIPELINE_MAX_RESEARCH=10`, `PIPELINE_MIN_MATCHES=10`, `PIPELINE_SCORE_BATCH=10`,
+  `PIPELINE_MAX_SEARCH_SWEEPS=3`, `FREEHIRE_POSTED_WITHIN_DAYS=14`.
 
 ## 2. Verify
 

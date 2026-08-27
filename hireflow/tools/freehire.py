@@ -34,9 +34,12 @@ class FreehireSource(JobSource):
         limit: int = 25,
         work_type: str = "any",
         locations: list[str] | None = None,
+        offset: int = 0,
     ) -> list[JobPosting]:
         try:
-            params = self._params(query, location, work_type=work_type, locations=locations)
+            params = self._params(
+                query, location, work_type=work_type, locations=locations, offset=offset
+            )
             data = await self._fetch_json(self._url, params)
         except Exception as exc:
             self._last_error = f"{type(exc).__name__}: {str(exc)[:300]}"
@@ -51,13 +54,14 @@ class FreehireSource(JobSource):
         location: str,
         work_type: str = "any",
         locations: list[str] | None = None,
+        offset: int = 0,
     ) -> dict[str, str]:
         params: dict[str, str] = {
             "q": query or "software engineer",
             "posted_within_days": str(SETTINGS.freehire_posted_within_days),
             "include_description": "true",
             "limit": "25",
-            "offset": "0",
+            "offset": str(max(0, offset)),
         }
         geo = self._mapper.map(locations or [])
         if geo["countries"]:

@@ -307,8 +307,8 @@ The cleanup pass removed these - if you grep and find a reference to them, it is
   `USE_UNVERIFIED_SOURCES=1`) in a background asyncio task, and returns
   `{"run_id":…,"status":"started"}` immediately. `seed` rotates query/source
   order for run-to-run variation; `seen=` (comma-separated job ids from client
-  `localStorage`) de-duplicates jobs already shown to the user. Caps: ≤25 jobs,
-  ≤10 scored, ≤5 prepared, ≤8 researched (env-tunable).
+  `localStorage`) de-duplicates jobs already shown to the user. Adaptive gather caps:
+  ≤60 pool, ≤60 scored, ≤5 prepared, ≤10 researched, min 10 matches (env-tunable).
 - `GET /pipeline/run/{run_id}/events` - **Server-Sent Events** (`text/event-stream`):
   streams `parse → audit → search → match → research → prepare → approve`
   agent-tagged stage events with counts/names as `data: {…}`, then a final
@@ -460,25 +460,38 @@ behaviors below are live code in `SearchAgent` (`hireflow/agents/router.py`) +
    **vary run-to-run** (no single deterministic query → no "same results every run"). The SSE
    `search` stage shows the expanded terms + per-source counts.
 3. **Gate-then-cap** - before scoring, jobs are gated on **work-type AND location AND recency**,
-   then capped (≤25 jobs, ≤10 scored, ≤5 prepared, ≤8 researched). Location is resolved via
+   then capped (≤60 pool, ≤60 scored, ≤5 prepared, ≤10 researched, min 10 matches). Location is resolved via
    `LocationMapper`; a location with no code (e.g. `"Johor"`) must **not** silently fall through
    to a global search (`SearchAgent._passes_location`).
 4. **Recency filter** - `SearchAgent._is_stale` drops jobs older than `JOB_RECENCY_DAYS` (default
    14). freehire additionally sends server-side `posted_within_days`; the client-side gate covers
    the sources that only parse `posted_at`.
 5. **Cross-run memory (seen jobs)** - the browser sends a `?seen=` list of job ids to
-   `/pipeline/run`; the agent skips jobs the user has already seen (dedup across runs). **No DB -
-   the seen list lives in client `localStorage` and rides on the query string; the backend stays
-   stateless/in-memory.**
+   `/pipeline/run`; fresh (never-seen) jobs are returned first, already-seen jobs become
+   **fill** so a rerun still reaches `PIPELINE_MIN_MATCHES` (the seen list is a preference,
+   not a hard cut - it no longer starves a rerun to a handful). **No DB - the seen list lives
+   in client `localStorage` and rides on the query string; the backend stays stateless/in-memory.**
 6. **Per-company diversity cap** - `SearchAgent._cap_company` limits how many jobs from one
    company survive to scoring (`DIVERSITY_MAX_SAME_COMPANY`, default 2), so results aren't one
    employer's wall.
+7. **Adaptive gather (RouterAgent._discover)** - search+score runs in `PIPELINE_SCORE_BATCH`
+   chunks across `offset`-paginated sweeps until `PIPELINE_MIN_MATCHES` matches are scored, so
+   a run never full-throttles scoring beyond what it needs but always tries to surface the
+   minimum result count.
 
 **Config knobs - all present in `config.py`:** `QUERY_EXPANSION` (on/off, default on),
 `QUERY_EXPANSION_TERMS` (6), `JOB_RECENCY_DAYS` (14), `DIVERSITY_MAX_SAME_COMPANY` (2),
 `USE_UNVERIFIED_SOURCES` (off - only Wantedly/JapanDev come in when on), `FREEHIRE_SOURCES`
 (default `seek,mycareersfuture` - the regional freehire passes registered in `_build_default_agent()`),
 `RESUME_AUDIT_ENABLED` (on - upload-time classify + ATS audit), `RESUME_HEALTH_BLOCK` (60).
+**Adaptive gather (2026-08-27, code; live proof pending redeploy):** `PIPELINE_MIN_MATCHES` (10) is
+the guaranteed match floor. `RouterAgent._discover` loops `SearchAgent` sweeps (each `offset`-paginated,
+max `PIPELINE_MAX_SEARCH_SWEEPS`=3), scoring in batches of `PIPELINE_SCORE_BATCH` (10) until it has
+≥ `PIPELINE_MIN_MATCHES` scored matches - it never "full-throttles" scoring more than it needs. Caps:
+`PIPELINE_MAX_JOBS` (60 pool) / `PIPELINE_MAX_SCORE` (60 ceiling) / `PIPELINE_MAX_PREP` (5) /
+`PIPELINE_MAX_RESEARCH` (10). **`seen=` no longer starves reruns:** `SearchAgent` returns fresh
+(never-seen) jobs first and already-seen jobs as fill, so a rerun with the same `seen` still reaches
+the minimum instead of collapsing to a handful - the `seen` list is a preference, not a hard cut.
 
 **Known bug - FIXED in code:** the old `LocationMapper` dropped `"Johor"` (no MY city entry, no
 `johor` country), so the `countries`/`regions` params were empty and freehire ran a **global onsite**
@@ -611,7 +624,7 @@ curl e2e (SSE `career` stage must show companies + new jobs) to count.**
 
 ## 14. Next session: where to pick up
 
-1. Re-deploy to Cloud Run (`docs/DEPLOY.md`) → curl `/health`, then the live curl e2e with a real `.pdf` (`docs/CURL_E2E.md`): upload → run (`?seed=` + `?seen=`) → SSE events → jobs → approve. **This proves the phase - not the offline green.** The SSE `search` stage must show **expanded query terms** + per-source counts, the `career` stage must show **companies probed + new jobs**, and a Johor-style location must NOT widen to a global search (search intelligence + career-page sourcing are now in the tree - prove them live). **Also prove the upload gate (§8/§9):** upload a non-CV (receipt/notes) → `not_a_resume` + no run; upload a thin CV → `needs_improvement` + frontend confirm before "Run anyway"; healthy CV → `parsed_and_stored` auto-run.
+1. Re-deploy to Cloud Run (`docs/DEPLOY.md`) → curl `/health`, then the live curl e2e with a real `.pdf` (`docs/CURL_E2E.md`): upload → run (`?seed=` + `?seen=`) → SSE events → jobs → approve. **This proves the phase - not the offline green.** The SSE `search` stage must show **expanded query terms** + per-source counts, the `career` stage must show **companies probed + new jobs**, and a Johor-style location must NOT widen to a global search (search intelligence + career-page sourcing are now in the tree - prove them live). **Prove the adaptive gather (§9/§10):** a run surfaces ≥ `PIPELINE_MIN_MATCHES` (10) scored matches and the `search` stage shows `X new · Y seen` per source; a rerun with the same `?seen=` still reaches the minimum (seen is fill, not a hard cut). **Also prove the upload gate (§8/§9):** upload a non-CV (receipt/notes) → `not_a_resume` + no run; upload a thin CV → `needs_improvement` + frontend confirm before "Run anyway"; healthy CV → `parsed_and_stored` auto-run. Frontend: results cards show a **research excerpt** (not the full markdown essay) + compact reasons.
 2. **Watch for the in-flight parallel pass** (§10/§12): universal webfetch (`webfetch.py`) + discovery (`discovery.py`), embeddings re-rank (`embeddings.py`, `gemini-embedding-001`), real-submit sandbox ATS (`/sandbox/ats/apply`, `ApplicationStatus.SUBMITTED`, `/approve` submits). Grep the tree each session - mark done ONLY when each is present + redeployed + curl-e2e'd. Agent Search stays OPTIONAL (domain-verify, `docs/GCP_SETUP.md` §3).
 3. **Vite + React app** (`frontend/`) is **built + verified live** (2026-08-25): components for resume upload, prefs modal, SSE agent timeline (animates from the real streamed events), ranked matches + approve, applications, history (localStorage). Wired to the live backend via `fetch`; builds clean with `npm install && npm run build`. **Remaining acceptance: prove the same run against the deployed `.run.app` URL** (needs the redeploy so `/pipeline/run` answers the RouterAgent pipeline, not `agent_not_configured`). **Resume-after-refresh + Cancel are IMPLEMENTED (2026-08-26, code; live proof pending redeploy):** run start persists `{run_id, profile}` to `localStorage` (`hireflow.active_run.v1`); on mount the app calls `GET /pipeline/run/{run_id}` and either re-attaches the live SSE stream (`Last-Event-ID` resume) or renders the finished result; a Cancel button in the timeline header calls `POST /pipeline/run/{run_id}/cancel` to stop the background task. A refreshed run only continues while the same in-memory instance lives; a missing run clears the marker gracefully.
 4. **Layer II Playwright/Chromium** is **coded + enabled** in the `Dockerfile` (`HIREFLOW_PLAYWRIGHT=1`); needs the redeploy + a live curl row.
