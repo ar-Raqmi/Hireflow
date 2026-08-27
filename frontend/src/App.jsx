@@ -7,6 +7,7 @@ import {
   saveActiveRun, loadActiveRun, clearActiveRun,
   loadPool, savePool, loadLastView, saveLastView, MAX_POOL,
   loadProfile, saveProfile, clearProfile, shouldAutoCheck, loadLastCheck, saveLastCheck,
+  loadDrafts, saveDrafts, mergeDrafts,
 } from './storage.js';
 import ResumeDrop from './components/ResumeDrop.jsx';
 import PrefsModal from './components/PrefsModal.jsx';
@@ -81,16 +82,23 @@ export default function App() {
 
   function restoreCachedPool() {
     let pool = loadPool();
-    if (!pool || pool.length === 0) {
+    let drafts = loadDrafts();
+    if ((!pool || pool.length === 0) || (!drafts || Object.keys(drafts).length === 0)) {
       const h = loadHistory();
       const last = h[0];
       if (last && last.result && last.result.matches && last.result.matches.length > 0) {
-        pool = last.result.matches.map((m) => ({ ...m, isNew: Boolean(m.isNew) }));
-        savePool(pool);
+        if (!pool || pool.length === 0) {
+          pool = last.result.matches.map((m) => ({ ...m, isNew: Boolean(m.isNew) }));
+          savePool(pool);
+        }
+        if (!drafts || Object.keys(drafts).length === 0) {
+          drafts = last.result.drafts || {};
+          saveDrafts(drafts);
+        }
       }
     }
     if (pool && pool.length > 0) {
-      setResult({ status: 'completed', matches: pool });
+      setResult({ status: 'completed', matches: pool, drafts });
       setMatches(pool);
       setNewCount(pool.filter((m) => m.isNew).length);
       setApplications((pool[0] && pool[0]._applications) || []);
@@ -129,6 +137,7 @@ export default function App() {
     setNewCount(fresh);
     setApplications(a);
     savePool(tagged);
+    mergeDrafts(res.drafts);
     clearActiveRun();
     if (res.status === 'cancelled') {
       setRunning(false);
@@ -150,9 +159,7 @@ export default function App() {
       showToast((res.detail || (res.errors && res.errors[0])) || 'Run finished with errors', 'error', 6000);
     } else if (fresh > 0) {
       showToast(`Run complete - ${fresh} new since your last check, ${a.length} applications`);
-      if (p && p.isAuto) {
-        setNewJobsNotice({ count: fresh, matches: tagged });
-      }
+      setNewJobsNotice({ count: fresh, matches: tagged });
     } else {
       showToast(`No new jobs since your last check - ${merged.length} saved matches`, 'info');
     }
@@ -320,7 +327,7 @@ export default function App() {
     const pool = loadPool();
     const res = run.result || { status: 'completed', matches: [], applications: [] };
     const tagged = (res.matches || []).map((m) => ({ ...m, isNew: Boolean(m.isNew) }));
-    setResult(res);
+    setResult({ ...res, drafts: res.drafts || loadDrafts() });
     setMatches(pool.length > 0 ? pool : tagged);
     setNewCount((pool.length > 0 ? pool : tagged).filter((m) => m.isNew).length);
     setApplications(res.applications || res.application_records || []);

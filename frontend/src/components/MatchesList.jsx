@@ -77,7 +77,20 @@ export default function MatchesList({ matches = [], applications = [], drafts = 
   }, [matches, sort, draftsOnly, newOnly, drafts]);
 
   function toggleExpand(id, key) {
-    setExpanded((prev) => ({ ...prev, [id]: { ...prev[id], [key]: !(prev[id] && prev[id][key]) } }));
+    const willOpen = !(expanded[id] && expanded[id][key]);
+    setExpanded((prev) => ({ ...prev, [id]: { ...prev[id], [key]: willOpen } }));
+    if (key === 'draft' && willOpen) {
+      setTimeout(() => {
+        const el = document.getElementById(`draft-${id}`);
+        if (!el) return;
+        const vh = window.innerHeight || document.documentElement.clientHeight;
+        const rect = el.getBoundingClientRect();
+        const pad = 120;
+        let top = window.scrollY + rect.top - (vh - Math.min(rect.height, vh - pad)) / 2 - pad / 2;
+        top = Math.max(0, top);
+        window.scrollTo({ top, behavior: 'smooth' });
+      }, 140);
+    }
   }
 
   if (!matches || matches.length === 0) {
@@ -187,8 +200,8 @@ export default function MatchesList({ matches = [], applications = [], drafts = 
                     </M3eButton>
                   )}
 
-                  {hasDraft(m) && exp.draft && (
-                    <div className="draftpanel">
+                  {hasDraft(m) && (
+                    <div id={`draft-${m.job_id}`} className={`draftpanel ${exp.draft ? 'open' : ''}`}>
                       {draft.cv && (
                         <div className="draft-block">
                           <div className="draft-h"><M3eIcon name="description" size={16} /> CV</div>

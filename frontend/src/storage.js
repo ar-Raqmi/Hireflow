@@ -3,6 +3,7 @@ const PREFS_KEY = 'hireflow.prefs.v1';
 const HISTORY_KEY = 'hireflow.history.v1';
 const SEEN_KEY = 'hireflow.seen.v1';
 const POOL_KEY = 'hireflow.pool.v1';
+const DRAFTS_KEY = 'hireflow.drafts.v1';
 const VIEW_KEY = 'hireflow.view.v1';
 const PROFILE_KEY = 'hireflow.profile.v1';
 const LAST_CHECK_KEY = 'hireflow.last_check.v1';
@@ -87,6 +88,20 @@ export function loadPool() {
 
 export function savePool(pool) {
   safeSet(POOL_KEY, pool.slice(0, MAX_POOL));
+}
+
+export function loadDrafts() {
+  return safeGet(DRAFTS_KEY, {});
+}
+
+export function saveDrafts(drafts) {
+  safeSet(DRAFTS_KEY, drafts || {});
+}
+
+export function mergeDrafts(drafts) {
+  const merged = { ...loadDrafts(), ...(drafts || {}) };
+  saveDrafts(merged);
+  return merged;
 }
 
 export function loadLastView() {
