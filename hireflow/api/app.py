@@ -19,9 +19,9 @@ from hireflow.domain import Application, ApplicationStatus, JobPosting, Profile
 from hireflow.storage.factory import StorageFactory
 from hireflow.tools.ats import AtsBoardSource
 from hireflow.tools.browser import PlaywrightSource
-from hireflow.tools.discovery import WebDiscoverySource
 from hireflow.tools.freehire import FreehireSource
 from hireflow.tools.gemini import GeminiClient
+from hireflow.tools.gemini_search import GeminiWebSearchSource
 from hireflow.tools.japan_dev import JapanDevSource
 from hireflow.tools.jsonld import JsonLdSource
 from hireflow.tools.jobstreet import JobStreetSource
@@ -202,10 +202,9 @@ def _build_default_agent() -> HireflowAgent:
     ]
     if SETTINGS.web_discovery_enabled:
         sources.append(
-            WebDiscoverySource(
+            GeminiWebSearchSource(
+                gemini=gemini,
                 max_links=SETTINGS.web_discovery_max_links,
-                companies=SETTINGS.web_discovery_companies,
-                timeout=SETTINGS.web_fetch_timeout,
             )
         )
     if SETTINGS.use_unverified_sources:

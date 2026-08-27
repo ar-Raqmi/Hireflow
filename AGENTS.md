@@ -76,7 +76,7 @@ The agent is **not a chatbot** - it is a **watcher**. The user uploads a resume 
 | Database/state | **No SQL**. Browser `localStorage` owns prefs + history; backend is stateless, in-memory only for a run |
 | Hosting | **Cloud Run** (scale-to-zero) |
 | Scheduling | **Cloud Scheduler** → `POST /pipeline/run` (job polling) - optional |
-| Job sources | **An AI search agent, not a keyword fetcher** - **IMPLEMENTED + LIVE (proven on the deployed Cloud Run 2026-08-27)**: Gemini query expansion (synonyms per role, deterministic fallback), multiple query variants per source for variation, then gate-then-cap (work-type + **location** + recency) before scoring, with cross-run seen-job dedup + per-company diversity. Backed by a **keyless global source registry** (freehire/RemoteOK/Remotive + JSON-LD + LinkedIn guest + ATS Greenhouse/Ashby + freehire `source=seek`/`mycareersfuture`), honest per-country paths. **Universal webfetch + discovery layer + embeddings re-rank: PRESENT (code)** - no 50-domain whitelist; **Agent Search is OPTIONAL** (replaces CSE; only indexes domains Zach can verify he owns - see `docs/GCP_SETUP.md` §3). Never "remote-only" nor "US-only" (details §10) |
+| Job sources | **An AI search agent, not a keyword fetcher** - **IMPLEMENTED + LIVE (proven on the deployed Cloud Run 2026-08-27)**: Gemini query expansion (synonyms per role, deterministic fallback), multiple query variants per source for variation, then gate-then-cap (work-type + **location** + recency) before scoring, with cross-run seen-job dedup + per-company diversity. Backed by a **keyless global source registry** (freehire/RemoteOK/Remotive + JSON-LD + LinkedIn guest + ATS Greenhouse/Ashby + freehire `source=seek`/`mycareersfuture`), honest per-country paths. **Universal webfetch + Gemini grounded-search (replaces the rate-limited DuckDuckGo scrape) + embeddings re-rank: PRESENT (code; live proof pending redeploy)** - no 50-domain whitelist; **Agent Search is OPTIONAL** (replaces CSE; only indexes domains Zach can verify he owns - see `docs/GCP_SETUP.md` §3). Never "remote-only" nor "US-only" (details §10) |
 | Apply strategy | **Sandboxed job board (simple ATS)** in the demo; real-world = draft-for-approval. **Real submit to the sandbox ATS is LIVE** - `/approve` submits to `/sandbox/ats/apply` (`ApplicationStatus.SUBMITTED` + `ats_confirmation`), proven in the live e2e; in-memory + best-effort `sandbox_ats.json`, no DB |
 | Scoring | 5 dimensions: skills, experience, location, salary band, culture/keywords |
 | Human handoff | offers, salary talks, counter-offers → flag "needs human" |
@@ -110,7 +110,7 @@ The agent is **not a chatbot** - it is a **watcher**. The user uploads a resume 
 
 MVP agents: **Search, Match/Analyze, Research, Prepare (drafter→reviewer→revise)**, orchestrated by **RouterAgent**. Every agent runs server-side through `GeminiClient` (the only LLM entry point) and tags its stage on the SSE stream. Tracking = passive localStorage/dashboard. No DB.
 
-`SearchAgent` is the **search intelligence** pass: query expansion → multi-variant queries per source → gate-then-cap (work-type + location + recency) → cross-run seen-job dedup → per-company diversity cap. The universal **webfetch + discovery** layer (`webfetch.py`/`discovery.py`) and the **embeddings re-rank** stage (`embeddings.py`) are **PRESENT (code)** and slot inside `SearchAgent`. **LIVE (proven on the deployed Cloud Run 2026-08-27)** - the full pipeline ran end-to-end.
+`SearchAgent` is the **search intelligence** pass: query expansion → multi-variant queries per source → gate-then-cap (work-type + location + recency) → cross-run seen-job dedup → per-company diversity cap. The universal **webfetch + Gemini grounded-search** layer (`webfetch.py`/`gemini_search.py`) and the **embeddings re-rank** stage (`embeddings.py`) are **PRESENT (code)** and slot inside `SearchAgent`. **LIVE (proven on the deployed Cloud Run 2026-08-27)** - the full pipeline ran end-to-end.
 
 State story (judge-grade): **client-side persistence, stateless backend.** Nothing sensitive is ever stored server-side. The **watcher layer lives on the frontend**: it owns the browser `seen` list in `localStorage`, tags "new since last check" matches, re-ranks them on top, and offers a "Check for new jobs" re-run (see §7/§9).
 
@@ -139,8 +139,9 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
     `JOBSTREET_ENABLED=true`; cap ≤20 cards/run, ToS low-volume; soft-fail → `[]`)**. `LocationMapper` (`geo.py` - incl. `Johor → my`; the location gate lives in
     `SearchAgent._passes_location`).
   - `hireflow/tools/` → **PRESENT (code; live proof pending redeploy)**:
-    `WebFetchSource` (`webfetch.py`), `WebDiscoverySource` (`discovery.py`), `EmbeddingRanker`
-    (`embeddings.py`). All landed in the tree; still need a redeploy + curl e2e to count.
+    `WebFetchSource` (`webfetch.py`), `GeminiWebSearchSource` (`gemini_search.py` - Google Search
+    grounding, name `gemini_web`), `EmbeddingRanker` (`embeddings.py`). All landed in the tree;
+    still need a redeploy + curl e2e to count.
 - Domain models in `hireflow/domain/` - plain typed classes, no framework imports:
   - `Profile` (incl. `residence`, `work_type`, preferred `locations`, `salary_floor`)
   - `JobPosting`, `Application` (+ `ApplicationStatus` - `MATCHED`/`ROUTED`/`DRAFTED`/`SUBMITTED`; `SUBMITTED` is the real-submit state)
@@ -200,7 +201,7 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 │   │                        #   GeminiClient, incl. vision parse), linkedin.py (LinkedInSource),
 │   │                        #   jsonld.py (JsonLdSource), ats.py (AtsBoardSource), browser.py
 │   │                        #   (PlaywrightSource), jobstreet.py (Playwright JobStreet), +
-│   │                        #   webfetch/discovery/embeddings (universal catch-all layer)
+│   │                        #   webfetch/gemini_search/embeddings (universal catch-all layer)
 │   └── api/app.py           # FastAPI: health, upload (text+vision parse), dashboard, jobs,
 │                            #   applications, approve (submits to sandbox ATS - PRESENT),
 │                            #   pipeline/run (async, ?seed= & ?seen=), pipeline/run/{id}/events (SSE)
@@ -417,7 +418,8 @@ curl proof.
   widens freehire to a global onsite search.
 - **Universal webfetch + discovery + embeddings + real-submit sandbox ATS - PRESENT (code):**
   `webfetch.py` (`WebFetchSource` - any URL → JSON-LD/ATS/HTML),
-  `discovery.py` (`WebDiscoverySource` - keyless DDG web-search fallback, no 50-domain whitelist),
+  `gemini_search.py` (`GeminiWebSearchSource` - **Google Search grounding** via
+  `GeminiClient.grounded_search`, name `gemini_web`, replaces the rate-limited DDG scrape),
   `embeddings.py` (`EmbeddingRanker`, `gemini-embedding-001`, gated `SEMANTIC_SEARCH`),
   `/sandbox/ats/apply` + `ApplicationStatus.SUBMITTED` + `/approve` → real submit
   (in-memory + best-effort `sandbox_ats.json`). All landed in the tree.
@@ -464,7 +466,7 @@ Columns: **Srv-recency** = server-side recency filter the agent applies · **Loc
 | JSON-LD career pages | `GET https://www.greenhouse.io/careers` → `application/ld+json` → `@type=JobPosting` | 0 | **200** | **1 JobPosting** | no | yes | yes | real schema.org `JobPosting`; registry = 1 URL (`JSONLD_COMPANY_URLS`); Atlassian/Shopify/Nike have **no** JobPosting ld+json |
 | Playwright Layer II | env-gated `HIREFLOW_PLAYWRIGHT=1` + Chromium in image | II | not run | n/a | no | n/a | n/a | **IMPLEMENTED (code):** `browser.py`/`jobstreet.py` share the `browser_launcher.py` stealth helpers; Chromium IS installed in the `Dockerfile`; needs a live curl row once deployed |
 
-**In-tree sources NOT yet in the matrix (code present, no curl row this session - verify, then add a row):** `freehire:seek` + `freehire:mycareersfuture` (`FreehireRegionalSource` in `api/app.py`, registered by default), `wantedly` + `japan_dev` (flag-gated behind `USE_UNVERIFIED_SOURCES=1`; Wantedly docstring claims live 200, JapanDev degrades to `[]`). The universal webfetch/discovery layer IS in the tree (`webfetch.py`/`discovery.py`) - needs a live curl row once deployed.
+**In-tree sources NOT yet in the matrix (code present, no curl row this session - verify, then add a row):** `freehire:seek` + `freehire:mycareersfuture` (`FreehireRegionalSource` in `api/app.py`, registered by default), `wantedly` + `japan_dev` (flag-gated behind `USE_UNVERIFIED_SOURCES=1`; Wantedly docstring claims live 200, JapanDev degrades to `[]`). The universal webfetch/Gemini grounded-search layer IS in the tree (`webfetch.py`/`gemini_search.py`) - needs a live curl row once deployed.
 
 ### Search intelligence (how the agent actually searches - an AI agent, NOT a keyword fetcher)
 
@@ -533,14 +535,17 @@ on boards. Knobs: `CAREER_SOURCE_ENABLED` (default true), `CAREER_SOURCE_MAX_COM
 (default 5), `CAREER_SOURCE_MAX_PER_COMPANY` (default 8). Emits a `career` SSE stage
 (probing … N companies → M new jobs). Soft-fail: a company with no parseable
 careers page contributes 0 + a source note in `errors`, never a 500. This is a
-**separate path** from `WEB_DISCOVERY_COMPANIES` (that static opt-in list stays);
-the career path is automatic from the matched results.
+**separate path** from the old `WEB_DISCOVERY_COMPANIES` static opt-in list (that config field was removed); the career path is automatic from the matched results.
 
 **Layer 0 - Universal catch-all (every country, everyone):**
-- **Universal webfetch + discovery layer** (`webfetch.py`/`discovery.py`) - **PRESENT (code; live proof
-  pending redeploy)**, the replacement for the retired CSE 50-site whitelist:
-  a keyless web-search fallback + domain-discovery from the sources we already fetch, no
-  50-domain whitelist. Grep before trusting.
+- **Universal webfetch + Gemini grounded-search layer** (`webfetch.py`/`gemini_search.py`) - **PRESENT
+  (code; live proof pending redeploy)**, the replacement for the retired CSE 50-site whitelist:
+  the rate-limited keyless DDG scrape was dropped; `GeminiWebSearchSource` (`gemini_web`) uses Google
+  Search grounding (`google_search_retrieval` tool, `MODE_DYNAMIC`) via `GeminiClient.grounded_search`
+  to get real source URLs, each turned into JobPostings via `WebFetchSource.fetch_url`, then
+  domain-discovery from the sources we already fetch, no
+  50-domain whitelist. Needs Vertex AI + a live run after redeploy (may require `location=global`).
+  Grep before trusting.
 - **Agent Search (formerly CSE)** - **OPTIONAL, NOT set up.** Google's Custom Search JSON API is
   retired; Agent Search website indexing only works on domains **you can verify you own** (or get
   the owner to approve) - it is NOT a keyless way to index third-party job boards. Skip-able:
@@ -613,7 +618,7 @@ the career path is automatic from the matched results.
 8. **Global job-source registry** - ✅ **IMPLEMENTED + curl-verified (2026-08-23)**: `LinkedInSource` (guest API), `JsonLdSource` (schema.org career pages), `AtsBoardSource` (Greenhouse+Ashby). Registered in `_build_default_agent()` after RemoteOK/Remotive/Freehire. Lever (404) and Workable (0 jobs) are coded but **disabled** - add rows only once curl-verified. **Still pending: redeploy + live curl e2e** against the `.run.app` URL to prove this on the live deploy.
 9. **APAC keyless relays - LIVE (2026-08-27):** freehire `source=seek` (JobStreet engine → MY/ID/SG/AU/NZ) + `source=mycareersfuture` (SG) via `FreehireRegionalSource` (in `api/app.py`), registered by default through `SETTINGS.freehire_sources` - the honest keyless APAC path since JobStreet/Kalibrr/Maukerja/Indeed direct APIs are **blocked**. Wantedly/JapanDev (JP) are **in the tree but flag-gated** behind `USE_UNVERIFIED_SOURCES=1` until live-proven (still no dedicated curl row).
 9b. **Career-page company sourcing - LIVE (2026-08-27):** `CareerSourceAgent` probes the top matched companies' `/careers` pages + ATS boards via `WebFetchSource.webfetch_company` and merges the new jobs (deduped by id) back for scoring/prepare. Knobs `CAREER_SOURCE_ENABLED` / `CAREER_SOURCE_MAX_COMPANIES` / `CAREER_SOURCE_MAX_PER_COMPANY` in `config.py`; emits a `career` SSE stage (ran live in the e2e).
-10. **Universal webfetch + discovery layer + embeddings re-rank + real-submit sandbox ATS** - the parallel code-agent pass, **DONE (code)**: `webfetch.py`/`discovery.py`/`embeddings.py`, `/sandbox/ats/apply`, and `ApplicationStatus.SUBMITTED` are **in this tree**. **Real-submit sandbox ATS is LIVE-PROVEN (2026-08-27, `/approve` → `SUBMITTED`)**; the universal webfetch/discovery/embeddings layers are present but a dedicated live row for the discovery/embedding re-rank path is still pending - do not overclaim. **Agent Search (formerly CSE) is OPTIONAL + NOT set up** (only indexes domains Zach can verify he owns - `docs/GCP_SETUP.md` §3). **Layer II** Playwright/Chromium is **coded** (`browser.py`/`jobstreet.py` + `browser_launcher.py` stealth; Chromium in the `Dockerfile`) - still needs a live curl row.
+10. **Universal webfetch + Gemini grounded-search + embeddings re-rank + real-submit sandbox ATS** - the parallel code-agent pass, **DONE (code)**: `webfetch.py`/`gemini_search.py`/`embeddings.py`, `/sandbox/ats/apply`, and `ApplicationStatus.SUBMITTED` are **in this tree** (the rate-limited DDG scrape was dropped; `GeminiWebSearchSource` uses Google Search grounding). **Real-submit sandbox ATS is LIVE-PROVEN (2026-08-27, `/approve` → `SUBMITTED`)**; the universal webfetch/Gemini grounded-search/embeddings layers are present but a dedicated live row for the grounded-search/embedding re-rank path is still pending - do not overclaim. **Agent Search (formerly CSE) is OPTIONAL + NOT set up** (only indexes domains Zach can verify he owns - `docs/GCP_SETUP.md` §3). **Layer II** Playwright/Chromium is **coded** (`browser.py`/`jobstreet.py` + `browser_launcher.py` stealth; Chromium in the `Dockerfile`) - still needs a live curl row.
 11. **Build the Vite + React app** (`frontend/`) - **DONE + LIVE (2026-08-25/27)**: `npm install && npm run build` passes. Wired to the live backend via `fetch` (upload, SSE agent timeline, ranked matches, approve → sandbox ATS); prefs + run history in `localStorage`; base URL via `VITE_HIREFLOW_API` (dev proxy in `vite.config.js`). `hireflow-frontend.html` is retired as the reference prototype. **Live e2e against the deployed `.run.app` URL is DONE (2026-08-27)** (npm run dev → upload audit → "Run anyway" → SSE timeline → Results → draft view → History).
 12. **Demo & docs (remaining submission TODOs)**: clean architecture diagram image (README currently has ASCII), README spin-up, ≤4-min unedited video showing Cloud Run console + Vertex AI logs + live `.run` calls. Email `testing@devpost.com` / `cloudhackathons@google.com` access. **Follow-up emails + Cloud Scheduler are NOT built - keep honest.**
 
@@ -646,7 +651,7 @@ the career path is automatic from the matched results.
 ## 14. Next session: where to pick up
 
 1. ~~Re-deploy to Cloud Run + live curl e2e~~ - **DONE (2026-08-27)**: the deployed `.run.app` runs the full pipeline live end-to-end (upload → run → SSE → jobs → approve, 10 matches with drafts). **Remaining verification (not yet captured this session):** prove the upload gate's `not_a_resume` (non-CV) + `parsed_and_stored` (healthy CV) paths via curl, and the adaptive gather's rerun-with-same-`?seen=` still reaching ≥ `PIPELINE_MIN_MATCHES` - the browser run covered `needs_improvement` → "Run anyway" and the main auto-run. Frontend: results cards show a **research excerpt** (not the full markdown essay) + compact reasons.
-2. **Watch for the in-flight parallel pass** (§10/§12): universal webfetch (`webfetch.py`) + discovery (`discovery.py`), embeddings re-rank (`embeddings.py`, `gemini-embedding-001`), real-submit sandbox ATS (`/sandbox/ats/apply`, `ApplicationStatus.SUBMITTED`, `/approve` submits). Grep the tree each session - mark done ONLY when each is present + redeployed + curl-e2e'd. Agent Search stays OPTIONAL (domain-verify, `docs/GCP_SETUP.md` §3).
+2. **Watch for the in-flight parallel pass** (§10/§12): universal webfetch (`webfetch.py`) + Gemini grounded-search (`gemini_search.py`), embeddings re-rank (`embeddings.py`, `gemini-embedding-001`), real-submit sandbox ATS (`/sandbox/ats/apply`, `ApplicationStatus.SUBMITTED`, `/approve` submits). Grep the tree each session - mark done ONLY when each is present + redeployed + curl-e2e'd. Agent Search stays OPTIONAL (domain-verify, `docs/GCP_SETUP.md` §3).
 3. **Vite + React app** (`frontend/`) is **built + verified live** (2026-08-25): components for resume upload, prefs modal, SSE agent timeline (animates from the real streamed events), ranked matches + approve, applications, history (localStorage). Wired to the live backend via `fetch`; builds clean with `npm install && npm run build`. **Live e2e against the deployed `.run.app` URL is DONE (2026-08-27)** (npm run dev → upload audit → "Run anyway" → SSE timeline → Results → draft view → History). **Resume-after-refresh + Cancel are IMPLEMENTED (2026-08-26, code; on the live build):** run start persists `{run_id, profile}` to `localStorage` (`hireflow.active_run.v1`); on mount the app calls `GET /pipeline/run/{run_id}` and either re-attaches the live SSE stream (`Last-Event-ID` resume) or renders the finished result; a Cancel button in the timeline header calls `POST /pipeline/run/{run_id}/cancel` to stop the run. A refreshed run only continues while the same in-memory instance lives; a missing run clears the marker gracefully.
 4. **Layer II Playwright/Chromium** is **coded + enabled** in the `Dockerfile` (`HIREFLOW_PLAYWRIGHT=1`); still needs a live curl row.
 5. Demo & docs: clean diagram image, ≤4-min video with Cloud Run console + Vertex logs, grant repo access to `testing@devpost.com` / `cloudhackathons@google.com`.

@@ -50,7 +50,7 @@ export default function ResumeAuditModal({ open, audit, onRun, onClose }) {
 
       <div className="pf-foot">
         <M3eButton variant="text" className="pf-back" onClick={onClose}>
-          <M3eIcon name="edit_note" size={16} /> Fix my résumé
+          <M3eIcon name="edit_note" size={16} /> Reupload résumé
         </M3eButton>
         <M3eButton variant="filled" onClick={onRun}>
           Run anyway

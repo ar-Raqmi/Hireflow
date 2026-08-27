@@ -90,11 +90,6 @@ class Settings:
             if part.strip()
         ]
     )
-    web_search_endpoint: str = field(
-        default_factory=lambda: _env(
-            "WEB_SEARCH_ENDPOINT", "https://lite.duckduckgo.com/lite/"
-        )
-    )
     web_fetch_enabled: bool = field(
         default_factory=lambda: _env("WEB_FETCH", "true").lower() in {"1", "true", "yes"}
     )
@@ -107,13 +102,6 @@ class Settings:
     )
     web_discovery_max_links: int = field(
         default_factory=lambda: _int_env("WEB_DISCOVERY_MAX_LINKS", 8)
-    )
-    web_discovery_companies: list[str] = field(
-        default_factory=lambda: [
-            part.strip()
-            for part in os.getenv("WEB_DISCOVERY_COMPANIES", "").split(",")
-            if part.strip()
-        ]
     )
     career_source_enabled: bool = field(
         default_factory=lambda: _env("CAREER_SOURCE_ENABLED", "true").lower()

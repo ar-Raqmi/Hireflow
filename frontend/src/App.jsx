@@ -422,6 +422,11 @@ export default function App() {
                 {profile.target_roles && profile.target_roles.length > 0 && (
                   <span className="hchip">{profile.target_roles.slice(0, 3).join(', ')}</span>
                 )}
+                <M3eButton variant="filled" className="runbtn-strip" disabled={running} onClick={() => handleRun()}>
+                  {running && <M3eIcon name="progress_activity" size={16} className="spin" />}
+                  {!running && <M3eIcon name="refresh" size={16} />}
+                  {running ? 'Running…' : 'Check for new jobs'}
+                </M3eButton>
                 <M3eButton variant="text" className="newresume" onClick={handleNewResume}>
                   <M3eIcon name="note_add" size={16} /> New résumé
                 </M3eButton>

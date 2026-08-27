@@ -177,6 +177,47 @@ class GeminiClient:
             vectors.append([float(value) for value in values])
         return vectors or None
 
+    async def grounded_search(self, query: str) -> list[dict[str, str]]:
+        """Google Search grounded retrieval - returns [{title, uri, domain}] for a query.
+
+        Uses Vertex (or Gemini API) Google Search grounding via the
+        ``google_search_retrieval`` tool so the model returns real, current
+        source URLs (no fragile scraping). Never fakes: any failure returns [].
+        """
+        from google.genai import types
+
+        try:
+            tool = types.Tool(
+                google_search_retrieval=types.GoogleSearchRetrieval(
+                    dynamic_retrieval_config=types.DynamicRetrievalConfig(
+                        mode=types.DynamicRetrievalConfigMode.MODE_DYNAMIC,
+                        dynamic_threshold=0.0,
+                    )
+                )
+            )
+            response = await self._async_client.models.generate_content(
+                model=self._model,
+                contents=query,
+                config=types.GenerateContentConfig(tools=[tool]),
+            )
+            candidate = response.candidates[0] if response.candidates else None
+            metadata = candidate.grounding_metadata if candidate else None
+            chunks = metadata.grounding_chunks if metadata else None
+        except Exception:
+            return []
+        results: list[dict[str, str]] = []
+        for chunk in chunks or []:
+            web = chunk.web
+            if web and web.uri:
+                results.append(
+                    {
+                        "title": web.title or "",
+                        "uri": web.uri,
+                        "domain": web.domain or "",
+                    }
+                )
+        return results
+
     async def expand_query(self, roles: list[str], skills: list[str] | None = None) -> list[str]:
         if not roles:
             return []
