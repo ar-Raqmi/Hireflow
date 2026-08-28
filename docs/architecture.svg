@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5f5346"/>
+    </marker>
+    <marker id="arB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4285F4"/>
+    </marker>
+  </defs>
+
+  <style>
+    .box   { fill:#ffffff; stroke:#c9bfae; stroke-width:1.5; rx:10; }
+    .gcp   { fill:#e8f0fe; stroke:#4285F4; stroke-width:1.5; }
+    .gcp2  { fill:#d2e3fc; stroke:#4285F4; stroke-width:1.5; }
+    .agent { fill:#fff3ec; stroke:#8F4100; stroke-width:1.5; }
+    .t     { fill:#3c352b; font-size:14px; font-weight:600; }
+    .s     { fill:#6b6155; font-size:11px; }
+    .lbl   { fill:#5f5346; font-size:11px; font-weight:600; }
+    .flow  { stroke:#5f5346; stroke-width:1.6; fill:none; }
+    .flowB { stroke:#4285F4; stroke-width:1.6; fill:none; }
+  </style>
+
+  <rect x="0" y="0" width="1240" height="760" fill="#faf7f2"/>
+
+  <text x="620" y="36" text-anchor="middle" font-size="21" font-weight="700" fill="#3c352b">Hireflow — autonomous job-search agent (Taskmaster)</text>
+  <text x="620" y="58" text-anchor="middle" font-size="12" fill="#6b6155">upload résumé once → the agent watches, searches, scores, drafts → the human approves</text>
+
+  <!-- ================= USER ================= -->
+  <rect class="box" x="30" y="150" width="150" height="130" rx="10"/>
+  <text class="t" x="105" y="185" text-anchor="middle">👤 User</text>
+  <text class="s" x="105" y="208" text-anchor="middle">uploads résumé</text>
+  <text class="s" x="105" y="224" text-anchor="middle">sets preferences</text>
+  <text class="s" x="105" y="248" text-anchor="middle">reviews drafts</text>
+  <text class="s" x="105" y="264" text-anchor="middle">approves / rejects</text>
+
+  <!-- ================= BROWSER ================= -->
+  <rect class="box" x="230" y="120" width="250" height="240" rx="10"/>
+  <text class="t" x="355" y="150" text-anchor="middle">Browser · React app (Vite + M3E)</text>
+  <text class="s" x="355" y="170" text-anchor="middle">hosted on Vercel</text>
+  <text class="s" x="355" y="196" text-anchor="middle">· resume drop + ATS audit modal</text>
+  <text class="s" x="355" y="214" text-anchor="middle">· SSE agent timeline (live stages)</text>
+  <text class="s" x="355" y="232" text-anchor="middle">· ranked matches + drafts</text>
+  <text class="s" x="355" y="258" text-anchor="middle">· watcher: “Check for new jobs”,</text>
+  <text class="s" x="355" y="276" text-anchor="middle">  new-since-last-check re-ranked on top</text>
+
+  <rect class="box" x="255" y="292" width="200" height="52" rx="8" fill="#f6efe6" stroke="#b8a88f"/>
+  <text class="t" x="355" y="312" text-anchor="middle" font-size="12">localStorage (no DB)</text>
+  <text class="s" x="355" y="330" text-anchor="middle">prefs · seen jobs · history · pool</text>
+
+  <!-- ================= CLOUD RUN ================= -->
+  <rect x="540" y="80" width="430" height="560" rx="14" fill="#ffffff" stroke="#4285F4" stroke-width="2" stroke-dasharray="7 5"/>
+  <text x="755" y="106" text-anchor="middle" font-size="15" font-weight="700" fill="#174ea6">Google Cloud Run  (serverless, scale-to-zero)</text>
+
+  <rect class="box" x="565" y="122" width="380" height="56" rx="8"/>
+  <text class="t" x="755" y="144" text-anchor="middle" font-size="13">FastAPI  ·  /upload  /pipeline/run  /events (SSE)  /approve</text>
+  <text class="s" x="755" y="163" text-anchor="middle">async run_id + Server-Sent Events stage stream</text>
+
+  <rect class="gcp" x="565" y="192" width="380" height="52" rx="8"/>
+  <text class="t" x="755" y="213" text-anchor="middle" font-size="13">RouterAgent on Google ADK</text>
+  <text class="s" x="755" y="231" text-anchor="middle">LlmAgent + Runner + FunctionTool, session service</text>
+
+  <!-- agents row -->
+  <text class="s" x="755" y="272" text-anchor="middle">— the 5 live agents (every call through GeminiClient) —</text>
+  <g>
+    <rect class="agent" x="565" y="282" width="180" height="40" rx="8"/>
+    <text class="t" x="655" y="307" text-anchor="middle" font-size="12">SearchAgent</text>
+    <rect class="agent" x="765" y="282" width="180" height="40" rx="8"/>
+    <text class="t" x="855" y="307" text-anchor="middle" font-size="12">MatchAgent (CV analysis)</text>
+
+    <rect class="agent" x="565" y="332" width="180" height="40" rx="8"/>
+    <text class="t" x="655" y="357" text-anchor="middle" font-size="12">CareerSourceAgent</text>
+    <rect class="agent" x="765" y="332" width="180" height="40" rx="8"/>
+    <text class="t" x="855" y="357" text-anchor="middle" font-size="12">ResearchAgent</text>
+
+    <rect class="agent" x="565" y="382" width="180" height="40" rx="8"/>
+    <text class="t" x="655" y="407" text-anchor="middle" font-size="12">PrepareAgent</text>
+    <text class="s" x="655" y="422" text-anchor="middle" font-size="10">drafter → reviewer → revise</text>
+    <rect class="box" x="765" y="382" width="180" height="40" rx="8" fill="#f6efe6" stroke="#b8a88f"/>
+    <text class="t" x="855" y="407" text-anchor="middle" font-size="12">GeminiClient</text>
+    <text class="s" x="855" y="422" text-anchor="middle" font-size="10">the only LLM entry point</text>
+  </g>
+
+  <!-- search internals -->
+  <rect class="box" x="565" y="436" width="380" height="74" rx="8"/>
+  <text class="t" x="755" y="456" text-anchor="middle" font-size="12">Search intelligence (inside SearchAgent)</text>
+  <text class="s" x="755" y="474" text-anchor="middle">Gemini query expansion · multi-variant queries · gate-then-cap</text>
+  <text class="s" x="755" y="490" text-anchor="middle">work-type + location + recency gates · seen-job dedup · company diversity</text>
+
+  <!-- sandbox ATS -->
+  <rect class="gcp2" x="565" y="524" width="380" height="48" rx="8"/>
+  <text class="t" x="755" y="544" text-anchor="middle" font-size="12">Sandbox ATS  ·  /sandbox/ats/apply</text>
+  <text class="s" x="755" y="562" text-anchor="middle">human-approved submit → SUBMITTED + HFS confirmation</text>
+
+  <text class="s" x="755" y="600" text-anchor="middle">stateless · in-memory per run · nothing sensitive stored server-side</text>
+
+  <!-- ================= VERTEX AI ================= -->
+  <rect class="gcp" x="1040" y="160" width="170" height="120" rx="10"/>
+  <text class="t" x="1125" y="192" text-anchor="middle" font-size="13">Vertex AI</text>
+  <text class="s" x="1125" y="214" text-anchor="middle">Gemini 3.5 Flash</text>
+  <text class="s" x="1125" y="231" text-anchor="middle">parse · score · research</text>
+  <text class="s" x="1125" y="248" text-anchor="middle">draft · review · revise</text>
+  <text class="s" x="1125" y="265" text-anchor="middle">+ gemini-embedding-001</text>
+
+  <!-- ================= EXTERNAL SOURCES ================= -->
+  <rect class="box" x="1040" y="420" width="170" height="220" rx="10"/>
+  <text class="t" x="1125" y="448" text-anchor="middle" font-size="13">Job sources (keyless)</text>
+  <text class="s" x="1125" y="470" text-anchor="middle">freehire (193 countries,</text>
+  <text class="s" x="1125" y="486" text-anchor="middle">+ seek / mycareersfuture)</text>
+  <text class="s" x="1125" y="506" text-anchor="middle">RemoteOK · Remotive</text>
+  <text class="s" x="1125" y="526" text-anchor="middle">LinkedIn guest · ATS boards</text>
+  <text class="s" x="1125" y="542" text-anchor="middle">(Greenhouse / Ashby)</text>
+  <text class="s" x="1125" y="562" text-anchor="middle">Gemini grounded web search</text>
+  <text class="s" x="1125" y="578" text-anchor="middle">+ universal webfetch</text>
+  <text class="s" x="1125" y="598" text-anchor="middle">+ company /careers pages</text>
+
+  <!-- ================= FLOWS ================= -->
+  <path class="flow" d="M180,215 L228,215" marker-end="url(#ar)"/>
+  <path class="flow" d="M480,200 L563,200" marker-end="url(#ar)"/>
+  <text class="lbl" x="490" y="192">upload / run</text>
+  <path class="flow" d="M563,215 L482,215" marker-end="url(#ar)" stroke-dasharray="4 4"/>
+  <text class="lbl" x="486" y="234">SSE progress + results</text>
+
+  <path class="flow" d="M355,290 L355,290"/>
+  <path class="flow" d="M755,178 L755,190" marker-end="url(#ar)"/>
+
+  <path class="flowB" d="M945,218 L1038,218" marker-end="url(#arB)"/>
+  <text class="lbl" x="960" y="210" fill="#174ea6">Gemini calls</text>
+
+  <path class="flow" d="M945,302 L1038,418" marker-end="url(#ar)"/>
+  <text class="lbl" x="948" y="342">HTTP fetches</text>
+
+  <path class="flow" d="M755,524 L755,512" marker-end="url(#ar)"/>
+
+  <!-- approval gate -->
+  <rect x="230" y="392" width="250" height="64" rx="10" fill="#e6f4ea" stroke="#188038" stroke-width="1.5"/>
+  <text class="t" x="355" y="416" text-anchor="middle" font-size="13" fill="#0d652d">HUMAN APPROVAL GATE</text>
+  <text class="s" x="355" y="434" text-anchor="middle">final submit is always human-approved</text>
+  <path class="flow" d="M355,360 L355,390" marker-end="url(#ar)"/>
+  <path class="flow" d="M480,424 L563,540" marker-end="url(#ar)" stroke="#188038"/>
+  <text class="lbl" x="472" y="500" fill="#0d652d">POST /approve</text>
+
+  <!-- watcher note -->
+  <rect class="box" x="30" y="392" width="150" height="64" rx="10" fill="#f6efe6" stroke="#b8a88f"/>
+  <text class="t" x="105" y="416" text-anchor="middle" font-size="12">Come back anytime</text>
+  <text class="s" x="105" y="434" text-anchor="middle">new jobs re-ranked</text>
+  <text class="s" x="105" y="448" text-anchor="middle">on top</text>
+
+  <!-- legend -->
+  <g transform="translate(30,600)">
+    <rect class="gcp" x="0" y="0" width="14" height="14" rx="3"/>
+    <text class="s" x="20" y="11">Google Cloud (Cloud Run, Vertex AI)</text>
+    <rect class="agent" x="0" y="24" width="14" height="14" rx="3"/>
+    <text class="s" x="20" y="35">ADK agents (autonomous work)</text>
+    <rect x="0" y="48" width="14" height="14" rx="3" fill="#e6f4ea" stroke="#188038"/>
+    <text class="s" x="20" y="59">Human decision point</text>
+    <text class="s" x="0" y="92">Live: parse → audit → search → match → career → research → prepare → approve</text>
+    <text class="s" x="0" y="110">Not built (honest): real auto-submit to employers · follow-ups · Cloud Scheduler</text>
+  </g>
+</svg>

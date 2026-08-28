@@ -5,6 +5,29 @@
 
 ---
 
+## 0. Session note - 2026-08-28 (read before acting on older sections)
+
+- **Playwright/Chromium is BACK by team decision (commit 00b7f58 "playwright").** The 2026-08-27
+  "removed entirely, do NOT resurrect" sections below are **superseded on this point**:
+  `hireflow/tools/browser_launcher.py` is restored, `webfetch.py` got a deep-search rewrite, and the
+  Dockerfile installs Chromium again. Status = **code present, pending redeploy + live e2e** - do not
+  claim it live-proven until a curl e2e on the redeployed build shows browser-passed jobs.
+- **Repo reorganized (2026-08-28, uncommitted - review before pushing):** CLI clients moved to
+  `clients/` (paths patched: `hireflow.sh` now resolves `ROOT` for `.env`/`.venv`/`PYTHONPATH`;
+  `hireflow_run.py` inserts the parent dir on `sys.path`), retired prototype moved to
+  `prototype/hireflow-frontend.html`, stale artifacts deleted (`result-demo.*`, `.playwright-mcp/`,
+  `.pytest_cache/`), `.dockerignore` now excludes `frontend/` (node_modules was riding in the
+  Cloud Build context), dead env knobs removed (`.env.example` `WEB_SEARCH_ENDPOINT` /
+  `WEB_DISCOVERY_COMPANIES`, Dockerfile `GOOGLE_GENAI_USE_ENTERPRISE`).
+- **Submission artifacts landed:** `docs/architecture.svg` (embed in README), `docs/VIDEO_SCRIPT.md`
+  (≤4-min storyboard), `LICENSE` (MIT), README rewritten judge-first. **Still missing for submission:**
+  the actual demo video (record from the storyboard) + Devpost repo access grants
+  (`testing@devpost.com`, `cloudhackathons@google.com`) + the credits form deadline was Aug 28 12:00pm PT.
+- Older sections below keep their original wording where still true; where they contradict this
+  note (Playwright, client file paths), **this note wins**.
+
+---
+
 ## 1. What this is
 
 **Hireflow** - an autonomous AI job-search agent for the **All Things Agentic Hackathon 2026** (Taskmaster track, deadline **Aug 31, 2026 @ 5:00pm PDT**).
@@ -157,16 +180,21 @@ State story (judge-grade): **client-side persistence, stateless backend.** Nothi
 .
 ├── AGENTS.md                # this file - the memory
 ├── README.md                # NEVER lie; update after every deploy with real URLs
-├── hireflow-frontend.html   # clickable prototype/reference ONLY (mock → replaced by the React app)
-├── hireflow.sh              # bash thin CLI driver - prompts + curls the LIVE Cloud Run URL (online-only)
-├── hireflow.bat             # Windows double-click client → runs hireflow_run.py (exports the HTML report too)
-├── hireflow_run.py          # cross-platform thin client shared by hireflow.sh/bat (pure stdlib + curl)
+├── LICENSE                  # MIT (added 2026-08-28)
+├── prototype/               # retired clickable prototype moved here (2026-08-28)
+│   └── hireflow-frontend.html  # reference ONLY (mock → replaced by the React app)
+├── clients/                 # thin terminal clients moved here (2026-08-28; paths patched)
+│   ├── hireflow.sh          # bash driver - prompts + curls the LIVE Cloud Run URL (online-only)
+│   ├── hireflow.bat         # Windows double-click client → runs ../clients/hireflow_run.py
+│   └── hireflow_run.py      # cross-platform thin client shared by hireflow.sh/bat (pure stdlib + curl)
 ├── requirements.txt
-├── Dockerfile
-├── .dockerignore            # keeps .env/API.md/credential JSON out of the Cloud Build context
+├── Dockerfile               # 2026-08-28: Playwright/Chromium RE-ADDED (see the 2026-08-28 note below)
+├── .dockerignore            # keeps .env/API.md/credential JSON + frontend/clients/prototype out of the build context
 ├── .gitignore
 ├── RULES.md                 # official hackathon rules - read before decisions
 ├── docs/
+│   ├── architecture.svg     # judge-facing architecture diagram (2026-08-28)
+│   ├── VIDEO_SCRIPT.md      # ≤4-min demo video storyboard (2026-08-28)
 │   ├── CURL_E2E.md          # exact online curl playbook (upload → run → approve) against live URL
 │   ├── DEPLOY.md            # Zach's one-command Cloud Run redeploy + Vertex IAM grant
 │   └── GCP_SETUP.md         # one-time GCP runbook: APIs, SA grant, embeddings check, optional

@@ -11,8 +11,16 @@ __pycache__
 .venv
 venv
 docs
-hireflow-frontend.html
+clients
+prototype
+frontend
 README.md
 AGENTS.md
 RULES.md
+LICENSE
+result-demo.html
+result-demo.json
+sandbox_ats.json
 hireflow_session_*.json
+.playwright-mcp
+.pytest_cache

@@ -2,54 +2,129 @@
 
 Autonomous AI job-search agent for **All Things Agentic Hackathon 2026** (Taskmaster track).
 
-> *"The agent never waits to be asked. It watches, decides, and acts - the human only approves."*
-
-Pipeline: `Find → Analyze → Rank → Research → Prepare → Approve → Track`
-
-Hireflow is a **watcher**, not a chatbot. You upload a résumé once; the agent watches for new matching jobs, scores fit, researches companies, and drafts a tailored CV + cover letter. Come back tomorrow and it has re-searched, shows the **NEW roles since your last check ranked on top**, and you decide which to apply to. It never spam-submits to every board - most boards are Cloudflare/anti-bot locked, so the **final submission is intentionally human-gated by design**: the agent does everything autonomously up to the last click, and the human only approves.
+> *"The agent never waits to be asked. It watches, decides, and acts — the human only approves."*
 
 by ar-Raqmi and Izaaz
 
----
+## What it is
 
-## What is real now (2026-08-27)
+Hireflow is a **watcher**, not a chatbot. You upload a résumé once and set your work-type, location, and role preferences. Five AI agents then take over the messy multi-step chore of job hunting: they search a global registry of keyless job sources, expand your target roles into synonym queries, score every posting against your résumé, probe the matched companies' own careers pages for jobs boards miss, research the companies, and draft a tailored CV + cover letter per match.
 
-- **Cloud Run backend LIVE** - `https://hireflow-backend-296941301245.us-central1.run.app` - the **full RouterAgent pipeline runs end-to-end** against the deployed build. `/pipeline/run` runs async with SSE (Search→Match→Career→Research→Prepare→approve) and `/approve` submits to the sandbox ATS. A live run this session produced `parse→audit→search→match→career→research→prepare→approve` stages, **10 matches ranked** (3 drafted / 2 routed / 4 matched), drafts (CV + cover letter) generated, and per-source new counts in `search` (freehire 5, linkedin 6, remoteok 3, ats 1, …). Soft-fail errors (e.g. a board 403ing behind Cloudflare, Ashby 404) were surfaced cleanly, never a 500. The upload gate works live: a resume scored 65/100 → "needs_improvement" confirm → "Run anyway".
-- **Keyless job-source registry (curl-verified):** freehire (193 countries), RemoteOK, Remotive, LinkedIn guest search, JSON-LD career pages, ATS boards (Greenhouse GitLab 204 jobs, Ashby Notion 128 jobs). Lever (404) and Workable (0 jobs) are coded but disabled.
-- **Vite + React frontend (`frontend/`) LIVE-verified** (2026-08-27) - `npm install && npm run build` passes; run live in-browser against the real backend (`localhost:5173`). Rebuilt on the **M3E (Material 3 Expressive) component library** (`@m3e/react`): app wrapped in `<M3eTheme color="#8F4100" scheme="light" motion="expressive">` (Hireflow's brand primary drives the full Material 3 palette), with M3E buttons, dialog (prefs), tabs, icons, chips, snackbar, progress indicators, segmented button, `M3eSelect`/`M3eOption` sort, `M3eFilterChip`/`M3eFilterChipSet` source filters. Custom dropzone + SSE timeline stay custom markup themed via `var(--md-sys-color-primary)`. **Watcher UX verified live:** upload-gate audit dialog → **live SSE agent timeline** → Results shows **"10 new since your last check · 10 matches ranked"**, a banner ("10 new roles since your last check - ranked on top. You decide which to apply to."), a **"New since last check (N)"** filter chip, per-card **"new" badges**, the primary CTA flips to **"Check for new jobs"** after a run, draft view (CV + cover letter) works, and History shows a "10 new" stat. Views: **Agent run / Results / History** (no separate Applications tab). Base URL via `VITE_HIREFLOW_API` (dev proxy in `vite.config.js`). `hireflow-frontend.html` is the retired reference prototype only.
-- **Agent pipeline** - five agents (Search → Match → Career → Research → Prepare, orchestrated by RouterAgent) run server-side through `GeminiClient` (Vertex AI, Gemini 3.5 Flash - the only LLM entry point, no stubs/mocks). `/pipeline/run` is async and streams per-stage progress over SSE; `/upload` does a real Gemini parse (text, or vision via PyMuPDF page images when text is thin). Verified live end-to-end.
-- **Search intelligence** - `QueryExpander` (Gemini synonym expansion per query + deterministic fallback), multiple query variants per source (seed-rotated so runs vary), gate-then-cap (work-type + **location** + **recency**), cross-run seen-job dedup (`?seen=` from browser `localStorage`), per-company diversity cap (max 2/company). Knobs in `hireflow/config.py`.
-- **Johor/Israel false-global bug fixed** - `Johor` maps to `my` (`geo.py`); an unmapped location no longer silently widens freehire to a global onsite search.
-- **Career-page company sourcing** - after matching, `CareerSourceAgent` probes each distinct top-matched company's `/careers` page + ATS boards via `WebFetchSource.webfetch_company` and merges the new jobs back into the pipeline.
-- **Universal webfetch + Gemini grounded-search layer** - `webfetch.py`/`gemini_search.py`, the catch-all replacing the retired CSE 50-site whitelist; `GeminiWebSearchSource` (`gemini_web`) uses Google Search grounding via `GeminiClient.grounded_search` with the **`google_search` tool** (Vertex-verified - `google_search_retrieval` is rejected on Vertex with a 400) to surface real source URLs (the rate-limited DuckDuckGo scrape was dropped), each turned into a JobPosting via `WebFetchSource.fetch_url`. Live-verify without a full run: `GET /debug/grounded?q=…`. `WebFetchSource` is also used by the career-page step. **Embeddings re-rank** (`embeddings.py`, `gemini-embedding-001`; `text-embedding-005` fallback) gated by `SEMANTIC_SEARCH`.
-- **Real-submit sandbox ATS** - `/sandbox/ats/apply`, `ApplicationStatus.SUBMITTED`, and `/approve` submitting for real (records `ats_confirmation`).
-- **No browser automation** - Playwright/Chromium was **removed entirely (2026-08-27)**: it never contributed jobs (Cloudflare-blocked, `0 new` every run) and the Chromium install made Cloud Build take ~20 min; the image is now plain `python:3.11-slim` and builds take minutes.
-- **APAC relays** - freehire `source=seek` (freehire's JobStreet engine → MY/ID/SG/AU/NZ) and `source=mycareersfuture` (SG) wired in via `FreehireRegionalSource`, registered by default. Wantedly + JapanDev (JP) are in the tree but flag-gated (`USE_UNVERIFIED_SOURCES=1`).
-- **Clients** - `hireflow.sh` / `hireflow.bat` → `hireflow_run.py`, and `python -m hireflow.cli` are thin clients of the deployed API; after a run they export `result-demo.html` + `result-demo.json`.
-- **Agent Search** (formerly CSE) - **optional**, not set up. Only indexes domains you can verify you own (`docs/GCP_SETUP.md` §3). Not needed for the core pipeline.
+Come back anytime and hit **"Check for new jobs"** — the agent re-runs, and every role that appeared **since your last check is re-ranked on top** with a NEW badge. You decide which applications to pursue. The **final submission is intentionally human-gated**: most job boards are anti-bot/Cloudflare-locked and applying on your behalf is not something an agent should do silently — so Hireflow does everything autonomously up to the last click, then the human approves.
 
-## Docs
-- `docs/CURL_E2E.md` - exact curl acceptance playbook (upload → run → SSE → jobs → approve) against the live URL.
-- `docs/DEPLOY.md` - one-command Cloud Run redeploy + Vertex IAM grant.
-- `docs/GCP_SETUP.md` - one-time GCP runbook: APIs, SA grant, embeddings check, optional Agent Search, big-instance deploy.
+**Live (hosted for judging):**
 
-## Frontend (Vite + React)
+| | URL |
+|---|---|
+| React app | https://hireflow-pi-five.vercel.app |
+| Cloud Run backend | https://hireflow-backend-296941301245.us-central1.run.app (`/health`, `/docs`) |
+
+## Architecture
+
+![Hireflow architecture](docs/architecture.svg)
+
+The live pipeline runs as eight SSE-streamed stages: `parse → audit → search → match → career → research → prepare → approve`.
+
+## Repo map
+
+```
+├── clients/            # thin terminal clients of the DEPLOYED api (nothing runs locally)
+│   ├── hireflow.sh     #   bash driver (prompts, curls the live url, exports result-demo.html)
+│   ├── hireflow.bat    #   windows double-click driver
+│   └── hireflow_run.py #   cross-platform logic shared by the two above
+├── docs/
+│   ├── architecture.svg    # the diagram above
+│   ├── CURL_E2E.md         # exact curl acceptance playbook against the live url
+│   ├── DEPLOY.md           # one-command Cloud Run deploy
+│   ├── GCP_SETUP.md        # one-time GCP runbook (apis, IAM, embeddings)
+│   └── VIDEO_SCRIPT.md     # ≤4-min demo video storyboard
+├── frontend/           # vite + react app (m3e components) — the real ui, calls the live backend
+├── hireflow/           # fastapi backend
+│   ├── api/app.py      #   /upload /pipeline/run(+SSE) /approve /sandbox/ats
+│   ├── agents/         #   router.py (5 agents), adk_router.py (Google ADK graph), career_source.py
+│   ├── tools/          #   gemini client, job sources (freehire/remoteok/remotive/linkedin/ats),
+│   │                   #   query expander, webfetch + grounded search, geo/location mapper
+│   ├── domain/         #   typed models (Profile, JobPosting, Application, ResumeFinding)
+│   └── storage/        #   in-memory repository (stateless; browser owns persistence)
+├── prototype/          # retired clickable html mock (reference only)
+├── Dockerfile          # python:3.11-slim → uvicorn :8080 (cloud run)
+└── RULES.md            # official hackathon rules (source of truth)
+```
+
+## Run it
+
+**Option A — just use the hosted app (judges):** open https://hireflow-pi-five.vercel.app, drop a résumé, follow the timeline.
+
+**Option B — frontend locally** (talks to the deployed Cloud Run backend):
 
 ```bash
 cd frontend
 npm install
-npm run build        # production build → frontend/dist
-npm run dev          # dev server; /api/* proxied to VITE_HIREFLOW_API (default: the live Cloud Run URL)
+npm run dev        # /api/* proxied to VITE_HIREFLOW_API (default: the live Cloud Run url)
 ```
 
-Set `VITE_HIREFLOW_API=https://hireflow-backend-296941301245.us-central1.run.app` at build time to point the production bundle at the deployed backend. The app calls the **real** API endpoints (`/upload`, `/pipeline/run`, SSE `/pipeline/run/{id}/events`, `/jobs`, `/applications`, `/approve`) - no mock or hardcoded job data. Prefs + run history live in browser `localStorage` (backend stays stateless). `hireflow-frontend.html` is the retired reference prototype only.
+**Option C — backend locally:**
+
+```bash
+pip install -r requirements.txt
+# Vertex path (recommended): point GOOGLE_APPLICATION_CREDENTIALS at a service
+# account with roles/aiplatform.user, then set GCP_PROJECT_ID + GEMINI_USE_VERTEX=true.
+# Gemini-API fallback: set GEMINI_API_KEY.
+uvicorn hireflow.api.app:app --port 8080
+curl -s localhost:8080/health   # {"status":"ok"}
+```
+
+**Option D — deploy your own Cloud Run instance** (one command, full IAM notes in `docs/DEPLOY.md`):
+
+```bash
+gcloud run deploy hireflow-backend --region us-central1 --source . \
+  --allow-unauthenticated --memory 1Gi --timeout 3600
+```
+
+**Terminal client** (online-only thin client of the deployed api):
+
+```bash
+clients/hireflow.sh                 # prompts + streams live SSE progress
+python -m hireflow.cli ./resume.pdf --work-type hybrid --location "Kuala Lumpur"
+```
+
+## What is real (verified 2026-08-27, live on the deployed Cloud Run)
+
+- **The full pipeline ran end-to-end on the `.run.app` url** — a real run streamed `parse → audit → search → match → career → research → prepare → approve` and returned 10 ranked matches with drafts; `/approve` submitted to the sandbox ATS (`SUBMITTED` + `HFS-…` confirmation).
+- **Real Gemini 3.5 Flash via Vertex AI** — every agent calls the same `GeminiClient` (the only LLM entry point; no mocks or stubs). Résumé parsing is real Gemini (text, or vision via PyMuPDF page renders when text is thin), and uploads are gated by an AI résumé-classifier + ATS-health audit.
+- **Search is an agent, not a keyword matcher** — Gemini query expansion per role, multiple query variants per source, then gate-then-cap: work-type + location + recency gates, cross-run seen-job dedup (driven by your browser), per-company diversity cap.
+- **Global keyless source registry** (curl-verified): freehire (193 countries + `seek`/`mycareersfuture` regional relays), RemoteOK, Remotive, LinkedIn guest, ATS boards (Greenhouse, Ashby), plus Gemini **grounded web search** + universal webfetch as the catch-all layer. Dead sources (Lever, Workable) are coded but disabled, not claimed.
+- **React frontend verified in-browser against the real backend** — SSE timeline animates from the live stream; watcher ux (new-since-last-check re-ranking, "check for new jobs") works against real runs.
+
+Reproduce the proof yourself: `docs/CURL_E2E.md` is the exact curl sequence (health → upload → run → SSE → approve) against the live url.
+
+## Design decisions worth a look (judges' cliff notes)
+
+- **Client-owned persistence, stateless backend.** No database anywhere: preferences, seen-job memory, and history live in browser `localStorage`, so Cloud Run can scale to zero between checks. The watcher model survives server restarts because the *browser* remembers.
+- **Gate-then-cap before paying for scoring.** Every discovered job passes work-type/location/recency gates and a per-company diversity cap *before* any Gemini scoring call — the agent controls cost instead of scoring everything it finds.
+- **Deterministic ADK orchestration.** The `HireflowAgent` graph (`adk_router.py`) wraps the multi-agent `RouterAgent` as a single ADK `FunctionTool` injected via `before_model_callback` — the ADK Runner, session service, and tool dispatch execute on every run without wasting a round-trip on an orchestrator LLM call.
+- **Honesty as a feature.** Submission is sandboxed (demo ATS), follow-ups and scheduled runs are not built, and disabled/dead job sources are labeled as such. The agent's autonomy stops exactly where impersonating a human would begin.
+
+## Limitations (what's *not* built)
+
+- No real auto-submission to employers (sandbox ATS only) — by design.
+- No follow-up emails/tracking, no Cloud Scheduler polling.
+- Backend is stateless in-memory: job history beyond the current run lives in the browser only.
+- The browser-assisted fetch pass (Playwright) is in code (2026-08-28) and pending a redeploy + live e2e before it counts.
 
 ## Stack
-- **Gemini 3.5 Flash** via Vertex AI - `hireflow/config.py`
-- **Google ADK** (Python) - `hireflow/agents/adk_router.py` (the live orchestrator: `LlmAgent` + `Runner` expose the multi-agent `RouterAgent` as a `FunctionTool`)
-- **FastAPI** backend - `hireflow/api/app.py` (stateless, in-memory per run; no DB)
-- **Cloud Run** (scale-to-zero) - `Dockerfile`
-- Frontend: **Vite + React** (`frontend/`) - wired to the live backend via fetch; `hireflow-frontend.html` is the retired reference prototype only
 
-## Hackathon compliance (see RULES.md)
-Gemini 3.5+ via Vertex AI ✓ · Google ADK ✓ · Cloud Run ✓ · hosted public URL **LIVE** ✓ · open GitHub repo ✓ · README spin-up ✓ · architecture diagram in AGENTS.md (clean image pending) · ≤4-min demo video (pending) · repo access for `testing@devpost.com` + `cloudhackathons@google.com` (pending).
+Gemini 3.5 Flash (Vertex AI) · Google ADK (Python) · FastAPI · Cloud Run · Vite + React (@m3e/react Material 3 Expressive) · PyMuPDF / pypdf / python-docx
+
+## Hackathon compliance (RULES.md)
+
+| Requirement | Status |
+|---|---|
+| Gemini 3.5+ via Gemini API/Vertex AI | ✓ Vertex AI primary, `gemini-3.5-flash` |
+| Google Agent Framework | ✓ Google ADK (`adk_router.py`, live in every run) |
+| Google Cloud infrastructure | ✓ Cloud Run (scale-to-zero) + Vertex AI |
+| Hosted public URL | ✓ backend `.run.app` + frontend Vercel |
+| Spin-up instructions | ✓ this readme (options A–D) |
+| Architecture diagram | ✓ `docs/architecture.svg` |
+| Demo video ≤4 min | storyboard ready (`docs/VIDEO_SCRIPT.md`) — recording in progress |
+| Repo access for judging | grant `testing@devpost.com` + `cloudhackathons@google.com` before submitting |

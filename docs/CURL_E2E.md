@@ -4,17 +4,16 @@
 > against the **live Cloud Run URL**, with a real `.pdf` resume and the real Gemini
 > model (Vertex AI). This file is the exact command sequence.
 
-Live URL (after the next redeploy of `hireflow/`):
+Live URL:
 
 ```text
 BASE_URL=https://hireflow-backend-296941301245.us-central1.run.app
 ```
 
-Redeploy note: the instance currently live returns `{"status":"ok"}` on `/health`
-but was built before the pipeline wiring AND the SSE streaming - its
-`/pipeline/run` answers `agent_not_configured` and `/upload` answers
-`status:"stored"`. Upload this code, then the sequence below is the acceptance
-test for the redeploy.
+Status: the 2026-08-27 live e2e against this URL **passed end-to-end**
+(`parse → audit → search → match → career → research → prepare → approve`,
+10 matches with drafts, `/approve` → sandbox ATS `SUBMITTED`). The sequence
+below remains the acceptance test for any future redeploy.
 
 ---
 
@@ -63,7 +62,11 @@ curl -s -X POST "$BASE_URL/upload" \
 - HTTP 400 instead of this ⇒ either the extension is unsupported (only
   `.txt/.pdf/.docx` are accepted) or `work_type` is not one of
   `remote|hybrid|onsite|any`.
-- If this pre-deploy build returns `"status":"stored"`, the new build is NOT deployed yet.
+- Upload-gate outcomes (RESUME_AUDIT_ENABLED): `"status":"not_a_resume"`
+  (profile NOT stored, pipeline must NOT run) for non-CV files,
+  `"status":"needs_improvement"` (profile stored, frontend shows a confirm
+  dialog + "Run anyway") when ATS health < `RESUME_HEALTH_BLOCK`, else
+  `"parsed_and_stored"`.
 
 Grab the `id` from the response:
 
@@ -116,11 +119,13 @@ data: {"seq":5,"stage":"search","detail":"remotive: 11 found - queries: ['ML Eng
 
 data: {"seq":6,"stage":"match","detail":"scoring 10 jobs… 5/10 done (best so far: 87 Acme · ML Engineer)","ts":...}
 
-data: {"seq":7,"stage":"research","detail":"researching 3 companies… 2/3 done (Beta)","ts":...}
+data: {"seq":7,"stage":"career","detail":"probing 5 company /careers pages… 3 new jobs found","ts":...}
 
-data: {"seq":8,"stage":"prepare","detail":"drafting CV + cover letter… 2/2 done (Acme · ML Engineer)","ts":...}
+data: {"seq":8,"stage":"research","detail":"researching 3 companies… 2/3 done (Beta)","ts":...}
 
-data: {"seq":9,"stage":"approve","detail":"2 drafted · 1 routed · 0 matched · 1 needs human","ts":...}
+data: {"seq":9,"stage":"prepare","detail":"drafting CV + cover letter… 2/2 done (Acme · ML Engineer)","ts":...}
+
+data: {"seq":10,"stage":"approve","detail":"2 drafted · 1 routed · 0 matched · 1 needs human","ts":...}
 
 event: done
 data: {"profile_id":"<id>","run_id":"<uuid>","status":"completed","jobs_found":32,"matches":[...],"applications":[...],"needs_human":[...],"errors":[...],"drafts":{...}}
@@ -128,7 +133,7 @@ data: {"profile_id":"<id>","run_id":"<uuid>","status":"completed","jobs_found":3
 
 **What proves success:**
 - The stream shows every stage boundary (`parse` → `audit` → `search` →
-  `match` → `research` → `prepare` → `approve`) with **counts + names**, not a
+  `match` → `career` → `research` → `prepare` → `approve`) with **counts + names**, not a
   silent wait.
 - The final `event: done` carries the full result JSON:
   - `"status":"completed"` (NOT `agent_not_configured`)
@@ -205,9 +210,12 @@ agent working before the final report renders.
 
 - [ ] `curl $BASE_URL/health` → 200
 - [ ] Step 1 upload `real_resume.pdf` → `parsed_and_stored` with non-empty `skills`
+- [ ] Upload-gate: a non-CV file → `not_a_resume` (not stored, no run); a thin CV →
+      `needs_improvement` (confirm dialog on the frontend)
 - [ ] Step 2 `pipeline/run` → `{"run_id":…,"status":"started"}`
 - [ ] `curl -N …/events` streams stage events and ends with `event: done`
       → `completed` with jobs + matches ≥ 1
+- [ ] a `career` stage event appears (CareerSourceAgent probed matched companies' /careers pages)
 - [ ] `search` events show **expanded query terms** (post search-intelligence pass) and a
       **Johor-style location never degrades to a global search** (location gate active)
 - [ ] results render **"posted X ago"** / mark expired (recency gate active, `JOB_RECENCY_DAYS`)

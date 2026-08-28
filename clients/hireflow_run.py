@@ -7,7 +7,7 @@ import time
 import urllib.parse
 import urllib.request
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from hireflow.export_html import HtmlExporter, ago, is_expired  # noqa: E402
 from hireflow.config import SETTINGS  # noqa: E402
@@ -208,7 +208,7 @@ def _render(result: dict) -> None:
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print("usage: python hireflow_run.py <base_url> <resume> [work_type] [locations_csv] [target] [seed] [seen_csv] [approve]")
+        print("usage: python clients/hireflow_run.py <base_url> <resume> [work_type] [locations_csv] [target] [seed] [seen_csv] [approve]")
         return 2
     base = sys.argv[1].rstrip("/")
     resume = sys.argv[2]

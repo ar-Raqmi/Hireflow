@@ -3,11 +3,12 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$HERE/.." && pwd)"
 
-if [[ -f "$HERE/.env" ]]; then
+if [[ -f "$ROOT/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
-  source "$HERE/.env"
+  source "$ROOT/.env"
   set +a
 fi
 
@@ -18,8 +19,8 @@ for t in curl python3; do
 done
 
 PY="python3"
-if [[ -x "$HERE/.venv/bin/python3" ]]; then
-  PY="$HERE/.venv/bin/python3"
+if [[ -x "$ROOT/.venv/bin/python3" ]]; then
+  PY="$ROOT/.venv/bin/python3"
 fi
 
 echo
@@ -106,7 +107,7 @@ echo "run_id: $RUN_ID"
 echo
 echo "Streaming live progress from ${BASE_URL}/pipeline/run/${RUN_ID}/events"
 echo "--------------------------------------------------------------------------------"
-PYTHONPATH="$HERE${PYTHONPATH:+:$PYTHONPATH}" "$PY" - "$BASE_URL" "$RUN_ID" "$PROFILE_ID" <<'PY'
+PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}" "$PY" - "$BASE_URL" "$RUN_ID" "$PROFILE_ID" <<'PY'
 import json, subprocess, sys, time
 base, run_id, pid = sys.argv[1], sys.argv[2], sys.argv[3]
 started = time.monotonic()
