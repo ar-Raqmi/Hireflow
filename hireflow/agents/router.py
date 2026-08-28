@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
@@ -21,6 +22,12 @@ _REMOTEISH_MARKERS = ("remote", "worldwide", "anywhere", "distributed")
 _GEO_CAPABLE = {"freehire", "freehire:seek", "freehire:mycareersfuture"}
 _DEEP_QUERY_SOURCES = {"gemini_web"}
 _SPAM_DOMAINS = ("whatjobs.com",)
+_REMOTE_RESTRICTED_RE = re.compile(
+    r"\b(us|usa|u\.s\.|united states|america|canada|mexico|brazil|uk|united kingdom|"
+    r"england|europe|eu|germany|france|netherlands|spain|poland|portugal|ireland|"
+    r"israel|india|singapore|indonesia|philippines|vietnam|thailand|japan|china|"
+    r"hong kong|taiwan|australia|new zealand|emea|latam)\b"
+)
 
 
 def _default_caps() -> dict[str, int]:
@@ -218,12 +225,22 @@ class SearchAgent(BaseAgent):
         if not location:
             return True
         lowered = location.lower()
-        if any(marker in lowered for marker in _REMOTEISH_MARKERS):
-            return True
-        if not profile.locations:
+        remoteish = any(marker in lowered for marker in _REMOTEISH_MARKERS)
+        if not remoteish:
+            if not profile.locations:
+                return True
+            tokens = self._location_tokens(profile)
+            return any(token and token in lowered for token in tokens)
+        remainder = lowered
+        for marker in _REMOTEISH_MARKERS:
+            remainder = remainder.replace(marker, " ")
+        remainder = re.sub(r"[^a-z, ]+", " ", remainder).strip(" ,")
+        if not remainder:
             return True
         tokens = self._location_tokens(profile)
-        return any(token and token in lowered for token in tokens)
+        if any(token and token in remainder for token in tokens):
+            return True
+        return not _REMOTE_RESTRICTED_RE.search(remainder)
 
     def _location_tokens(self, profile: Profile) -> list[str]:
         tokens: list[str] = []

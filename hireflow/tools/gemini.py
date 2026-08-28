@@ -16,10 +16,13 @@ class GeminiClient:
         self._model = model or SETTINGS.gemini_model
         use_vertex = SETTINGS.gemini_use_vertex and bool(SETTINGS.project_id)
         if use_vertex:
+            from google.genai import types as genai_types
+
             self._client = genai.Client(
                 vertexai=True,
                 project=SETTINGS.project_id,
                 location=SETTINGS.vertex_location,
+                http_options=genai_types.HttpOptions(api_version="v1"),
             )
         else:
             if not SETTINGS.gemini_api_key:
@@ -235,18 +238,23 @@ class GeminiClient:
 
         prompt = (
             f"Search the web for currently-open job openings matching: {query}. "
+            "Only include postings that are actually open right now - exclude "
+            "anything whose snippet shows a posting date older than two weeks, "
+            "or that is marked closed/expired, or that is clearly an old listing. "
             "From the search results, extract the real job postings you can see. "
-            "Only include postings that actually appear in the search results - "
-            "never invent a job. For each one return the exact posting/listing "
-            "URL from the results, the job title, the hiring company, the "
-            "location if shown, and a short description (1-3 sentences) "
-            "summarizing what the search result snippet says about the role, "
-            "its requirements or responsibilities. Maximum 10 postings, most "
-            "relevant first.\n"
+            "For each one return the exact posting/listing URL from the results, "
+            "the job title, the hiring company, the location if shown, a short "
+            "description (1-3 sentences) summarizing what the search result "
+            "snippet says about the role, and the posting date or age exactly as "
+            "shown in the snippet (e.g. '2 days ago', 'Aug 20, 2026'), or "
+            "'unknown' if no date is visible. Maximum 10 postings, most recent "
+            "and most relevant first.\n"
             'Return ONLY a JSON array: [{"title": str, "company": str, '
-            '"location": str, "url": str, "description": str}]'
+            '"location": str, "url": str, "description": str, "posted": str}]'
         )
-        tool = types.Tool(google_search=types.GoogleSearch())
+        tool = types.Tool(
+            google_search=types.GoogleSearch(exclude_domains=["whatjobs.com"])
+        )
         response = await self._async_client.models.generate_content(
             model=self._model,
             contents=prompt,
