@@ -19,6 +19,8 @@ from hireflow.tools.webfetch import WebFetchSource
 _WORK_MODE_VALUES = {"remote", "hybrid", "onsite"}
 _REMOTEISH_MARKERS = ("remote", "worldwide", "anywhere", "distributed")
 _GEO_CAPABLE = {"freehire", "freehire:seek", "freehire:mycareersfuture"}
+_DEEP_QUERY_SOURCES = {"gemini_web"}
+_SPAM_DOMAINS = ("whatjobs.com",)
 
 
 def _default_caps() -> dict[str, int]:
@@ -69,19 +71,29 @@ class SearchAgent(BaseAgent):
         queries = self._rotate(queries, seed) if queries else base
         await self._emit(
             "search",
-            f"expanded {len(base)} role(s) → {len(queries)} queries · {len(seen)} already seen",
+            f"reading your profile: {len(base)} target role(s) expanded into {len(queries)} live search angles · {len(seen)} roles seen on previous checks",
         )
 
         per_source = self._per_source_cap()
         fresh: list[JobPosting] = []
         repeat: list[JobPosting] = []
         for source in self._rotate(self._sources, seed):
-            variants = queries if source.name in _GEO_CAPABLE else queries[:1]
-            source_jobs: list[JobPosting] = []
-            for query in variants:
-                source_jobs.extend(
-                    await self._collect(source, query, per_source, profile, offset, errors)
+            if source.name in _DEEP_QUERY_SOURCES and queries:
+                angles = ", ".join(q[:48] for q in queries[: SETTINGS.web_discovery_max_calls])
+                await self._emit(
+                    "search",
+                    f"deep web hunt: grounding {min(len(queries), SETTINGS.web_discovery_max_calls)} Google angles ({angles})…",
                 )
+                source_jobs = await self._collect_deep(
+                    source, queries, per_source, profile, errors
+                )
+            else:
+                variants = queries if source.name in _GEO_CAPABLE else queries[:1]
+                source_jobs: list[JobPosting] = []
+                for query in variants:
+                    source_jobs.extend(
+                        await self._collect(source, query, per_source, profile, offset, errors)
+                    )
             source_jobs = self._dedupe(
                 self._cap_company(source_jobs, SETTINGS.diversity_max_same_company)
             )
@@ -92,8 +104,13 @@ class SearchAgent(BaseAgent):
             label = self._source_label(source, profile)
             if summary:
                 detail = f"{source.name}: {summary}"
-            else:
+            elif kept:
                 detail = f"{label}: {len(kept)} new · {len(source_jobs) - len(kept)} seen"
+            else:
+                first_role = next((r for r in profile.target_roles if r), None)
+                detail = (
+                    f"{label}: no matching {first_role or 'role'} postings right now - moving on"
+                )
             await self._emit("search", detail)
 
         fresh = self._dedupe(self._cap_company(fresh, SETTINGS.diversity_max_same_company))
@@ -105,6 +122,37 @@ class SearchAgent(BaseAgent):
             "fresh": len(fresh),
             "new_jobs": len(jobs),
         }
+
+    async def _collect_deep(
+        self,
+        source: Any,
+        queries: list[str],
+        limit: int,
+        profile: Profile,
+        errors: list[str],
+    ) -> list[JobPosting]:
+        try:
+            found = await source.search(
+                query=queries[0] if queries else "",
+                limit=limit,
+                work_type=profile.work_type,
+                locations=profile.locations,
+                queries=queries,
+            )
+        except Exception as exc:
+            errors.append(f"{source.name}: {type(exc).__name__}: {str(exc)[:200]}")
+            found = []
+        if source.last_error:
+            errors.append(f"{source.name}: {source.last_error}")
+        return [
+            job
+            for job in found
+            if job.id
+            and not self._is_spam(job)
+            and self._passes_work_gate(job, profile.work_type)
+            and self._passes_location(job, profile)
+            and not self._is_stale(job)
+        ]
 
     async def _collect(
         self,
@@ -134,10 +182,16 @@ class SearchAgent(BaseAgent):
             job
             for job in found
             if job.id
+            and not self._is_spam(job)
             and self._passes_work_gate(job, profile.work_type)
             and self._passes_location(job, profile)
             and not self._is_stale(job)
         ]
+
+    @staticmethod
+    def _is_spam(job: JobPosting) -> bool:
+        url = (job.post_url or "").lower()
+        return any(domain in url for domain in _SPAM_DOMAINS)
 
     def _build_query(self, profile: Profile) -> list[str]:
         roles = [role for role in profile.target_roles if role]
@@ -488,6 +542,7 @@ class RouterAgent(BaseAgent):
         context["jobs"] = jobs
         context["matches"] = matches
 
+        context["career_urls"] = await self._discover_companies(context, profile, errors)
         career = await self._career.run(context)
         career_jobs = career["jobs"]
         if career_jobs:
@@ -521,6 +576,8 @@ class RouterAgent(BaseAgent):
         errors: list[str],
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         min_matches = SETTINGS.pipeline_min_matches
+        min_strong = SETTINGS.pipeline_min_strong
+        min_companies = SETTINGS.pipeline_min_companies
         batch = SETTINGS.pipeline_score_batch
         sweeps = SETTINGS.pipeline_max_search_sweeps
         jobs: list[dict[str, Any]] = []
@@ -530,11 +587,24 @@ class RouterAgent(BaseAgent):
         for sweep in range(sweeps):
             search_ctx = dict(context)
             search_ctx["offset"] = sweep * batch
+            search_ctx["seed"] = seed + sweep * 13
             search_ctx.pop("jobs", None)
             search_ctx.pop("matches", None)
+            if sweep > 0:
+                strong, companies = self._strength(scored)
+                await self._emit(
+                    "search",
+                    f"deep sweep {sweep + 1}: bar not met yet "
+                    f"({strong} strong of {min_strong} needed across {companies} companies) "
+                    f"- widening the hunt with fresh angles…",
+                )
             result = await self._search.run(search_ctx)
             pool = [job for job in result["jobs"] if job.get("id") and job["id"] not in known]
             if not pool:
+                await self._emit(
+                    "search",
+                    f"deep sweep {sweep + 1}: sources exhausted - every posting already reviewed",
+                )
                 break
             for job in pool:
                 known.add(job["id"])
@@ -546,12 +616,43 @@ class RouterAgent(BaseAgent):
                 match_ctx.pop("matches", None)
                 remaining = remaining[batch:]
                 scored.extend((await self._match.run(match_ctx))["matches"])
+            strong, companies = self._strength(scored)
             if len(scored) >= min_matches:
+                if strong >= min_strong and companies >= min_companies:
+                    await self._emit(
+                        "search",
+                        f"deep sweep {sweep + 1}: quality bar met - {strong} strong matches "
+                        f"across {companies} companies from {len(jobs)} postings",
+                    )
+                    break
+                if sweep + 1 < sweeps:
+                    continue
+            if len(scored) >= min_matches:
+                await self._emit(
+                    "search",
+                    f"deep sweep {sweep + 1}: best available - {strong} strong across "
+                    f"{companies} companies (search budget reached)",
+                )
                 break
 
         scored = self._dedupe_matches(scored)
         scored.sort(key=lambda match: int(match.get("score", 0) or 0), reverse=True)
         return jobs, scored
+
+    @staticmethod
+    def _strength(scored: list[dict[str, Any]]) -> tuple[int, int]:
+        strong = sum(
+            1
+            for match in scored
+            if int(match.get("score", 0) or 0) >= SETTINGS.approve_threshold_auto
+        )
+        companies = {
+            str((match.get("job") or {}).get("company", "")).strip().lower()
+            for match in scored
+            if isinstance(match, dict)
+        }
+        companies.discard("")
+        return strong, len(companies)
 
     @staticmethod
     def _dedupe_matches(matches: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -609,6 +710,56 @@ class RouterAgent(BaseAgent):
                 )
             )
         return applications
+
+    async def _discover_companies(
+        self,
+        context: dict[str, Any],
+        profile: Profile,
+        errors: list[str],
+    ) -> list[tuple[str, str]]:
+        if not SETTINGS.deep_search:
+            return []
+        role = ", ".join(role for role in profile.target_roles[:2] if role) or "engineer"
+        loc = ", ".join(loc for loc in profile.locations[:2] if loc)
+        query = f"companies currently hiring {role} in {loc}".strip()
+        await self._emit(
+            "career",
+            f"company hunt: searching Google for who is hiring {role} in {loc or 'anywhere'} right now…",
+        )
+        try:
+            found = await self._gemini.grounded_companies(query)
+        except Exception as exc:
+            errors.append(f"company discovery: {type(exc).__name__}: {str(exc)[:200]}")
+            await self._emit(
+                "career",
+                "company hunt: grounding unavailable - falling back to careers-page probes",
+            )
+            return []
+        clean: list[tuple[str, str]] = []
+        seen: set[str] = set()
+        for row in found:
+            company = str(row.get("company") or "").strip()
+            url = str(row.get("careers_url") or "").strip()
+            if not company or not url.startswith(("http://", "https://")):
+                continue
+            key = company.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            clean.append((company, url))
+        clean = clean[: SETTINGS.career_source_max_companies]
+        if clean:
+            names = ", ".join(company for company, _ in clean)
+            await self._emit(
+                "career",
+                f"company hunt: {len(clean)} companies hiring now - probing their live careers pages ({names})",
+            )
+        else:
+            await self._emit(
+                "career",
+                "company hunt: no companies with readable careers pages surfaced - using matched-company probes",
+            )
+        return clean
 
     async def _emit_approve(self, applications: list[Application]) -> None:
         drafted = sum(1 for app in applications if app.status == ApplicationStatus.DRAFTED)

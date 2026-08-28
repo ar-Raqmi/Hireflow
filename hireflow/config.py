@@ -53,7 +53,7 @@ class Settings:
         default_factory=lambda: _int_env("PIPELINE_SCORE_BATCH", 10)
     )
     pipeline_max_search_sweeps: int = field(
-        default_factory=lambda: _int_env("PIPELINE_MAX_SEARCH_SWEEPS", 3)
+        default_factory=lambda: _int_env("PIPELINE_MAX_SEARCH_SWEEPS", 4)
     )
     freehire_posted_within_days: int = field(
         default_factory=lambda: _int_env("FREEHIRE_POSTED_WITHIN_DAYS", 14)
@@ -101,7 +101,20 @@ class Settings:
         in {"1", "true", "yes"}
     )
     web_discovery_max_links: int = field(
-        default_factory=lambda: _int_env("WEB_DISCOVERY_MAX_LINKS", 8)
+        default_factory=lambda: _int_env("WEB_DISCOVERY_MAX_LINKS", 24)
+    )
+    web_discovery_max_calls: int = field(
+        default_factory=lambda: _int_env("WEB_DISCOVERY_MAX_CALLS", 4)
+    )
+    deep_search: bool = field(
+        default_factory=lambda: _env("DEEP_SEARCH", "true").lower()
+        in {"1", "true", "yes"}
+    )
+    pipeline_min_strong: int = field(
+        default_factory=lambda: _int_env("PIPELINE_MIN_STRONG", 4)
+    )
+    pipeline_min_companies: int = field(
+        default_factory=lambda: _int_env("PIPELINE_MIN_COMPANIES", 4)
     )
     career_source_enabled: bool = field(
         default_factory=lambda: _env("CAREER_SOURCE_ENABLED", "true").lower()

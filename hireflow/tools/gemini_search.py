@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 
 from hireflow.config import SETTINGS
@@ -8,14 +9,13 @@ from hireflow.tools.gemini import GeminiClient
 
 
 class GeminiWebSearchSource:
-    """Google Search grounded job discovery via Gemini.
+    """Multi-angle Google Search grounded job discovery.
 
-    One grounded generate_content per query: Gemini searches Google for the
-    role+location and extracts the real postings visible in its results into
-    structured jobs (title, company, location, url) via
-    ``GeminiClient.grounded_jobs``. This replaces the fetch-the-landing-page
-    approach - grounding returns listing pages that no parser could turn into
-    single postings. Every step soft-fails to ``[]`` with ``last_error`` set.
+    Fires one grounded Gemini call per search angle (per role variant), in
+    parallel, and extracts the real postings visible in Google's results into
+    structured jobs (title, company, location, url, description snippet).
+    Deduplicates across angles by title+company (grounding redirect URLs
+    differ per query). Every step soft-fails to ``[]`` with ``last_error``.
     Discovered jobs carry ``source="gemini_web"``.
     """
 
@@ -24,6 +24,7 @@ class GeminiWebSearchSource:
     def __init__(self, gemini: GeminiClient, max_jobs: int | None = None) -> None:
         self._gemini = gemini
         self._max_jobs = max(4, max_jobs or SETTINGS.web_discovery_max_links)
+        self._max_calls = max(1, SETTINGS.web_discovery_max_calls)
         self._last_error: str | None = None
         self._last_summary: str = ""
 
@@ -42,29 +43,41 @@ class GeminiWebSearchSource:
         limit: int = 25,
         work_type: str = "any",
         locations: list[str] | None = None,
+        queries: list[str] | None = None,
     ) -> list[JobPosting]:
         self._last_error = None
         role = (query or "").strip() or "software engineer"
         preferred = self._preferred_locations(location, locations)
-        terms = [self._query(role, loc) for loc in preferred] or [self._query(role, "")]
+        terms = queries or [self._query(role, loc) for loc in preferred] or [self._query(role, "")]
+        selected = [t for t in (t.strip() for t in terms) if t][: self._max_calls]
+        outcomes = await asyncio.gather(
+            *(self._grounded_jobs_safe(term) for term in selected),
+            return_exceptions=False,
+        )
         jobs: list[JobPosting] = []
         seen: set[str] = set()
-        for term in terms:
-            try:
-                rows = await self._gemini.grounded_jobs(term)
-            except Exception as exc:
-                self._last_error = f"search {term[:60]}: {type(exc).__name__}: {str(exc)[:200]}"
-                continue
+        for rows in outcomes:
             for row in rows:
                 job = self._to_posting(row)
-                if job is None or job.id in seen:
+                if job is None:
                     continue
-                seen.add(job.id)
+                key = str(job.raw_data.get("dedupe_key") or job.id)
+                if key in seen:
+                    continue
+                seen.add(key)
                 jobs.append(job)
-            if len(jobs) >= self._max_jobs:
-                break
-        self._last_summary = f"{len(jobs)} found via Google Search grounding"
+        jobs.sort(key=lambda j: 0, reverse=True)
+        self._last_summary = (
+            f"{len(jobs)} jobs grounded from Google across {len(selected)} search angles"
+        )
         return jobs[:limit]
+
+    async def _grounded_jobs_safe(self, term: str) -> list[dict]:
+        try:
+            return await self._gemini.grounded_jobs(term)
+        except Exception as exc:
+            self._last_error = f"search {term[:60]}: {type(exc).__name__}: {str(exc)[:200]}"
+            return []
 
     def _to_posting(self, row: dict) -> JobPosting | None:
         title = str(row.get("title") or "").strip()
@@ -74,7 +87,8 @@ class GeminiWebSearchSource:
         company = str(row.get("company") or "").strip()
         location = str(row.get("location") or "").strip()
         description = str(row.get("description") or "").strip()
-        digest = hashlib.sha1(f"{url}|{title}|{company}".encode()).hexdigest()[:12]
+        dedupe_key = f"{title.lower()}|{company.lower()}"
+        digest = hashlib.sha1(f"{dedupe_key}|{url}".encode()).hexdigest()[:12]
         return JobPosting(
             id=f"{title.lower().replace(' ', '-')}-{digest}",
             source="gemini_web",
@@ -82,7 +96,7 @@ class GeminiWebSearchSource:
             company=company,
             location=location,
             post_url=url,
-            raw_data={"gemini_web": True, "description": description},
+            raw_data={"gemini_web": True, "description": description, "dedupe_key": dedupe_key},
         )
 
     @classmethod

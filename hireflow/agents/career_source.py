@@ -35,10 +35,55 @@ class CareerSourceAgent(BaseAgent):
             return {"jobs": [], "new_jobs": 0, "companies": []}
         profile: Profile = context["profile"]
         errors: list[str] = context["errors"]
+        discovered: list[tuple[str, str]] = [
+            (str(item[0]), str(item[1]))
+            for item in context.get("career_urls", [])
+            if isinstance(item, (list, tuple)) and len(item) == 2
+        ]
         companies = self._top_companies(context.get("matches", []), SETTINGS.career_source_max_companies)
-        if not companies:
+        if not companies and not discovered:
             await self._emit("career", "no matched companies to probe for career-page jobs")
             return {"jobs": [], "new_jobs": 0, "companies": []}
+        role_query = self._role_query(profile)
+        seen = {
+            str(job_map.get("id", ""))
+            for job_map in context.get("jobs", [])
+            if isinstance(job_map, dict)
+        }
+        new_jobs: list[JobPosting] = []
+        if discovered:
+            probed = 0
+            for company, url in discovered:
+                if probed >= SETTINGS.career_source_max_companies:
+                    break
+                probed += 1
+                try:
+                    found = await self._fetcher.fetch_url(url, query_hint=role_query)
+                except Exception as exc:
+                    errors.append(f"career {company}: {type(exc).__name__}: {str(exc)[:200]}")
+                    found = []
+                if not found:
+                    note = getattr(self._fetcher, "last_error", None) or "no parseable jobs"
+                    errors.append(f"career {company}: {note}")
+                    continue
+                for job in found:
+                    if not job.company:
+                        job.company = company
+                    if not job.id or job.id in seen:
+                        continue
+                    seen.add(job.id)
+                    new_jobs.append(job)
+                    if len(new_jobs) >= SETTINGS.career_source_max_per_company * len(discovered):
+                        break
+            await self._emit(
+                "career",
+                f"careers hunt: {len(new_jobs)} new job(s) straight from {probed} discovered company careers pages",
+            )
+            return {
+                "jobs": [job.to_mapping() for job in new_jobs],
+                "new_jobs": len(new_jobs),
+                "companies": [company for company, _ in discovered],
+            }
         names = ", ".join(companies)
         await self._emit("career", f"probing careers pages for {len(companies)} companies ({names})…")
         role_query = self._role_query(profile)

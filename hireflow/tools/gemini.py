@@ -262,6 +262,43 @@ class GeminiClient:
             return []
         return [row for row in payload if isinstance(row, dict) and row.get("title")]
 
+    async def grounded_companies(self, query: str) -> list[dict[str, str]]:
+        """Grounded company discovery - which companies are hiring, with live careers URLs.
+
+        One grounded call: Gemini searches Google for companies currently
+        hiring for the query and extracts, from the results it can see, each
+        company plus its real careers/jobs page URL. Raises on failure.
+        """
+        from google.genai import types
+
+        prompt = (
+            f"Search the web for companies currently hiring for: {query}. "
+            "From the search results, list the actual hiring companies you can "
+            "see and, for each one, the URL of their careers page or jobs page "
+            "if it appears in the results - prefer the company's own site over "
+            "job boards, and never invent a URL. Maximum 12 companies.\n"
+            'Return ONLY a JSON array: [{"company": str, "careers_url": str}]'
+        )
+        tool = types.Tool(google_search=types.GoogleSearch())
+        response = await self._async_client.models.generate_content(
+            model=self._model,
+            contents=prompt,
+            config=types.GenerateContentConfig(tools=[tool], temperature=1.0),
+        )
+        text = response.text or ""
+        start, end = text.find("["), text.rfind("]")
+        if start == -1 or end == -1 or end <= start:
+            return []
+        try:
+            payload = json.loads(text[start : end + 1])
+        except (ValueError, json.JSONDecodeError):
+            return []
+        return [
+            row
+            for row in payload
+            if isinstance(row, dict) and row.get("company") and row.get("careers_url")
+        ]
+
     async def expand_query(self, roles: list[str], skills: list[str] | None = None) -> list[str]:
         if not roles:
             return []
