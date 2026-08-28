@@ -14,31 +14,69 @@ from hireflow.domain import JobPosting
 from hireflow.tools.ats import AtsBoardSource
 from hireflow.tools.jsonld import JsonLdSource
 from hireflow.tools.job_source import USER_AGENT
+from hireflow.tools.browser_launcher import stealth_browser, stealth_page
+
 
 _LD_SCRIPT_RE = re.compile(
-    r'<script\s+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', re.S
+    r'<script\s+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+    re.S,
 )
-_ANCHOR_RE = re.compile(r'<a\b[^>]*href="([^"]*)"[^>]*>(.*?)</a>', re.I | re.S)
-_CARD_RE = re.compile(
-    r"<(article|li|div)\b[^>]*\b(?:class|data-qa)=\"[^\"]*(?:job[-_]?(?:card|result|listing|post))[^\"]*\"[^>]*>(.*?)</\1>",
+
+_ANCHOR_RE = re.compile(
+    r'<a\b[^>]*href="([^"]*)"[^>]*>(.*?)</a>',
     re.I | re.S,
 )
-_HEADING_RE = re.compile(r"<h[1-6][^>]*>(.*?)</h[1-6]>", re.I | re.S)
+
+_CARD_RE = re.compile(
+    r'<(article|li|div)\b[^>]*\b(?:class|data-qa)="[^"]*'
+    r'(?:job[-_]?(?:card|result|listing|post))[^"]*"[^>]*>(.*?)</\1>',
+    re.I | re.S,
+)
+
+_HEADING_RE = re.compile(
+    r'<h[1-6][^>]*>(.*?)</h[1-6]>',
+    re.I | re.S,
+)
+
 _RELATIVE_DATE_RE = re.compile(
-    r"(\d+)\s*(minute|hour|day|week|month|year)s?\s+ago", re.I
+    r"(\d+)\s*(minute|hour|day|week|month|year)s?\s+ago",
+    re.I,
 )
+
 _MONTH_DAY_RE = re.compile(
-    r"\b(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b", re.I
+    r"\b(\d{1,2})\s+"
+    r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b",
+    re.I,
 )
+
 _DAY_MONTH_RE = re.compile(
-    r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})\b", re.I
+    r"\b"
+    r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*"
+    r"\s+(\d{1,2})\b",
+    re.I,
 )
+
+
 _ATS_API = {
-    "greenhouse": "https://boards-api.greenhouse.io/v1/boards/{name}/jobs?content=true",
-    "lever": "https://api.lever.co/v0/postings/{name}?mode=json",
-    "ashby": "https://api.ashbyhq.com/posting-api/job-board/{name}",
-    "workable": "https://apply.workable.com/api/v1/widget/accounts/{name}",
+    "greenhouse": (
+        "https://boards-api.greenhouse.io/v1/boards/"
+        "{name}/jobs?content=true"
+    ),
+    "lever": (
+        "https://api.lever.co/v0/postings/"
+        "{name}?mode=json"
+    ),
+    "ashby": (
+        "https://api.ashbyhq.com/posting-api/job-board/"
+        "{name}"
+    ),
+    "workable": (
+        "https://apply.workable.com/api/v1/widget/accounts/"
+        "{name}"
+    ),
 }
+
+
 _ATS_HOSTS = {
     "boards.greenhouse.io": "greenhouse",
     "job-boards.greenhouse.io": "greenhouse",
@@ -46,46 +84,106 @@ _ATS_HOSTS = {
     "jobs.ashbyhq.com": "ashby",
     "apply.workable.com": "workable",
 }
+
+
 _COMPANY_STOPWORDS = {
-    "apply", "apply now", "view job", "view", "see all jobs", "see jobs",
-    "learn more", "more jobs", "similar jobs", "jobs", "all jobs", "open jobs",
-    "search jobs", "browse jobs", "read more", "share", "save", "bookmark",
-    "hide this job", "hide", "saved", "company", "the company",
+    "apply",
+    "apply now",
+    "view job",
+    "view",
+    "see all jobs",
+    "see jobs",
+    "learn more",
+    "more jobs",
+    "similar jobs",
+    "jobs",
+    "all jobs",
+    "open jobs",
+    "search jobs",
+    "browse jobs",
+    "read more",
+    "share",
+    "save",
+    "bookmark",
+    "hide this job",
+    "hide",
+    "saved",
+    "company",
+    "the company",
 }
 
 
 class WebFetchSource:
-    """Universal URL extractor - any URL becomes jobs, no domain whitelist.
+    """
+    Universal URL extractor.
 
-    Given any company/job page URL, tries, in order: schema.org ``JobPosting``
-    JSON-LD (reusing ``JsonLdSource``), ATS board detection (Greenhouse / Lever /
-    Ashby / Workable via their public unauthenticated APIs), then a tolerant
-    generic HTML card parse (title / detail links / meta). Every step soft-fails
-    to ``[]`` with ``last_error`` set - a page that yields nothing never raises
-    and never sinks a run. ``source`` is ``webfetch``.
+    Fetch order:
+    1. Normal HTTP request using httpx.
+    2. If blocked or unsuccessful, fall back to Playwright.
+    3. Parse JSON-LD JobPosting.
+    4. Detect ATS and use its public API.
+    5. Parse generic HTML job cards.
+    6. Parse OpenGraph metadata for individual job pages.
+
+    Playwright is optional at runtime. If Chromium is unavailable,
+    webfetch falls back gracefully.
     """
 
     name = "webfetch"
 
     def __init__(self, timeout: float | None = None) -> None:
-        self._timeout = timeout if timeout is not None else SETTINGS.web_fetch_timeout
+        self._timeout = (
+            timeout
+            if timeout is not None
+            else SETTINGS.web_fetch_timeout
+        )
         self._last_error: str | None = None
 
     @property
     def last_error(self) -> str | None:
         return self._last_error
 
-    async def fetch_url(self, url: str, query_hint: str = "") -> list[JobPosting]:
+    async def fetch_url(
+        self,
+        url: str,
+        query_hint: str = "",
+        locations: list[str] | None = None,
+    ) -> list[JobPosting]:
+
         if not SETTINGS.web_fetch_enabled:
-            self._last_error = "webfetch disabled (set WEB_FETCH=1 to enable)"
+            self._last_error = (
+                "webfetch disabled "
+                "(set WEB_FETCH=1 to enable)"
+            )
             return []
+
         self._last_error = None
+
         try:
-            html = await self._fetch_html(url)
+            html = await self._fetch_html(
+                url,
+                locations,
+            )
         except Exception as exc:
-            self._last_error = f"{url}: {type(exc).__name__}: {str(exc)[:200]}"
+            self._last_error = (
+                f"{url}: "
+                f"{type(exc).__name__}: "
+                f"{str(exc)[:200]}"
+            )
             return []
-        return await self._extract(url, html, query_hint)
+
+        if not html:
+            if not self._last_error:
+                self._last_error = (
+                    f"{url}: empty response"
+                )
+            return []
+
+        return await self._extract(
+            url,
+            html,
+            query_hint,
+        )
 
     async def webfetch_company(
         self,
@@ -94,28 +192,149 @@ class WebFetchSource:
         query: str = "",
         tries: int = 4,
     ) -> list[JobPosting]:
+
         jobs: list[JobPosting] = []
         seen: set[str] = set()
+
         for url in self._company_candidates(company_name)[:tries]:
-            for job in await self.fetch_url(url, query_hint=query):
-                if not job.id or job.id in seen:
+
+            for job in await self.fetch_url(
+                url,
+                query_hint=query,
+                locations=locations,
+            ):
+
+                if not job.id:
                     continue
+
+                if job.id in seen:
+                    continue
+
                 seen.add(job.id)
                 jobs.append(job)
+
         return jobs
 
-    async def _fetch_html(self, url: str) -> str:
-        async with httpx.AsyncClient(
-            timeout=self._timeout, headers={"User-Agent": USER_AGENT}
-        ) as client:
-            response = await client.get(url, follow_redirects=True)
-            response.raise_for_status()
-        return response.text
+    async def _fetch_html(
+        self,
+        url: str,
+        locations: list[str] | None = None,
+    ) -> str:
+        """
+        Fetch HTML using httpx first.
 
-    def _company_candidates(self, company_name: str) -> list[str]:
-        slug = re.sub(r"[^a-z0-9]+", "-", (company_name or "").strip().lower()).strip("-")
+        If the server returns common blocking statuses such as:
+        403 Forbidden
+        405 Method Not Allowed
+        429 Too Many Requests
+
+        then fall back to Playwright.
+
+        Playwright is also used if the normal request fails.
+        """
+
+        # ---------------------------------------------------------
+        # 1. Fast path: normal HTTP request
+        # ---------------------------------------------------------
+
+        try:
+            async with httpx.AsyncClient(
+                timeout=self._timeout,
+                headers={
+                    "User-Agent": USER_AGENT,
+                    "Accept": (
+                        "text/html,"
+                        "application/xhtml+xml,"
+                        "application/xml;q=0.9,"
+                        "*/*;q=0.8"
+                    ),
+                },
+                follow_redirects=True,
+            ) as client:
+
+                response = await client.get(url)
+
+                # If the server did not explicitly block us,
+                # try to use the normal response.
+                if response.status_code not in {
+                    403,
+                    405,
+                    429,
+                }:
+
+                    response.raise_for_status()
+
+                    html = response.text
+
+                    if html and len(html) > 500:
+                        return html
+
+        except httpx.HTTPError as exc:
+            self._last_error = (
+                f"httpx failed: "
+                f"{type(exc).__name__}: "
+                f"{str(exc)[:200]}"
+            )
+
+        # ---------------------------------------------------------
+        # 2. Browser fallback
+        # ---------------------------------------------------------
+
+        try:
+            async with stealth_browser() as browser:
+
+                async with stealth_page(
+                    browser,
+                    locations,
+                ) as page:
+
+                    await page.goto(
+                        url,
+                        wait_until="domcontentloaded",
+                        timeout=int(
+                            self._timeout * 1000
+                        ),
+                    )
+
+                    # Give JavaScript/challenge pages a little
+                    # time to finish rendering.
+                    await page.wait_for_timeout(1500)
+
+                    html = await page.content()
+
+                    if html:
+                        return html
+
+                    self._last_error = (
+                        f"browser returned empty HTML: {url}"
+                    )
+
+                    return ""
+
+        except Exception as exc:
+
+            self._last_error = (
+                f"browser fetch failed: "
+                f"{type(exc).__name__}: "
+                f"{str(exc)[:200]}"
+            )
+
+            return ""
+
+    def _company_candidates(
+        self,
+        company_name: str,
+    ) -> list[str]:
+
+        slug = re.sub(
+            r"[^a-z0-9]+",
+            "-",
+            (company_name or "").strip().lower(),
+        ).strip("-")
+
         if not slug:
             return []
+
         return [
             f"https://{slug}.com/careers",
             f"https://www.{slug}.com/careers",
@@ -125,218 +344,642 @@ class WebFetchSource:
             f"https://jobs.lever.co/{slug}",
         ]
 
-    async def _extract(self, url: str, html: str, query: str) -> list[JobPosting]:
+    async def _extract(
+        self,
+        url: str,
+        html: str,
+        query: str,
+    ) -> list[JobPosting]:
+
         postings: list[JobPosting] = []
+
+        # ---------------------------------------------------------
+        # 1. JSON-LD JobPosting
+        # ---------------------------------------------------------
+
         for raw in JsonLdSource._extract_postings(html):
+
             job = JsonLdSource._parse_posting(raw)
+
             if job and job.title:
-                postings.append(self._normalize(job, "jsonld"))
+                postings.append(
+                    self._normalize(
+                        job,
+                        "jsonld",
+                    )
+                )
+
         if postings:
             return postings
+
+        # ---------------------------------------------------------
+        # 2. ATS
+        # ---------------------------------------------------------
+
         ats = self._detect_ats(url)
+
         if ats is not None:
+
             kind, name = ats
-            postings = await self._fetch_ats(kind, name)
+
+            postings = await self._fetch_ats(
+                kind,
+                name,
+            )
+
             if postings:
                 return postings
-        return self._parse_html(url, html, query)
 
-    def _normalize(self, job: JobPosting, via: str) -> JobPosting:
+        # ---------------------------------------------------------
+        # 3. Generic HTML
+        # ---------------------------------------------------------
+
+        return self._parse_html(
+            url,
+            html,
+            query,
+        )
+
+    def _normalize(
+        self,
+        job: JobPosting,
+        via: str,
+    ) -> JobPosting:
+
         job.source = "webfetch"
+
         if not job.id:
-            job.id = self._derive_id(job.post_url or "", job.title)
+            job.id = self._derive_id(
+                job.post_url or "",
+                job.title,
+            )
+
         if not job.post_url:
-            job.post_url = job.id if job.id.startswith("http") else ""
-        raw = dict(job.raw_data or {})
+            job.post_url = (
+                job.id
+                if job.id.startswith("http")
+                else ""
+            )
+
+        raw = dict(
+            job.raw_data or {}
+        )
+
         raw["webfetch_via"] = via
+
         job.raw_data = raw
+
         return job
 
     @staticmethod
-    def _detect_ats(url: str) -> tuple[str, str] | None:
+    def _detect_ats(
+        url: str,
+    ) -> tuple[str, str] | None:
+
         parts = urlsplit(url)
-        host = (parts.netloc or "").lower()
+
+        host = (
+            parts.netloc or ""
+        ).lower()
+
         kind: str | None = None
+
         for suffix, ats_kind in _ATS_HOSTS.items():
-            if host == suffix or host.endswith("." + suffix):
+
+            if (
+                host == suffix
+                or host.endswith("." + suffix)
+            ):
                 kind = ats_kind
                 break
+
         if kind is None:
             return None
-        segments = [segment for segment in parts.path.split("/") if segment]
+
+        segments = [
+            segment
+            for segment in parts.path.split("/")
+            if segment
+        ]
+
         if not segments:
             return None
-        first = segments[0].lower()
-        if first in {"api", "widget", "j", "jobs", "careers", "posting-api"}:
-            return None
-        return (kind, segments[0])
 
-    async def _fetch_ats(self, kind: str, name: str) -> list[JobPosting]:
+        first = segments[0].lower()
+
+        if first in {
+            "api",
+            "widget",
+            "j",
+            "jobs",
+            "careers",
+            "posting-api",
+        }:
+            return None
+
+        return (
+            kind,
+            segments[0],
+        )
+
+    async def _fetch_ats(
+        self,
+        kind: str,
+        name: str,
+    ) -> list[JobPosting]:
+
         try:
-            url = _ATS_API[kind].format(name=name)
+
+            url = _ATS_API[kind].format(
+                name=name,
+            )
+
             async with httpx.AsyncClient(
-                timeout=self._timeout, headers={"User-Agent": USER_AGENT}
+                timeout=self._timeout,
+                headers={
+                    "User-Agent": USER_AGENT,
+                },
             ) as client:
+
                 response = await client.get(url)
+
                 response.raise_for_status()
+
             payload = response.json()
-        except (httpx.HTTPError, ValueError) as exc:
-            self._last_error = f"{kind}:{name}: {type(exc).__name__}: {str(exc)[:200]}"
+
+        except (
+            httpx.HTTPError,
+            ValueError,
+        ) as exc:
+
+            self._last_error = (
+                f"{kind}:{name}: "
+                f"{type(exc).__name__}: "
+                f"{str(exc)[:200]}"
+            )
+
             return []
+
         parser = AtsBoardSource()
+
         jobs: list[JobPosting] = []
         seen: set[str] = set()
-        for row in self._ats_rows(kind, payload):
-            job = parser._parse(kind, row)
-            if not job or not job.id or job.id in seen:
+
+        for row in self._ats_rows(
+            kind,
+            payload,
+        ):
+
+            job = parser._parse(
+                kind,
+                row,
+            )
+
+            if not job:
                 continue
+
+            if not job.id:
+                continue
+
+            if job.id in seen:
+                continue
+
             seen.add(job.id)
-            jobs.append(self._normalize(job, f"ats:{kind}"))
+
+            jobs.append(
+                self._normalize(
+                    job,
+                    f"ats:{kind}",
+                )
+            )
+
         return jobs
 
     @staticmethod
-    def _ats_rows(kind: str, payload: Any) -> list[Any]:
+    def _ats_rows(
+        kind: str,
+        payload: Any,
+    ) -> list[Any]:
+
         if isinstance(payload, dict):
-            rows = payload.get("jobs", [])
-            return rows if isinstance(rows, list) else []
-        if kind == "lever" and isinstance(payload, list):
+
+            rows = payload.get(
+                "jobs",
+                [],
+            )
+
+            return (
+                rows
+                if isinstance(rows, list)
+                else []
+            )
+
+        if (
+            kind == "lever"
+            and isinstance(payload, list)
+        ):
             return payload
+
         return []
 
-    def _parse_html(self, url: str, html: str, query: str) -> list[JobPosting]:
+    def _parse_html(
+        self,
+        url: str,
+        html: str,
+        query: str,
+    ) -> list[JobPosting]:
+
         postings: list[JobPosting] = []
+
         for match in _CARD_RE.finditer(html):
-            job = self._parse_card(url, match.group(2), query)
+
+            job = self._parse_card(
+                url,
+                match.group(2),
+                query,
+            )
+
             if job is not None:
                 postings.append(job)
+
         postings = self._dedupe(postings)
+
         if postings:
             return postings
-        meta = self._parse_meta(url, html)
-        return [meta] if meta is not None else []
 
-    def _parse_card(self, url: str, body: str, query: str) -> JobPosting | None:
+        meta = self._parse_meta(
+            url,
+            html,
+        )
+
+        return (
+            [meta]
+            if meta is not None
+            else []
+        )
+
+    def _parse_card(
+        self,
+        url: str,
+        body: str,
+        query: str,
+    ) -> JobPosting | None:
+
         anchors = [
-            (href.replace("&amp;", "&"), self._clean_text(text))
+            (
+                href.replace("&amp;", "&"),
+                self._clean_text(text),
+            )
             for href, text in _ANCHOR_RE.findall(body)
         ]
+
         title = ""
         detail = ""
-        marked = re.search(r'data-qa="job-card-title"[^>]*>(.*?)<', body, re.S | re.I)
+
+        marked = re.search(
+            r'data-qa="job-card-title"[^>]*>(.*?)<',
+            body,
+            re.S | re.I,
+        )
+
         if marked:
-            title = self._clean_text(marked.group(1))
+            title = self._clean_text(
+                marked.group(1)
+            )
+
         for href, text in anchors:
+
             if self._is_job_detail(href):
+
                 if not detail:
-                    detail = urljoin(url, href)
+                    detail = urljoin(
+                        url,
+                        href,
+                    )
+
                 if not title and text:
                     title = text
+
         if not title:
+
             for href, text in anchors:
-                if self._is_job_href(href) and not title and text:
+
+                if (
+                    self._is_job_href(href)
+                    and not title
+                    and text
+                ):
                     title = text
+
         if not title:
+
             heading = _HEADING_RE.search(body)
+
             if heading:
-                title = self._clean_text(heading.group(1))
+                title = self._clean_text(
+                    heading.group(1)
+                )
+
         if not title:
             return None
+
         return JobPosting(
-            id=detail or self._derive_id(url, title),
+            id=(
+                detail
+                or self._derive_id(
+                    url,
+                    title,
+                )
+            ),
             source="webfetch",
             title=title[:180],
-            company=self._parse_company(body, title) or "",
-            location=self._parse_location(body) or "",
+            company=(
+                self._parse_company(
+                    body,
+                    title,
+                )
+                or ""
+            ),
+            location=(
+                self._parse_location(body)
+                or ""
+            ),
             post_url=detail or url,
-            posted_at=self._parse_posted_at(body),
+            posted_at=self._parse_posted_at(
+                body
+            ),
             raw_data={
-                "description": self._clean_text(re.sub(r"<[^>]+>", " ", body))[:600],
+                "description": self._clean_text(
+                    re.sub(
+                        r"<[^>]+>",
+                        " ",
+                        body,
+                    )
+                )[:600],
                 "webfetch_via": "html",
             },
         )
 
-    def _parse_company(self, body: str, title: str) -> str | None:
+    def _parse_company(
+        self,
+        body: str,
+        title: str,
+    ) -> str | None:
+
         for pattern in (
-            r'data-qa="[^"]*company[^"]*"[^>]*>(.*?)</(?:li|div|span|p|article|a)>',
-            r'data-qa="job-posted-by[^"]*"[^>]*>(.*?)</(?:li|div|span|p|article)>',
-            r'class="[^"]*company[^"]*"[^>]*>(.*?)</(?:li|div|span|p|article)>',
-            r'class="[^"]*org[^"]*"[^>]*>(.*?)</(?:li|div|span|p|article)>',
+
+            r'data-qa="[^"]*company[^"]*"[^>]*>'
+            r'(.*?)</(?:li|div|span|p|article|a)>',
+
+            r'data-qa="job-posted-by[^"]*"[^>]*>'
+            r'(.*?)</(?:li|div|span|p|article)>',
+
+            r'class="[^"]*company[^"]*"[^>]*>'
+            r'(.*?)</(?:li|div|span|p|article)>',
+
+            r'class="[^"]*org[^"]*"[^>]*>'
+            r'(.*?)</(?:li|div|span|p|article)>',
         ):
-            match = re.search(pattern, body, re.I | re.S)
+
+            match = re.search(
+                pattern,
+                body,
+                re.I | re.S,
+            )
+
             if not match:
                 continue
+
             captured = match.group(1)
-            anchor = re.search(r'<a\b[^>]*>(.*?)</a>', captured, re.S | re.I)
-            text = self._clean_text(anchor.group(1) if anchor else captured)
-            text = re.sub(r"^(?:posted|by|at)\s*:?\s*", "", text, flags=re.I).strip()
+
+            anchor = re.search(
+                r'<a\b[^>]*>(.*?)</a>',
+                captured,
+                re.S | re.I,
+            )
+
+            text = self._clean_text(
+                anchor.group(1)
+                if anchor
+                else captured
+            )
+
+            text = re.sub(
+                r"^(?:posted|by|at)\s*:?\s*",
+                "",
+                text,
+                flags=re.I,
+            ).strip()
+
             if text:
                 return text[:80]
+
         title_lower = title.strip().lower()
+
         fallback: str | None = None
+
         for href, text in _ANCHOR_RE.findall(body):
+
             text = self._clean_text(text)
+
             if not text or len(text) > 48:
                 continue
+
             lowered = text.lower()
-            if lowered == title_lower or lowered in _COMPANY_STOPWORDS:
+
+            if (
+                lowered == title_lower
+                or lowered in _COMPANY_STOPWORDS
+            ):
                 continue
-            if any(marker in lowered for marker in ("job", "hide", "view", "share", "save")):
+
+            if any(
+                marker in lowered
+                for marker in (
+                    "job",
+                    "hide",
+                    "view",
+                    "share",
+                    "save",
+                )
+            ):
                 continue
+
             if self._is_job_detail(href):
                 continue
+
             fallback = text
             break
+
         if fallback:
             return fallback[:80]
-        match = re.search(r"\b(?:by|at)\s+([A-Z][A-Za-z0-9&.'-]{1,39})", self._clean_text(body))
-        if match and match.group(1).lower() not in title_lower:
+
+        match = re.search(
+            r"\b(?:by|at)\s+"
+            r"([A-Z][A-Za-z0-9&.'-]{1,39})",
+            self._clean_text(body),
+        )
+
+        if (
+            match
+            and match.group(1).lower()
+            not in title_lower
+        ):
             return match.group(1)
+
         return None
 
-    def _parse_location(self, body: str) -> str | None:
+    def _parse_location(
+        self,
+        body: str,
+    ) -> str | None:
+
         for pattern in (
-            r'data-qa="[^"]*location[^"]*"[^>]*>(.*?)</(?:li|div|span|p|article|td)>',
-            r'class="[^"]*location[^"]*"[^>]*>(.*?)</(?:li|div|span|p|article|td)>',
+
+            r'data-qa="[^"]*location[^"]*"[^>]*>'
+            r'(.*?)</(?:li|div|span|p|article|td)>',
+
+            r'class="[^"]*location[^"]*"[^>]*>'
+            r'(.*?)</(?:li|div|span|p|article|td)>',
         ):
-            match = re.search(pattern, body, re.I | re.S)
+
+            match = re.search(
+                pattern,
+                body,
+                re.I | re.S,
+            )
+
             if match:
-                text = self._clean_text(match.group(1))
+
+                text = self._clean_text(
+                    match.group(1)
+                )
+
                 if text:
                     return text[:120]
+
         return None
 
-    def _parse_posted_at(self, body: str) -> datetime | None:
+    def _parse_posted_at(
+        self,
+        body: str,
+    ) -> datetime | None:
+
         lowered = body.lower()
+
         if "today" in lowered:
             return self._utcnow()
+
         if "yesterday" in lowered:
-            return self._utcnow() - timedelta(days=1)
-        match = _RELATIVE_DATE_RE.search(lowered)
+            return (
+                self._utcnow()
+                - timedelta(days=1)
+            )
+
+        match = _RELATIVE_DATE_RE.search(
+            lowered
+        )
+
         if match:
-            amount = int(match.group(1))
+
+            amount = int(
+                match.group(1)
+            )
+
             unit = match.group(2)
-            return self._utcnow() - self._delta(unit, amount)
-        match = _MONTH_DAY_RE.search(lowered)
+
+            return (
+                self._utcnow()
+                - self._delta(
+                    unit,
+                    amount,
+                )
+            )
+
+        match = _MONTH_DAY_RE.search(
+            lowered
+        )
+
         if match:
-            return self._month_day(int(match.group(1)), _MONTHS_SHORT[match.group(2)])
-        match = _DAY_MONTH_RE.search(lowered)
+
+            return self._month_day(
+                int(match.group(1)),
+                _MONTHS_SHORT[
+                    match.group(2).lower()
+                ],
+            )
+
+        match = _DAY_MONTH_RE.search(
+            lowered
+        )
+
         if match:
-            return self._month_day(int(match.group(2)), _MONTHS_SHORT[match.group(1)])
+
+            return self._month_day(
+                int(match.group(2)),
+                _MONTHS_SHORT[
+                    match.group(1).lower()
+                ],
+            )
+
         return None
 
-    def _parse_meta(self, url: str, html: str) -> JobPosting | None:
-        title = self._meta(html, "og:title") or self._meta(html, "twitter:title")
+    def _parse_meta(
+        self,
+        url: str,
+        html: str,
+    ) -> JobPosting | None:
+
+        title = (
+            self._meta(
+                html,
+                "og:title",
+            )
+            or self._meta(
+                html,
+                "twitter:title",
+            )
+        )
+
         if not title:
             return None
-        detail = self._meta(html, "og:url") or url
-        if not (self._is_job_detail(detail) or self._is_job_detail(url)):
+
+        detail = (
+            self._meta(
+                html,
+                "og:url",
+            )
+            or url
+        )
+
+        if not (
+            self._is_job_detail(detail)
+            or self._is_job_detail(url)
+        ):
             return None
-        description = self._meta(html, "og:description") or self._meta(html, "twitter:description")
+
+        description = (
+            self._meta(
+                html,
+                "og:description",
+            )
+            or self._meta(
+                html,
+                "twitter:description",
+            )
+        )
+
         return JobPosting(
             id=detail,
             source="webfetch",
             title=title[:180],
-            company=self._meta(html, "og:site_name") or "",
+            company=(
+                self._meta(
+                    html,
+                    "og:site_name",
+                )
+                or ""
+            ),
             location="",
             post_url=detail,
             raw_data={
@@ -346,81 +989,236 @@ class WebFetchSource:
         )
 
     @staticmethod
-    def _meta(html: str, key: str) -> str:
-        for pattern in (
-            r'<meta\b[^>]*?(?:property|name)=["\']%s["\'][^>]*?(?:content|value)=["\']([^"\']*)["\']'
+    def _meta(
+        html: str,
+        key: str,
+    ) -> str:
+
+        patterns = (
+
+            r'<meta\b[^>]*?'
+            r'(?:property|name)=["\']%s["\']'
+            r'[^>]*?'
+            r'(?:content|value)=["\']([^"\']*)["\']'
             % re.escape(key),
-            r'<meta\b[^>]*?(?:content|value)=["\']([^"\']*)["\'][^>]*?(?:property|name)=["\']%s["\']'
+
+            r'<meta\b[^>]*?'
+            r'(?:content|value)=["\']([^"\']*)["\']'
+            r'[^>]*?'
+            r'(?:property|name)=["\']%s["\']'
             % re.escape(key),
-        ):
-            match = re.search(pattern, html, re.I)
+        )
+
+        for pattern in patterns:
+
+            match = re.search(
+                pattern,
+                html,
+                re.I,
+            )
+
             if match:
-                return html_module.unescape(match.group(1)).strip()
+
+                return html_module.unescape(
+                    match.group(1)
+                ).strip()
+
         return ""
 
     @staticmethod
-    def _is_job_href(href: str) -> bool:
-        lowered = href.lower().split("?")[0].rstrip("/")
-        return bool(re.search(r"/(?:jobs|job|positions?|careers)/", lowered)) or lowered.endswith(
-            ("/jobs", "/job", "/positions", "/careers")
+    def _is_job_href(
+        href: str,
+    ) -> bool:
+
+        lowered = (
+            href.lower()
+            .split("?")[0]
+            .rstrip("/")
+        )
+
+        return bool(
+            re.search(
+                r"/(?:jobs|job|positions?|careers)/",
+                lowered,
+            )
+        ) or lowered.endswith(
+            (
+                "/jobs",
+                "/job",
+                "/positions",
+                "/careers",
+            )
         )
 
     @staticmethod
-    def _is_job_detail(href: str) -> bool:
-        lowered = href.lower().split("?")[0].rstrip("/")
-        if not re.search(r"/(?:jobs|job|positions?|careers)/", lowered):
+    def _is_job_detail(
+        href: str,
+    ) -> bool:
+
+        lowered = (
+            href.lower()
+            .split("?")[0]
+            .rstrip("/")
+        )
+
+        # Must contain a job-related path segment.
+        if not re.search(
+            r"/(?:jobs?|positions?|careers?|openings?)/",
+            lowered,
+        ):
             return False
-        last = lowered.rsplit("/", 1)[-1]
-        return bool(last) and last.isdigit()
+
+        last = lowered.rsplit(
+            "/",
+            1,
+        )[-1]
+
+        if not last:
+            return False
+
+        # Reject listing pages.
+        listing_names = {
+            "jobs",
+            "job",
+            "careers",
+            "career",
+            "positions",
+            "position",
+            "openings",
+            "opening",
+            "search",
+        }
+
+        return last not in listing_names
 
     @staticmethod
-    def _clean_text(value: str) -> str:
-        return " ".join(re.sub(r"<[^>]+>", " ", value or "").split())
+    def _clean_text(
+        value: str,
+    ) -> str:
+
+        return " ".join(
+            re.sub(
+                r"<[^>]+>",
+                " ",
+                value or "",
+            ).split()
+        )
 
     @staticmethod
-    def _derive_id(url: str, title: str = "") -> str:
-        material = f"{url}|{title}".encode("utf-8", "ignore")
-        return hashlib.sha1(material).hexdigest()[:16]
+    def _derive_id(
+        url: str,
+        title: str = "",
+    ) -> str:
+
+        material = (
+            f"{url}|{title}"
+        ).encode(
+            "utf-8",
+            "ignore",
+        )
+
+        return hashlib.sha1(
+            material
+        ).hexdigest()[:16]
 
     @staticmethod
     def _utcnow() -> datetime:
-        return datetime.now(timezone.utc)
+        return datetime.now(
+            timezone.utc
+        )
 
     @staticmethod
-    def _delta(unit: str, amount: int) -> timedelta:
+    def _delta(
+        unit: str,
+        amount: int,
+    ) -> timedelta:
+
         return {
-            "minute": timedelta(minutes=amount),
-            "hour": timedelta(hours=amount),
-            "day": timedelta(days=amount),
-            "week": timedelta(weeks=amount),
-            "month": timedelta(days=30 * amount),
-            "year": timedelta(days=365 * amount),
-        }.get(unit, timedelta(0))
+            "minute": timedelta(
+                minutes=amount
+            ),
+            "hour": timedelta(
+                hours=amount
+            ),
+            "day": timedelta(
+                days=amount
+            ),
+            "week": timedelta(
+                weeks=amount
+            ),
+            "month": timedelta(
+                days=30 * amount
+            ),
+            "year": timedelta(
+                days=365 * amount
+            ),
+        }.get(
+            unit,
+            timedelta(0),
+        )
 
     @staticmethod
-    def _month_day(day: int, month: int) -> datetime | None:
-        now = datetime.now(timezone.utc)
+    def _month_day(
+        day: int,
+        month: int,
+    ) -> datetime | None:
+
+        now = datetime.now(
+            timezone.utc
+        )
+
         try:
-            when = datetime(now.year, month, day, tzinfo=timezone.utc)
+
+            when = datetime(
+                now.year,
+                month,
+                day,
+                tzinfo=timezone.utc,
+            )
+
         except ValueError:
             return None
+
         if when > now:
-            when = when.replace(year=now.year - 1)
+            when = when.replace(
+                year=now.year - 1
+            )
+
         return when
 
     @staticmethod
-    def _dedupe(jobs: list[JobPosting]) -> list[JobPosting]:
+    def _dedupe(
+        jobs: list[JobPosting],
+    ) -> list[JobPosting]:
+
         seen: set[str] = set()
         unique: list[JobPosting] = []
+
         for job in jobs:
-            if not job.id or job.id in seen:
+
+            if not job.id:
                 continue
+
+            if job.id in seen:
+                continue
+
             seen.add(job.id)
             unique.append(job)
+
         return unique
 
 
 _MONTHS_SHORT = {
-    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+    "jan": 1,
+    "feb": 2,
+    "mar": 3,
+    "apr": 4,
+    "may": 5,
+    "jun": 6,
+    "jul": 7,
+    "aug": 8,
+    "sep": 9,
+    "oct": 10,
+    "nov": 11,
+    "dec": 12,
 }
