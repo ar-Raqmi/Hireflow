@@ -21,7 +21,7 @@ Come back anytime and hit **"Check for new jobs"** — the agent re-runs, and ev
 
 ## Architecture
 
-![Hireflow architecture](docs/architecture.svg)
+![Hireflow architecture](docs/architecture.png)
 
 The live pipeline runs as eight SSE-streamed stages: `parse → audit → search → match → career → research → prepare → approve`.
 
