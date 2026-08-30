@@ -88,16 +88,6 @@ clients/hireflow.sh                 # prompts + streams live SSE progress
 python -m hireflow.cli ./resume.pdf --work-type hybrid --location "Kuala Lumpur"
 ```
 
-## What is real (verified 2026-08-30, live on the deployed Cloud Run)
-
-- **The full pipeline ran end-to-end on the `.run.app` url** — a real run streamed `parse → audit → search → match → career → research → prepare → approve` and returned 10 ranked matches with drafts; `/approve` submitted to the sandbox ATS (`SUBMITTED` + `HFS-…` confirmation).
-- **Real Gemini 3.5 Flash via Vertex AI** — every agent calls the same `GeminiClient` (the only LLM entry point; no mocks or stubs). Résumé parsing is real Gemini (text, or vision via PyMuPDF page renders when text is thin), and uploads are gated by an AI résumé-classifier + ATS-health audit.
-- **Search is an agent, not a keyword matcher** — Gemini query expansion per role, multiple query variants per source, then gate-then-cap: work-type + location + recency gates, cross-run seen-job dedup (driven by your browser), per-company diversity cap.
-- **Global keyless source registry** (curl-verified): freehire (193 countries + `seek`/`mycareersfuture` regional relays), RemoteOK, Remotive, LinkedIn guest, ATS boards (Greenhouse, Ashby), plus Gemini **grounded web search** + universal webfetch as the catch-all layer. Dead sources (Lever, Workable) are coded but disabled, not claimed.
-- **React frontend verified in-browser against the real backend** — SSE timeline animates from the live stream; watcher ux (new-since-last-check re-ranking, "check for new jobs") works against real runs.
-
-Reproduce the proof yourself: `docs/CURL_E2E.md` is the exact curl sequence (health → upload → run → SSE → approve) against the live url.
-
 ## Design decisions worth a look (judges' cliff notes)
 
 - **Client-owned persistence, stateless backend.** No database anywhere: preferences, seen-job memory, and history live in browser `localStorage`, so Cloud Run can scale to zero between checks. The watcher model survives server restarts because the *browser* remembers.
