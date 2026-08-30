@@ -37,7 +37,6 @@ The live pipeline runs as eight SSE-streamed stages: `parse → audit → search
 │   ├── CURL_E2E.md         # exact curl acceptance playbook against the live url
 │   ├── DEPLOY.md           # one-command Cloud Run deploy
 │   ├── GCP_SETUP.md        # one-time GCP runbook (apis, IAM, embeddings)
-│   └── VIDEO_SCRIPT.md     # ≤4-min demo video storyboard
 ├── frontend/           # vite + react app (m3e components) — the real ui, calls the live backend
 ├── hireflow/           # fastapi backend
 │   ├── api/app.py      #   /upload /pipeline/run(+SSE) /approve /sandbox/ats
