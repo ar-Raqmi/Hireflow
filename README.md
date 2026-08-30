@@ -105,16 +105,3 @@ python -m hireflow.cli ./resume.pdf --work-type hybrid --location "Kuala Lumpur"
 ## Stack
 
 Gemini 3.5 Flash (Vertex AI) · Google ADK (Python) · FastAPI · Cloud Run · Vite + React (@m3e/react Material 3 Expressive) · PyMuPDF / pypdf / python-docx
-
-## Hackathon compliance (RULES.md)
-
-| Requirement | Status |
-|---|---|
-| Gemini 3.5+ via Gemini API/Vertex AI | ✓ Vertex AI primary, `gemini-3.5-flash` |
-| Google Agent Framework | ✓ Google ADK (`adk_router.py`, live in every run) |
-| Google Cloud infrastructure | ✓ Cloud Run (scale-to-zero) + Vertex AI |
-| Hosted public URL | ✓ backend `.run.app` + frontend Vercel |
-| Spin-up instructions | ✓ this readme (options A–D) |
-| Architecture diagram | ✓ `docs/architecture.svg` |
-| Demo video ≤4 min | storyboard ready (`docs/VIDEO_SCRIPT.md`) — recording in progress |
-| Repo access for judging | grant `testing@devpost.com` + `cloudhackathons@google.com` before submitting |
