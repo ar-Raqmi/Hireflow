@@ -48,7 +48,6 @@ The live pipeline runs as eight SSE-streamed stages: `parse → audit → search
 │   └── storage/        #   in-memory repository (stateless; browser owns persistence)
 ├── prototype/          # retired clickable html mock (reference only)
 ├── Dockerfile          # python:3.11-slim → uvicorn :8080 (cloud run)
-└── RULES.md            # official hackathon rules (source of truth)
 ```
 
 ## Run it
