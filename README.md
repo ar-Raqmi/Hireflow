@@ -8,7 +8,7 @@ by ar-Raqmi and Izaaz
 
 ## What it is
 
-Hireflow is a **watcher**, not a chatbot. You upload a résumé once and set your work-type, location, and role preferences. Five AI agents then take over the messy multi-step chore of job hunting: they search a global registry of keyless job sources, expand your target roles into synonym queries, score every posting against your résumé, probe the matched companies' own careers pages for jobs boards miss, research the companies, and draft a tailored CV + cover letter per match.
+Hireflow is a **watcher**, not a chatbot. Upload your résumé and set your work-type, location, and role preferences. Five AI agents then take over the messy multi-step chore of job hunting: they will search a global registry of keyless job sources, expand your target roles into synonym queries, score every job boards against your résumé, probe the matched companies' own careers pages for missed jobs boards, research the companies, and draft a CV + cover letter for top 5 job boards that matches with your resume.
 
 Come back anytime and hit **"Check for new jobs"** — the agent re-runs, and every role that appeared **since your last check is re-ranked on top** with a NEW badge. You decide which applications to pursue. The **final submission is intentionally human-gated**: most job boards are anti-bot/Cloudflare-locked and applying on your behalf is not something an agent should do silently — so Hireflow does everything autonomously up to the last click, then the human approves.
 
@@ -16,7 +16,7 @@ Come back anytime and hit **"Check for new jobs"** — the agent re-runs, and ev
 
 | | URL |
 |---|---|
-| React app | https://hireflow-pi-five.vercel.app |
+| Vercel app | https://hireflow-pi-five.vercel.app |
 | Cloud Run backend | https://hireflow-backend-296941301245.us-central1.run.app (`/health`, `/docs`) |
 
 ## Architecture
@@ -78,7 +78,7 @@ curl -s localhost:8080/health   # {"status":"ok"}
 
 ```bash
 gcloud run deploy hireflow-backend --region us-central1 --source . \
-  --allow-unauthenticated --memory 1Gi --timeout 3600
+  --allow-unauthenticated --memory 4Gi --cpu 2 --timeout 3600
 ```
 
 **Terminal client** (online-only thin client of the deployed api):
@@ -88,7 +88,7 @@ clients/hireflow.sh                 # prompts + streams live SSE progress
 python -m hireflow.cli ./resume.pdf --work-type hybrid --location "Kuala Lumpur"
 ```
 
-## What is real (verified 2026-08-27, live on the deployed Cloud Run)
+## What is real (verified 2026-08-30, live on the deployed Cloud Run)
 
 - **The full pipeline ran end-to-end on the `.run.app` url** — a real run streamed `parse → audit → search → match → career → research → prepare → approve` and returned 10 ranked matches with drafts; `/approve` submitted to the sandbox ATS (`SUBMITTED` + `HFS-…` confirmation).
 - **Real Gemini 3.5 Flash via Vertex AI** — every agent calls the same `GeminiClient` (the only LLM entry point; no mocks or stubs). Résumé parsing is real Gemini (text, or vision via PyMuPDF page renders when text is thin), and uploads are gated by an AI résumé-classifier + ATS-health audit.
@@ -110,7 +110,7 @@ Reproduce the proof yourself: `docs/CURL_E2E.md` is the exact curl sequence (hea
 - No real auto-submission to employers (sandbox ATS only) — by design.
 - No follow-up emails/tracking, no Cloud Scheduler polling.
 - Backend is stateless in-memory: job history beyond the current run lives in the browser only.
-- The browser-assisted fetch pass (Playwright) is in code (2026-08-28) and pending a redeploy + live e2e before it counts.
+- Playwright that can pass Cloudflare/anti-bot is not built.
 
 ## Stack
 
